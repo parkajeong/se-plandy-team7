@@ -1,4 +1,4 @@
-# se-study-mate-team7
+# se-plandy-team7
 
 ## 협업 가이드
 
