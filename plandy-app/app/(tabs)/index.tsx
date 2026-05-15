@@ -1,8 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Button, Text, TextInput, View } from "react-native";
-import { loginWithIdOrEmail, signUpWithEmail } from "../../src/authService";
+import { onAuthStateChanged, User } from "firebase/auth";
+import {
+  loginWithIdOrEmail,
+  signUpWithEmail,
+  logout,
+} from "../../src/authService";
+import { auth } from "../../src/firebase";
 
 export default function HomeScreen() {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isSignUpMode, setIsSignUpMode] = useState(false);
 
   // 로그인: 아이디 또는 이메일
@@ -16,6 +23,14 @@ export default function HomeScreen() {
 
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+
+    return unsubscribe;
+  }, []);
 
   const handleSignUp = async () => {
     if (!email || !password || !nickname || !loginId) {
@@ -59,6 +74,43 @@ export default function HomeScreen() {
       Alert.alert("로그인 실패", error.message);
     }
   };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+
+      setIdOrEmail("");
+      setEmail("");
+      setLoginId("");
+      setNickname("");
+      setPassword("");
+      setShowPassword(false);
+      setIsSignUpMode(false);
+
+      Alert.alert("로그아웃 성공");
+    } catch (error: any) {
+      Alert.alert("로그아웃 실패", error.message);
+    }
+  };
+
+  // 로그인 상태일 때 보여줄 테스트용 빈 화면
+  if (currentUser) {
+    return (
+      <View style={{ padding: 24, marginTop: 60 }}>
+        <Text style={{ fontSize: 24, marginBottom: 20 }}>
+          테스트용 로그인 완료 화면
+        </Text>
+
+        <Text style={{ marginBottom: 8 }}>로그인 상태입니다.</Text>
+
+        <Text style={{ marginBottom: 20 }}>
+          현재 계정: {currentUser.email}
+        </Text>
+
+        <Button title="로그아웃" onPress={handleLogout} />
+      </View>
+    );
+  }
 
   return (
     <View style={{ padding: 24, marginTop: 60 }}>
