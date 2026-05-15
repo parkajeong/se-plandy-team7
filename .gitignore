@@ -25,6 +25,7 @@ GoogleService-Info.plist
 /android
 plandy-app/ios
 plandy-app/android
+android/local.properties
 
 # logs
 npm-debug.*

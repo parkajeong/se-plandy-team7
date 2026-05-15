@@ -5,6 +5,7 @@ import {
   loginWithIdOrEmail,
   signUpWithEmail,
   logout,
+  loginWithGoogle,
 } from "../../src/authService";
 import { auth } from "../../src/firebase";
 
@@ -60,6 +61,22 @@ export default function HomeScreen() {
       Alert.alert("회원가입 실패", error.message);
     }
   };
+
+  const handleGoogleLogin = async () => {
+  try {
+    await loginWithGoogle();
+    Alert.alert("구글 로그인 성공");
+  } catch (error: any) {
+    Alert.alert("구글 로그인 실패", error.message);
+  }
+};
+
+const handleKakaoLogin = async () => {
+  Alert.alert(
+    "준비 중",
+    "카카오 로그인은 Firebase Custom Token 서버 연동 후 구현 예정입니다."
+  );
+};
 
   const handleLogin = async () => {
     if (!idOrEmail || !password) {
@@ -213,6 +230,18 @@ export default function HomeScreen() {
       ) : (
         <Button title="로그인" onPress={handleLogin} />
       )}
+
+      {!isSignUpMode && (
+      <>
+    <View style={{ height: 12 }} />
+
+    <Button title="구글로 로그인" onPress={handleGoogleLogin} />
+
+    <View style={{ height: 12 }} />
+
+    <Button title="카카오로 로그인" onPress={handleKakaoLogin} />
+      </>
+    )}
 
       <View style={{ height: 12 }} />
 

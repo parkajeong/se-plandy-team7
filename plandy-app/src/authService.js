@@ -3,13 +3,21 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  GoogleAuthProvider,
+  signInWithCredential,
 } from "firebase/auth";
 import {
   doc,
   getDoc,
   runTransaction,
   serverTimestamp,
+  setDoc,
 } from "firebase/firestore";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
+
+GoogleSignin.configure({
+  webClientId: "116925888955-o5mak3tjasjbb27np3l74b2kqhoint81.apps.googleusercontent.com",
+});
 
 export const signUpWithEmail = async ({ email, password, loginId, nickname }) => {
   const trimmedEmail = email.trim();
@@ -103,4 +111,37 @@ export const loginWithIdOrEmail = async (idOrEmail, password) => {
 
 export const logout = async () => {
   await signOut(auth);
+};
+
+export const loginWithGoogle = async () => {
+  await GoogleSignin.hasPlayServices();
+
+  const googleUser = await GoogleSignin.signIn();
+
+  const idToken = googleUser.data?.idToken || googleUser.idToken;
+
+  if (!idToken) {
+    throw new Error("구글 로그인 토큰을 가져오지 못했습니다.");
+  }
+
+  const googleCredential = GoogleAuthProvider.credential(idToken);
+
+  const userCredential = await signInWithCredential(auth, googleCredential);
+  const user = userCredential.user;
+
+  const userRef = doc(db, "users", user.uid);
+  const userSnap = await getDoc(userRef);
+
+  if (!userSnap.exists()) {
+    await setDoc(userRef, {
+      uid: user.uid,
+      email: user.email || "",
+      loginId: "",
+      nickname: user.displayName || "",
+      provider: "google",
+      created_at: serverTimestamp(),
+    });
+  }
+
+  return user;
 };
