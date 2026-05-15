@@ -1,38 +1,59 @@
 import { useState } from "react";
 import { Alert, Button, Text, TextInput, View } from "react-native";
-import { loginWithEmail, signUpWithEmail } from "../../src/authService";
+import { loginWithIdOrEmail, signUpWithEmail } from "../../src/authService";
 
 export default function HomeScreen() {
   const [isSignUpMode, setIsSignUpMode] = useState(false);
 
+  // 로그인: 아이디 또는 이메일
+  // 회원가입: 이메일
+  const [idOrEmail, setIdOrEmail] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
 
   // 회원가입할 때만 사용
+  const [loginId, setLoginId] = useState("");
   const [nickname, setNickname] = useState("");
 
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
   const handleSignUp = async () => {
-    if (!email || !password || !nickname) {
-      Alert.alert("입력 오류", "이메일, 비밀번호, 닉네임을 모두 입력하세요.");
+    if (!email || !password || !nickname || !loginId) {
+      Alert.alert("입력 오류", "아이디, 이메일, 비밀번호, 닉네임을 모두 입력하세요.");
       return;
     }
 
     try {
-      await signUpWithEmail(email, password, nickname);
+      await signUpWithEmail({
+        email,
+        password,
+        loginId,
+        nickname,
+      });
+
       Alert.alert("회원가입 성공");
+      setIsSignUpMode(false);
+
+      // 회원가입 후 로그인 입력칸에 이메일 자동 입력
+      setIdOrEmail(email);
+
+      // 회원가입 입력값 초기화
+      setLoginId("");
+      setNickname("");
+      setPassword("");
     } catch (error: any) {
       Alert.alert("회원가입 실패", error.message);
     }
   };
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("입력 오류", "이메일과 비밀번호를 입력하세요.");
+    if (!idOrEmail || !password) {
+      Alert.alert("입력 오류", "아이디 또는 이메일과 비밀번호를 입력하세요.");
       return;
     }
 
     try {
-      await loginWithEmail(email, password);
+      await loginWithIdOrEmail(idOrEmail, password);
       Alert.alert("로그인 성공");
     } catch (error: any) {
       Alert.alert("로그인 실패", error.message);
@@ -45,32 +66,81 @@ export default function HomeScreen() {
         {isSignUpMode ? "회원가입" : "로그인"}
       </Text>
 
-      <TextInput
-        placeholder="이메일"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        style={{
-          borderWidth: 1,
-          padding: 12,
-          marginBottom: 12,
-          borderRadius: 8,
-        }}
-      />
+      {isSignUpMode ? (
+        <>
+          <TextInput
+            placeholder="아이디"
+            value={loginId}
+            onChangeText={setLoginId}
+            autoCapitalize="none"
+            style={{
+              borderWidth: 1,
+              padding: 12,
+              marginBottom: 12,
+              borderRadius: 8,
+            }}
+          />
 
-      <TextInput
-        placeholder="비밀번호"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
+          <TextInput
+            placeholder="이메일"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            style={{
+              borderWidth: 1,
+              padding: 12,
+              marginBottom: 12,
+              borderRadius: 8,
+            }}
+          />
+        </>
+      ) : (
+        <TextInput
+          placeholder="아이디 또는 이메일"
+          value={idOrEmail}
+          onChangeText={setIdOrEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          style={{
+            borderWidth: 1,
+            padding: 12,
+            marginBottom: 12,
+            borderRadius: 8,
+          }}
+        />
+      )}
+
+      <View
         style={{
           borderWidth: 1,
-          padding: 12,
           marginBottom: 12,
           borderRadius: 8,
+          flexDirection: "row",
+          alignItems: "center",
         }}
-      />
+      >
+        <TextInput
+          placeholder="비밀번호"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+          style={{
+            flex: 1,
+            padding: 12,
+          }}
+        />
+
+        <Text
+          onPress={() => setShowPassword(!showPassword)}
+          style={{
+            paddingHorizontal: 12,
+            color: "blue",
+          }}
+        >
+          {showPassword ? "숨기기" : "보기"}
+        </Text>
+      </View>
 
       {isSignUpMode && (
         <TextInput
@@ -96,7 +166,10 @@ export default function HomeScreen() {
 
       <Button
         title={isSignUpMode ? "이미 계정이 있나요? 로그인" : "계정이 없나요? 회원가입"}
-        onPress={() => setIsSignUpMode(!isSignUpMode)}
+        onPress={() => {
+          setIsSignUpMode(!isSignUpMode);
+          setPassword("");
+        }}
       />
     </View>
   );
