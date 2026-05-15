@@ -49,3 +49,7 @@ app-example
 # generated native folders
 /ios
 /android
+
+# IDE
+.vscode/
+**/.vscode/
