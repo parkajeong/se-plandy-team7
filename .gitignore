@@ -1,0 +1,40 @@
+# dependencies
+node_modules/
+**/node_modules/
+
+# Expo
+.expo/
+**/.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# env
+.env
+.env.local
+.env.development
+.env.production
+.env*.local
+
+# Firebase
+google-services.json
+GoogleService-Info.plist
+
+# Native generated
+/ios
+/android
+plandy-app/ios
+plandy-app/android
+android/local.properties
+
+# logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+**/.vscode/

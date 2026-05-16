@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Plandy",
+    "slug": "plandy-app",
+    "scheme": "plandy",
+    "android": {
+      "package": "com.plandy.app",
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": [
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraMavenRepos": [
+              "https://devrepo.kakao.com/nexus/content/groups/public/"
+            ]
+          }
+        }
+      ]
+    ]
+  }
+}
