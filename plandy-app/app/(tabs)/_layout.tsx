@@ -37,6 +37,12 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="book.fill" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="todo"
+        options={{
+          title: '투두리스트',
+        }}
+      />
     </Tabs>
   );
 }
