@@ -36,9 +36,11 @@ export default function NoteScreen() {
 
     try {
       await addDoc(collection(db, "notes"), {
-        subject,
-        content,
-        createdAt: new Date(),
+        user_id: "test-user",
+        subject_id: subject,
+        title: subject,
+        content: content,
+        updated_at: new Date(),
       });
 
       Alert.alert("성공", "노트가 저장되었습니다.");
@@ -61,7 +63,7 @@ export default function NoteScreen() {
     try {
       const q = query(
         collection(db, "notes"),
-        where("subject", "==", searchSubject)
+        where("subject_id", "==", searchSubject)
       );
 
       const querySnapshot = await getDocs(q);
@@ -128,8 +130,13 @@ export default function NoteScreen() {
         }
         renderItem={({ item }) => (
           <View style={styles.card}>
-            <Text style={styles.subject}>{item.subject}</Text>
-            <Text style={styles.noteText}>{item.content}</Text>
+            <Text style={styles.subject}>
+              {item.subject_id}
+            </Text>
+
+            <Text style={styles.noteText}>
+              {item.content}
+            </Text>
           </View>
         )}
       />

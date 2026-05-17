@@ -41,10 +41,14 @@ export default function ScheduleScreen() {
         });
       });
 
+      // start_time 기준 날짜 빠른 순 정렬
       data.sort((a, b) => {
-        return new Date(a.date).getTime() - new Date(b.date).getTime();
+        return (
+          new Date(a.start_time).getTime() -
+          new Date(b.start_time).getTime()
+        );
       });
-      
+
       setSchedules(data);
     } catch (error) {
       console.log(error);
@@ -65,10 +69,12 @@ export default function ScheduleScreen() {
 
     try {
       await addDoc(collection(db, "schedules"), {
-        title,
-        date,
-        type,
-        createdAt: new Date(),
+        user_id: "test-user",
+        title: title,
+        start_time: date,
+        end_time: date,
+        description: type,
+        created_at: new Date(),
       });
 
       Alert.alert("성공", "일정이 등록되었습니다.");
@@ -136,11 +142,11 @@ export default function ScheduleScreen() {
             </Text>
 
             <Text style={styles.scheduleText}>
-              날짜: {item.date}
+              날짜: {item.start_time}
             </Text>
 
             <Text style={styles.scheduleText}>
-              유형: {item.type}
+              유형: {item.description}
             </Text>
 
           </View>
