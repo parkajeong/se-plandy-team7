@@ -3,8 +3,10 @@ import {
   Alert,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   SafeAreaView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -167,6 +169,7 @@ export default function TodoScreen() {
           <Text style={[styles.todoTitle, isCompleted && styles.completedText]}>
             {item.title}
           </Text>
+
           <Text style={styles.statusBadge}>
             {isCompleted ? '완료' : '진행중'}
           </Text>
@@ -217,7 +220,7 @@ export default function TodoScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.screenTitle}>투두리스트</Text>
+        <Text style={styles.screenTitle}>TodoList</Text>
 
         <Pressable style={styles.addButton} onPress={openCreateModal}>
           <Text style={styles.addButtonText}>+ 할 일 등록</Text>
@@ -331,7 +334,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop:
+      Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) + 28 : 28,
   },
   header: {
     alignItems: 'center',
@@ -417,7 +423,10 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     backgroundColor: '#ffffff',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop:
+      Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) + 28 : 28,
   },
   modalTitle: {
     color: '#111827',
