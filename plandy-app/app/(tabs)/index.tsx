@@ -6,7 +6,6 @@ import {
   signUpWithEmail,
   logout,
   loginWithGoogle,
-  isGoogleSignInSupported,
 } from "../../src/authService";
 import { auth } from "../../src/firebase";
 
@@ -240,14 +239,9 @@ const handleKakaoLogin = async () => {
 
       {!isSignUpMode && (
       <>
-    {isGoogleSignInSupported && (
-      <>
         <View style={{ height: 12 }} />
 
         <Button title="구글로 로그인" onPress={handleGoogleLogin} />
-      </>
-    )}
-
     <View style={{ height: 12 }} />
 
     <Button title="카카오로 로그인" onPress={handleKakaoLogin} />

@@ -5,6 +5,7 @@ import {
   signOut,
   GoogleAuthProvider,
   signInWithCredential,
+  signInWithPopup,
 } from "firebase/auth";
 import {
   doc,
@@ -19,14 +20,25 @@ import {
   isErrorWithCode,
   statusCodes,
 } from "@react-native-google-signin/google-signin";
+import { Platform } from "react-native";
 
 const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+const isWeb = Platform.OS === "web";
 
-GoogleSignin.configure({
-  webClientId: googleWebClientId,
-});
+if (!isWeb) {
+  GoogleSignin.configure({
+    webClientId: googleWebClientId,
+  });
+}
 
 export const signUpWithEmail = async ({ email, password, loginId, nickname }) => {
+  console.log("[signUpWithEmail] called", {
+    email,
+    loginId,
+    nickname,
+    passwordLength: password?.length ?? 0,
+  });
+
   const trimmedEmail = email.trim();
   const trimmedLoginId = loginId.trim();
   const trimmedNickname = nickname.trim();
@@ -117,11 +129,42 @@ export const loginWithIdOrEmail = async (idOrEmail, password) => {
 };
 
 export const logout = async () => {
-  await GoogleSignin.signOut().catch(() => {});
+  if (!isWeb) {
+    await GoogleSignin.signOut().catch(() => {});
+  }
+
   await signOut(auth);
 };
 
+const createGoogleUserDocumentIfNeeded = async (user) => {
+  const userRef = doc(db, "users", user.uid);
+  const userSnap = await getDoc(userRef);
+
+  if (!userSnap.exists()) {
+    await setDoc(userRef, {
+      uid: user.uid,
+      email: user.email || "",
+      loginId: "",
+      nickname: user.displayName || "",
+      provider: "google",
+      created_at: serverTimestamp(),
+    });
+  }
+};
+
 export const loginWithGoogle = async () => {
+  if (isWeb) {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+
+    const userCredential = await signInWithPopup(auth, provider);
+    const user = userCredential.user;
+
+    await createGoogleUserDocumentIfNeeded(user);
+
+    return user;
+  }
+
   if (!googleWebClientId) {
     throw new Error("Google Web Client ID가 설정되지 않았습니다.");
   }
@@ -148,19 +191,7 @@ export const loginWithGoogle = async () => {
     const userCredential = await signInWithCredential(auth, googleCredential);
     const user = userCredential.user;
 
-    const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDoc(userRef);
-
-    if (!userSnap.exists()) {
-      await setDoc(userRef, {
-        uid: user.uid,
-        email: user.email || "",
-        loginId: "",
-        nickname: user.displayName || "",
-        provider: "google",
-        created_at: serverTimestamp(),
-      });
-    }
+    await createGoogleUserDocumentIfNeeded(user);
 
     return user;
   } catch (error) {
