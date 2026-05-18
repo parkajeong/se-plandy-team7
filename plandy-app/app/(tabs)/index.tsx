@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Text, TextInput, View } from "react-native";
 import { onAuthStateChanged, User } from "firebase/auth";
 import {
@@ -15,6 +15,8 @@ export default function HomeScreen() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentAppUser, setCurrentAppUser] = useState<any | null>(getAppUser());
   const [isSignUpMode, setIsSignUpMode] = useState(false);
+  const [isKakaoLoginLoading, setIsKakaoLoginLoading] = useState(false);
+  const kakaoLoginInProgressRef = useRef(false);
 
   const [idOrEmail, setIdOrEmail] = useState("");
   const [email, setEmail] = useState("");
@@ -88,12 +90,22 @@ export default function HomeScreen() {
   const handleKakaoLogin = async () => {
     console.log("[handleKakaoLogin] 카카오 버튼 클릭됨");
 
+    if (kakaoLoginInProgressRef.current) {
+      console.log("[handleKakaoLogin] ignored duplicate click");
+      return;
+    }
+
     try {
+      kakaoLoginInProgressRef.current = true;
+      setIsKakaoLoginLoading(true);
       const kakaoUser = await loginWithKakao();
       setCurrentAppUser(kakaoUser);
       Alert.alert("카카오 로그인 성공");
     } catch (error: any) {
       Alert.alert("카카오 로그인 실패", error.message);
+    } finally {
+      kakaoLoginInProgressRef.current = false;
+      setIsKakaoLoginLoading(false);
     }
   };
 
@@ -251,7 +263,11 @@ export default function HomeScreen() {
 
           <View style={{ height: 12 }} />
 
-          <Button title="카카오로 로그인" onPress={handleKakaoLogin} />
+          <Button
+            title={isKakaoLoginLoading ? "카카오 로그인 중..." : "카카오로 로그인"}
+            onPress={handleKakaoLogin}
+            disabled={isKakaoLoginLoading}
+          />
         </>
       )}
 

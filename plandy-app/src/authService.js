@@ -1,13 +1,13 @@
-import { auth, db } from "./firebase";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
+import * as WebBrowser from "expo-web-browser";
+import { Platform } from "react-native";
 import {
   createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
   GoogleAuthProvider,
   signInWithCredential,
+  signInWithEmailAndPassword,
+  signOut,
 } from "firebase/auth";
-import * as Linking from "expo-linking";
-import * as WebBrowser from "expo-web-browser";
 import {
   doc,
   getDoc,
@@ -15,14 +15,18 @@ import {
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { clearAppUser, setAppUser } from "./appSession";
+import { auth, db } from "./firebase";
 
 WebBrowser.maybeCompleteAuthSession();
 
-GoogleSignin.configure({
-  webClientId: "116925888955-o5mak3tjasjbb27np3l74b2kqhoint81.apps.googleusercontent.com",
-});
+const isWeb = Platform.OS === "web";
+
+if (!isWeb) {
+  GoogleSignin.configure({
+    webClientId: "116925888955-o5mak3tjasjbb27np3l74b2kqhoint81.apps.googleusercontent.com",
+  });
+}
 
 const KAKAO_REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY;
 const KAKAO_REDIRECT_URI = "http://localhost:8081/kakao-auth";
@@ -169,26 +173,43 @@ const createKakaoUserDocumentIfNeeded = async (user) => {
 };
 
 const exchangeKakaoCodeForToken = async ({ code, redirectUri }) => {
+  const restApiKey = KAKAO_REST_API_KEY;
+
+  console.log("[Kakao] token request", {
+    grantType: "authorization_code",
+    restApiKeyExists: !!restApiKey,
+    redirectUri,
+    codeExists: !!code,
+    codePreview: code ? `${code.slice(0, 10)}...` : null,
+  });
+
+  const tokenRequestBody = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: restApiKey,
+    redirect_uri: redirectUri,
+    code,
+  });
+
   const response = await fetch("https://kauth.kakao.com/oauth/token", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
     },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: KAKAO_REST_API_KEY,
-      redirect_uri: redirectUri,
-      code,
-    }).toString(),
+    body: tokenRequestBody.toString(),
   });
 
-  const tokenResult = await response.json();
+  const tokenData = await response.json();
+  console.log("[Kakao] token response", {
+    status: response.status,
+    ok: response.ok,
+    tokenData,
+  });
 
   if (!response.ok) {
-    throw new Error(tokenResult.error_description || "카카오 토큰 발급에 실패했습니다.");
+    throw new Error(tokenData.error_description || tokenData.error || "카카오 토큰 발급에 실패했습니다.");
   }
 
-  return tokenResult.access_token;
+  return tokenData.access_token;
 };
 
 const fetchKakaoUser = async (accessToken) => {
@@ -219,38 +240,40 @@ const fetchKakaoUser = async (accessToken) => {
 };
 
 export const loginWithKakao = async () => {
+  const restApiKey = KAKAO_REST_API_KEY;
+
   console.log("[loginWithKakao] service entered", {
-    hasRestApiKey: Boolean(KAKAO_REST_API_KEY),
+    hasRestApiKey: !!restApiKey,
   });
-  if (!KAKAO_REST_API_KEY) {
+
+  if (!restApiKey) {
     throw new Error("EXPO_PUBLIC_KAKAO_REST_API_KEY가 설정되지 않았습니다.");
   }
 
   const redirectUri = KAKAO_REDIRECT_URI;
-  console.log("[loginWithKakao] redirectUri", redirectUri);
+
+  console.log("[Kakao] restApiKey exists:", !!restApiKey);
+  console.log("[Kakao] redirectUri:", redirectUri);
+
   const authUrl =
     "https://kauth.kakao.com/oauth/authorize?" +
-    new URLSearchParams({
-      response_type: "code",
-      client_id: KAKAO_REST_API_KEY,
-      redirect_uri: redirectUri,
-    }).toString();
+    `response_type=code` +
+    `&client_id=${encodeURIComponent(restApiKey)}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
   const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+  console.log("[Kakao] auth result:", result);
 
   if (result.type !== "success") {
-    throw new Error("카카오 로그인이 취소되었습니다.");
+    throw new Error("카카오 로그인이 완료되지 않았습니다.");
   }
 
-  const parsedUrl = Linking.parse(result.url);
-  const rawCode = parsedUrl.queryParams?.code;
-  const rawError = parsedUrl.queryParams?.error_description || parsedUrl.queryParams?.error;
-  const code = Array.isArray(rawCode) ? rawCode[0] : rawCode;
+  const code = new URL(result.url).searchParams.get("code");
+
+  console.log("[Kakao] code exists:", !!code);
 
   if (!code) {
-    throw new Error(
-      Array.isArray(rawError) ? rawError[0] : rawError || "카카오 인증 코드를 받지 못했습니다."
-    );
+    throw new Error("카카오 인가 코드를 가져오지 못했습니다.");
   }
 
   const accessToken = await exchangeKakaoCodeForToken({ code, redirectUri });
@@ -263,6 +286,10 @@ export const loginWithKakao = async () => {
 };
 
 export const loginWithGoogle = async () => {
+  if (isWeb) {
+    throw new Error("웹에서는 네이티브 GoogleSignin을 사용할 수 없습니다.");
+  }
+
   await GoogleSignin.hasPlayServices();
 
   const googleUser = await GoogleSignin.signIn();
