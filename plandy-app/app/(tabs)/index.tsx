@@ -6,6 +6,7 @@ import {
   signUpWithEmail,
   logout,
   loginWithGoogle,
+  isGoogleSignInSupported,
 } from "../../src/authService";
 import { auth } from "../../src/firebase";
 
@@ -34,6 +35,12 @@ export default function HomeScreen() {
   }, []);
 
   const handleSignUp = async () => {
+    console.log("[handleSignUp] clicked", {
+      email,
+      loginId,
+      nickname,
+      passwordLength: password.length,
+    });
     if (!email || !password || !nickname || !loginId) {
       Alert.alert("입력 오류", "아이디, 이메일, 비밀번호, 닉네임을 모두 입력하세요.");
       return;
@@ -233,9 +240,13 @@ const handleKakaoLogin = async () => {
 
       {!isSignUpMode && (
       <>
-    <View style={{ height: 12 }} />
+    {isGoogleSignInSupported && (
+      <>
+        <View style={{ height: 12 }} />
 
-    <Button title="구글로 로그인" onPress={handleGoogleLogin} />
+        <Button title="구글로 로그인" onPress={handleGoogleLogin} />
+      </>
+    )}
 
     <View style={{ height: 12 }} />
 
