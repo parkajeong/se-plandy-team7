@@ -11,15 +11,16 @@ import {
 } from 'firebase/firestore';
 
 import { auth, db } from './firebase';
+import { getCurrentAppUserIdOrNull } from './appSession';
 
 function getCurrentUserId() {
-  const user = auth.currentUser;
+  const userId = auth.currentUser?.uid || getCurrentAppUserIdOrNull();
 
-  if (!user) {
+  if (!userId) {
     throw new Error('로그인이 필요합니다.');
   }
 
-  return user.uid;
+  return userId;
 }
 
 function getTodoCollectionRef() {

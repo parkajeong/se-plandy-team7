@@ -18,7 +18,8 @@
             ]
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ]
   }
 }

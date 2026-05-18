@@ -3,37 +3,55 @@ import { Alert, Button, Text, TextInput, View } from "react-native";
 import { onAuthStateChanged, User } from "firebase/auth";
 import {
   loginWithIdOrEmail,
-  signUpWithEmail,
-  logout,
   loginWithGoogle,
+  loginWithKakao,
+  logout,
+  signUpWithEmail,
 } from "../../src/authService";
+import { getAppUser } from "../../src/appSession";
 import { auth } from "../../src/firebase";
 
 export default function HomeScreen() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentAppUser, setCurrentAppUser] = useState<any | null>(getAppUser());
   const [isSignUpMode, setIsSignUpMode] = useState(false);
 
-  // 로그인: 아이디 또는 이메일
-  // 회원가입: 이메일
   const [idOrEmail, setIdOrEmail] = useState("");
   const [email, setEmail] = useState("");
-
-  // 회원가입할 때만 사용
   const [loginId, setLoginId] = useState("");
   const [nickname, setNickname] = useState("");
-
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
+      if (user) {
+        setCurrentAppUser(null);
+      }
     });
 
     return unsubscribe;
   }, []);
 
+  const resetForm = () => {
+    setIdOrEmail("");
+    setEmail("");
+    setLoginId("");
+    setNickname("");
+    setPassword("");
+    setShowPassword(false);
+    setIsSignUpMode(false);
+  };
+
   const handleSignUp = async () => {
+    console.log("[handleSignUp] clicked", {
+      email,
+      loginId,
+      nickname,
+      passwordLength: password.length,
+    });
+
     if (!email || !password || !nickname || !loginId) {
       Alert.alert("입력 오류", "아이디, 이메일, 비밀번호, 닉네임을 모두 입력하세요.");
       return;
@@ -48,35 +66,36 @@ export default function HomeScreen() {
       });
 
       Alert.alert("회원가입 성공");
-      setIsSignUpMode(false);
-
-      // 회원가입 후 로그인 입력칸에 이메일 자동 입력
       setIdOrEmail(email);
-
-      // 회원가입 입력값 초기화
       setLoginId("");
       setNickname("");
       setPassword("");
+      setIsSignUpMode(false);
     } catch (error: any) {
       Alert.alert("회원가입 실패", error.message);
     }
   };
 
   const handleGoogleLogin = async () => {
-  try {
-    await loginWithGoogle();
-    Alert.alert("구글 로그인 성공");
-  } catch (error: any) {
-    Alert.alert("구글 로그인 실패", error.message);
-  }
-};
+    try {
+      await loginWithGoogle();
+      Alert.alert("구글 로그인 성공");
+    } catch (error: any) {
+      Alert.alert("구글 로그인 실패", error.message);
+    }
+  };
 
-const handleKakaoLogin = async () => {
-  Alert.alert(
-    "준비 중",
-    "카카오 로그인은 Firebase Custom Token 서버 연동 후 구현 예정입니다."
-  );
-};
+  const handleKakaoLogin = async () => {
+    console.log("[handleKakaoLogin] 카카오 버튼 클릭됨");
+
+    try {
+      const kakaoUser = await loginWithKakao();
+      setCurrentAppUser(kakaoUser);
+      Alert.alert("카카오 로그인 성공");
+    } catch (error: any) {
+      Alert.alert("카카오 로그인 실패", error.message);
+    }
+  };
 
   const handleLogin = async () => {
     if (!idOrEmail || !password) {
@@ -95,23 +114,18 @@ const handleKakaoLogin = async () => {
   const handleLogout = async () => {
     try {
       await logout();
-
-      setIdOrEmail("");
-      setEmail("");
-      setLoginId("");
-      setNickname("");
-      setPassword("");
-      setShowPassword(false);
-      setIsSignUpMode(false);
-
+      setCurrentAppUser(null);
+      resetForm();
       Alert.alert("로그아웃 성공");
     } catch (error: any) {
       Alert.alert("로그아웃 실패", error.message);
     }
   };
 
-  // 로그인 상태일 때 보여줄 테스트용 빈 화면
-  if (currentUser) {
+  if (currentUser || currentAppUser) {
+    const accountLabel =
+      currentUser?.email || currentAppUser?.email || currentAppUser?.nickname || "";
+
     return (
       <View style={{ padding: 24, marginTop: 60 }}>
         <Text style={{ fontSize: 24, marginBottom: 20 }}>
@@ -120,9 +134,7 @@ const handleKakaoLogin = async () => {
 
         <Text style={{ marginBottom: 8 }}>로그인 상태입니다.</Text>
 
-        <Text style={{ marginBottom: 20 }}>
-          현재 계정: {currentUser.email}
-        </Text>
+        <Text style={{ marginBottom: 20 }}>현재 계정: {accountLabel}</Text>
 
         <Button title="로그아웃" onPress={handleLogout} />
       </View>
@@ -232,16 +244,16 @@ const handleKakaoLogin = async () => {
       )}
 
       {!isSignUpMode && (
-      <>
-    <View style={{ height: 12 }} />
+        <>
+          <View style={{ height: 12 }} />
 
-    <Button title="구글로 로그인" onPress={handleGoogleLogin} />
+          <Button title="구글로 로그인" onPress={handleGoogleLogin} />
 
-    <View style={{ height: 12 }} />
+          <View style={{ height: 12 }} />
 
-    <Button title="카카오로 로그인" onPress={handleKakaoLogin} />
-      </>
-    )}
+          <Button title="카카오로 로그인" onPress={handleKakaoLogin} />
+        </>
+      )}
 
       <View style={{ height: 12 }} />
 
