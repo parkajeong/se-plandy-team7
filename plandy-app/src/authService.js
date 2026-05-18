@@ -13,10 +13,17 @@ import {
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
+import {
+  GoogleSignin,
+  isCancelledResponse,
+  isErrorWithCode,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
+
+const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
 GoogleSignin.configure({
-  webClientId: "116925888955-o5mak3tjasjbb27np3l74b2kqhoint81.apps.googleusercontent.com",
+  webClientId: googleWebClientId,
 });
 
 export const signUpWithEmail = async ({ email, password, loginId, nickname }) => {
@@ -110,38 +117,69 @@ export const loginWithIdOrEmail = async (idOrEmail, password) => {
 };
 
 export const logout = async () => {
+  await GoogleSignin.signOut().catch(() => {});
   await signOut(auth);
 };
 
 export const loginWithGoogle = async () => {
-  await GoogleSignin.hasPlayServices();
-
-  const googleUser = await GoogleSignin.signIn();
-
-  const idToken = googleUser.data?.idToken || googleUser.idToken;
-
-  if (!idToken) {
-    throw new Error("구글 로그인 토큰을 가져오지 못했습니다.");
+  if (!googleWebClientId) {
+    throw new Error("Google Web Client ID가 설정되지 않았습니다.");
   }
 
-  const googleCredential = GoogleAuthProvider.credential(idToken);
+  try {
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
 
-  const userCredential = await signInWithCredential(auth, googleCredential);
-  const user = userCredential.user;
+    const googleUser = await GoogleSignin.signIn();
 
-  const userRef = doc(db, "users", user.uid);
-  const userSnap = await getDoc(userRef);
+    if (isCancelledResponse(googleUser)) {
+      throw new Error("Google 로그인이 취소되었습니다.");
+    }
 
-  if (!userSnap.exists()) {
-    await setDoc(userRef, {
-      uid: user.uid,
-      email: user.email || "",
-      loginId: "",
-      nickname: user.displayName || "",
-      provider: "google",
-      created_at: serverTimestamp(),
-    });
+    const idToken = googleUser.data?.idToken;
+
+    if (!idToken) {
+      throw new Error(
+        "Google ID 토큰을 받지 못했습니다. Firebase의 Android OAuth 클라이언트/SHA 설정을 확인하세요."
+      );
+    }
+
+    const googleCredential = GoogleAuthProvider.credential(idToken);
+
+    const userCredential = await signInWithCredential(auth, googleCredential);
+    const user = userCredential.user;
+
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+
+    if (!userSnap.exists()) {
+      await setDoc(userRef, {
+        uid: user.uid,
+        email: user.email || "",
+        loginId: "",
+        nickname: user.displayName || "",
+        provider: "google",
+        created_at: serverTimestamp(),
+      });
+    }
+
+    return user;
+  } catch (error) {
+    if (isErrorWithCode(error)) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        throw new Error("Google 로그인이 취소되었습니다.");
+      }
+
+      if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        throw new Error("Google Play Services를 사용할 수 없습니다.");
+      }
+
+      if (error.code === "10") {
+        throw new Error(
+          "Google 로그인 설정 오류입니다. Firebase에 앱의 SHA-1/SHA-256을 등록하고 google-services.json을 다시 받아야 합니다."
+        );
+      }
+    }
+
+    throw error;
   }
-
-  return user;
 };
