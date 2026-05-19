@@ -22,6 +22,7 @@ export default {
         },
       ],
       "expo-web-browser",
+      "@react-native-community/datetimepicker",
     ],
 
     extra: {
