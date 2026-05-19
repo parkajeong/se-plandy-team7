@@ -14,6 +14,7 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { clearAppUser, setAppUser } from "./appSession";
 import { auth, db } from "./firebase";
@@ -131,6 +132,9 @@ export const logout = async () => {
 const createGoogleUserDocumentIfNeeded = async (user) => {
   const userRef = doc(db, "users", user.uid);
   const userSnap = await getDoc(userRef);
+  const photoURL = user.photoURL || "";
+
+  console.log("[Google] login user.photoURL:", photoURL);
 
   if (!userSnap.exists()) {
     await setDoc(userRef, {
@@ -138,24 +142,24 @@ const createGoogleUserDocumentIfNeeded = async (user) => {
       email: user.email || "",
       loginId: "",
       nickname: user.displayName || "",
-      photoURL: user.photoURL || "",
+      photoURL,
       provider: "google",
       created_at: serverTimestamp(),
     });
+
+    console.log("[Google] created users/{uid} photoURL:", photoURL);
     return;
   }
 
-  await setDoc(
-    userRef,
-    {
-      email: user.email || "",
-      nickname: user.displayName || "",
-      photoURL: user.photoURL || "",
-      provider: "google",
-      updated_at: serverTimestamp(),
-    },
-    { merge: true }
-  );
+  await updateDoc(userRef, {
+    email: user.email || "",
+    nickname: user.displayName || "",
+    photoURL,
+    provider: "google",
+    updated_at: serverTimestamp(),
+  });
+
+  console.log("[Google] updated users/{uid} photoURL:", photoURL);
 };
 
 const createKakaoUserDocumentIfNeeded = async (user) => {

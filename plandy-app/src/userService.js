@@ -59,8 +59,8 @@ export const getCurrentUserProfile = async () => {
       uid: firebaseUser.uid,
       email: firebaseUser.email || "",
       displayName: firebaseUser.displayName || "",
-      photoURL: firebaseUser.photoURL || "",
       ...storedProfile,
+      photoURL: storedProfile?.photoURL || firebaseUser.photoURL || "",
     });
   }
 
