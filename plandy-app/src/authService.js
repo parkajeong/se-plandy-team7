@@ -1,4 +1,3 @@
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
 import {
@@ -6,6 +5,7 @@ import {
   GoogleAuthProvider,
   signInWithCredential,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
 } from "firebase/auth";
 import {
@@ -21,12 +21,6 @@ import { auth, db } from "./firebase";
 WebBrowser.maybeCompleteAuthSession();
 
 const isWeb = Platform.OS === "web";
-
-if (!isWeb) {
-  GoogleSignin.configure({
-    webClientId: "116925888955-o5mak3tjasjbb27np3l74b2kqhoint81.apps.googleusercontent.com",
-  });
-}
 
 const KAKAO_REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY;
 const KAKAO_REDIRECT_URI = "http://localhost:8081/kakao-auth";
@@ -290,43 +284,6 @@ export const loginWithKakao = async () => {
   await setAppUser(kakaoUser);
 
   return kakaoUser;
-};
-
-export const loginWithGoogle = async () => {
-  if (isWeb) {
-    throw new Error("웹에서는 네이티브 GoogleSignin을 사용할 수 없습니다.");
-  }
-
-  await GoogleSignin.hasPlayServices();
-
-  const googleUser = await GoogleSignin.signIn();
-
-  const idToken = googleUser.data?.idToken || googleUser.idToken;
-
-  if (!idToken) {
-    throw new Error("구글 로그인 토큰을 가져오지 못했습니다.");
-  }
-
-  const googleCredential = GoogleAuthProvider.credential(idToken);
-
-  const userCredential = await signInWithCredential(auth, googleCredential);
-  const user = userCredential.user;
-
-  await createGoogleUserDocumentIfNeeded(user);
-const createGoogleUserDocumentIfNeeded = async (user) => {
-  const userRef = doc(db, "users", user.uid);
-  const userSnap = await getDoc(userRef);
-
-  if (!userSnap.exists()) {
-    await setDoc(userRef, {
-      uid: user.uid,
-      email: user.email || "",
-      loginId: "",
-      nickname: user.displayName || "",
-      provider: "google",
-      created_at: serverTimestamp(),
-    });
-  }
 };
 
 export const loginWithGoogle = async () => {

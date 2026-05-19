@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Platform, Text, TextInput, View } from "react-native";
 import { onAuthStateChanged, User } from "firebase/auth";
 import * as AuthSession from "expo-auth-session";
@@ -10,8 +10,6 @@ import {
   loginWithKakao,
   logout,
   signUpWithEmail,
-  logout,
-  loginWithGoogle,
   loginWithGoogleIdToken,
 } from "../../src/authService";
 import { getAppUser } from "../../src/appSession";
