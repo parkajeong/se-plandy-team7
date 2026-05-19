@@ -8,7 +8,6 @@
       "googleServicesFile": "./google-services.json"
     },
     "plugins": [
-      "@react-native-google-signin/google-signin",
       [
         "expo-build-properties",
         {
@@ -18,7 +17,13 @@
             ]
           }
         }
-      ]
-    ]
+      ],
+      "expo-web-browser"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "30960e38-0ce6-4834-a869-2e4baa81e5ed"
+      }
+    }
   }
 }
