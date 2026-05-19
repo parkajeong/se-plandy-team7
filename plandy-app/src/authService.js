@@ -80,6 +80,7 @@ export const signUpWithEmail = async ({ email, password, loginId, nickname }) =>
       email: trimmedEmail,
       loginId: trimmedLoginId,
       nickname: trimmedNickname,
+      photoURL: user.photoURL || "",
       provider: "email",
       created_at: serverTimestamp(),
     });
@@ -137,10 +138,24 @@ const createGoogleUserDocumentIfNeeded = async (user) => {
       email: user.email || "",
       loginId: "",
       nickname: user.displayName || "",
+      photoURL: user.photoURL || "",
       provider: "google",
       created_at: serverTimestamp(),
     });
+    return;
   }
+
+  await setDoc(
+    userRef,
+    {
+      email: user.email || "",
+      nickname: user.displayName || "",
+      photoURL: user.photoURL || "",
+      provider: "google",
+      updated_at: serverTimestamp(),
+    },
+    { merge: true }
+  );
 };
 
 const createKakaoUserDocumentIfNeeded = async (user) => {
@@ -153,6 +168,7 @@ const createKakaoUserDocumentIfNeeded = async (user) => {
       email: user.email || "",
       loginId: "",
       nickname: user.nickname || "",
+      photoURL: user.photoURL || "",
       provider: "kakao",
       kakaoId: user.kakaoId,
       created_at: serverTimestamp(),
@@ -165,6 +181,7 @@ const createKakaoUserDocumentIfNeeded = async (user) => {
     {
       email: user.email || "",
       nickname: user.nickname || "",
+      photoURL: user.photoURL || "",
       provider: "kakao",
       kakaoId: user.kakaoId,
       updated_at: serverTimestamp(),
@@ -236,6 +253,12 @@ const fetchKakaoUser = async (accessToken) => {
     kakaoId,
     email: kakaoAccount.email || "",
     nickname: profileInfo.nickname || profile.properties?.nickname || "Kakao User",
+    photoURL:
+      profileInfo.profile_image_url ||
+      profileInfo.thumbnail_image_url ||
+      profile.properties?.profile_image ||
+      profile.properties?.thumbnail_image ||
+      "",
     provider: "kakao",
   };
 };
