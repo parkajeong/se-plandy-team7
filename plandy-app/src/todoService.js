@@ -94,7 +94,9 @@ function validateTodoInput(todoInput) {
 export async function fetchSubjects() {
   const userId = getCurrentUserId();
   const subjectsRef = collection(db, SUBJECT_COLLECTION_NAME);
-  const subjectsQuery = query(subjectsRef, where('user_id', '==', userId));
+
+  // subjectService.js가 userId 필드로 저장하므로 여기서도 userId 기준으로 조회
+  const subjectsQuery = query(subjectsRef, where('userId', '==', userId));
   const snapshot = await getDocs(subjectsQuery);
 
   return snapshot.docs
@@ -103,10 +105,15 @@ export async function fetchSubjects() {
 
       return {
         id: subjectDocument.id,
-        user_id: data.user_id || '',
+        user_id: data.user_id || data.userId || userId,
+        userId: data.userId || data.user_id || userId,
         title: data.title || '',
         goal: data.goal || '',
-        created_at: data.created_at?.toDate?.()?.toISOString?.() || '',
+        progress: Number(data.progress || 0),
+        created_at:
+          data.created_at?.toDate?.()?.toISOString?.() ||
+          data.createdAt?.toDate?.()?.toISOString?.() ||
+          '',
       };
     })
     .sort((a, b) => a.title.localeCompare(b.title, 'ko'));
@@ -119,6 +126,7 @@ export async function createTodo(todoInput) {
   const todosRef = collection(db, TODO_COLLECTION_NAME);
 
   const docRef = await addDoc(todosRef, {
+    // DB 명세서 기준 기본 필드
     user_id: userId,
     subject_id: todoInput.subject_id.trim(),
     title: todoInput.title.trim(),
@@ -127,7 +135,7 @@ export async function createTodo(todoInput) {
     priority: Number(todoInput.priority),
     created_at: serverTimestamp(),
 
-    // DB 명세서 기본 구조는 유지하되, 화면 요구사항 처리를 위한 추가 필드
+    // 화면 요구사항 처리를 위한 추가 필드
     description: todoInput.description?.trim() || '',
     category: todoInput.category,
   });
