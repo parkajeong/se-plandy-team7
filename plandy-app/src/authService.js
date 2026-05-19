@@ -5,6 +5,7 @@ import {
   signOut,
   GoogleAuthProvider,
   signInWithCredential,
+  signInWithPopup,
 } from "firebase/auth";
 import {
   doc,
@@ -13,13 +14,18 @@ import {
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
+import { Platform } from "react-native";
 
-GoogleSignin.configure({
-  webClientId: "116925888955-o5mak3tjasjbb27np3l74b2kqhoint81.apps.googleusercontent.com",
-});
+const isWeb = Platform.OS === "web";
 
 export const signUpWithEmail = async ({ email, password, loginId, nickname }) => {
+  console.log("[signUpWithEmail] called", {
+    email,
+    loginId,
+    nickname,
+    passwordLength: password?.length ?? 0,
+  });
+
   const trimmedEmail = email.trim();
   const trimmedLoginId = loginId.trim();
   const trimmedNickname = nickname.trim();
@@ -113,22 +119,7 @@ export const logout = async () => {
   await signOut(auth);
 };
 
-export const loginWithGoogle = async () => {
-  await GoogleSignin.hasPlayServices();
-
-  const googleUser = await GoogleSignin.signIn();
-
-  const idToken = googleUser.data?.idToken || googleUser.idToken;
-
-  if (!idToken) {
-    throw new Error("구글 로그인 토큰을 가져오지 못했습니다.");
-  }
-
-  const googleCredential = GoogleAuthProvider.credential(idToken);
-
-  const userCredential = await signInWithCredential(auth, googleCredential);
-  const user = userCredential.user;
-
+const createGoogleUserDocumentIfNeeded = async (user) => {
   const userRef = doc(db, "users", user.uid);
   const userSnap = await getDoc(userRef);
 
@@ -142,6 +133,34 @@ export const loginWithGoogle = async () => {
       created_at: serverTimestamp(),
     });
   }
+};
+
+export const loginWithGoogle = async () => {
+  if (isWeb) {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+
+    const userCredential = await signInWithPopup(auth, provider);
+    const user = userCredential.user;
+
+    await createGoogleUserDocumentIfNeeded(user);
+
+    return user;
+  }
+
+  throw new Error("앱 Google 로그인은 Expo AuthSession 훅에서 처리해야 합니다.");
+};
+
+export const loginWithGoogleIdToken = async (idToken) => {
+  if (!idToken) {
+    throw new Error("Google ID 토큰을 받지 못했습니다. Firebase 설정을 확인하세요.");
+  }
+
+  const googleCredential = GoogleAuthProvider.credential(idToken);
+  const userCredential = await signInWithCredential(auth, googleCredential);
+  const user = userCredential.user;
+
+  await createGoogleUserDocumentIfNeeded(user);
 
   return user;
 };
