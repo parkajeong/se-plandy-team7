@@ -1,20 +1,46 @@
-import { useEffect, useRef, useState } from "react";
-import { Alert, Button, Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Alert, Button, Platform, Text, TextInput, View } from "react-native";
 import { onAuthStateChanged, User } from "firebase/auth";
+import * as AuthSession from "expo-auth-session";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
 import {
   loginWithIdOrEmail,
   loginWithGoogle,
   loginWithKakao,
   logout,
   signUpWithEmail,
+  logout,
+  loginWithGoogle,
+  loginWithGoogleIdToken,
 } from "../../src/authService";
 import { getAppUser } from "../../src/appSession";
 import { auth } from "../../src/firebase";
+
+WebBrowser.maybeCompleteAuthSession();
+
+const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 
 export default function HomeScreen() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentAppUser, setCurrentAppUser] = useState<any | null>(getAppUser());
   const [isSignUpMode, setIsSignUpMode] = useState(false);
+  const isWeb = Platform.OS === "web";
+  const redirectUri = useMemo(
+    () => AuthSession.makeRedirectUri({ scheme: "plandy", path: "oauthredirect" }),
+    []
+  );
+  const [googleRequest, googleResponse, promptGoogleLogin] =
+    Google.useAuthRequest({
+      webClientId: googleWebClientId,
+      androidClientId: googleAndroidClientId || googleWebClientId,
+      iosClientId: googleIosClientId || googleWebClientId,
+      redirectUri,
+      scopes: ["openid", "profile", "email"],
+      selectAccount: true,
+    });
   const [isKakaoLoginLoading, setIsKakaoLoginLoading] = useState(false);
   const kakaoLoginInProgressRef = useRef(false);
 
@@ -36,6 +62,43 @@ export default function HomeScreen() {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    const loginWithGoogleResponse = async () => {
+      if (isWeb || !googleResponse) {
+        return;
+      }
+
+      if (googleResponse.type !== "success") {
+        if (googleResponse.type === "error") {
+          Alert.alert(
+            "구글 로그인 실패",
+            googleResponse.params?.error_description ||
+              googleResponse.params?.error ||
+              "Google 인증 중 오류가 발생했습니다."
+          );
+        }
+
+        return;
+      }
+
+      const idToken =
+        googleResponse.params?.id_token || googleResponse.authentication?.idToken;
+
+      if (!idToken && googleResponse.params?.code) {
+        return;
+      }
+
+      try {
+        await loginWithGoogleIdToken(idToken);
+        Alert.alert("구글 로그인 성공");
+      } catch (error: any) {
+        Alert.alert("구글 로그인 실패", error.message);
+      }
+    };
+
+    loginWithGoogleResponse();
+  }, [googleResponse, isWeb]);
+
   const resetForm = () => {
     setIdOrEmail("");
     setEmail("");
@@ -53,7 +116,6 @@ export default function HomeScreen() {
       nickname,
       passwordLength: password.length,
     });
-
     if (!email || !password || !nickname || !loginId) {
       Alert.alert("입력 오류", "아이디, 이메일, 비밀번호, 닉네임을 모두 입력하세요.");
       return;
@@ -80,8 +142,29 @@ export default function HomeScreen() {
 
   const handleGoogleLogin = async () => {
     try {
-      await loginWithGoogle();
-      Alert.alert("구글 로그인 성공");
+      if (isWeb) {
+        await loginWithGoogle();
+        Alert.alert("구글 로그인 성공");
+        return;
+      }
+
+      if (!googleWebClientId) {
+        throw new Error("Google Web Client ID가 설정되지 않았습니다.");
+      }
+
+      if (Platform.OS === "android" && !googleAndroidClientId) {
+        throw new Error("Google Android Client ID가 설정되지 않았습니다.");
+      }
+
+      if (!googleRequest) {
+        throw new Error("Google 로그인 요청을 준비하는 중입니다. 잠시 후 다시 시도해주세요.");
+      }
+
+      const result = await promptGoogleLogin();
+
+      if (result.type !== "success") {
+        throw new Error("Google 로그인이 취소되었습니다.");
+      }
     } catch (error: any) {
       Alert.alert("구글 로그인 실패", error.message);
     }
@@ -259,8 +342,11 @@ export default function HomeScreen() {
         <>
           <View style={{ height: 12 }} />
 
-          <Button title="구글로 로그인" onPress={handleGoogleLogin} />
-
+          <Button
+            title="구글로 로그인"
+            onPress={handleGoogleLogin}
+            disabled={!isWeb && !googleRequest}
+          />
           <View style={{ height: 12 }} />
 
           <Button

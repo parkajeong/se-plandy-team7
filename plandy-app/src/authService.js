@@ -32,6 +32,13 @@ const KAKAO_REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY;
 const KAKAO_REDIRECT_URI = "http://localhost:8081/kakao-auth";
 
 export const signUpWithEmail = async ({ email, password, loginId, nickname }) => {
+  console.log("[signUpWithEmail] called", {
+    email,
+    loginId,
+    nickname,
+    passwordLength: password?.length ?? 0,
+  });
+
   const trimmedEmail = email.trim();
   const trimmedLoginId = loginId.trim();
   const trimmedNickname = nickname.trim();
@@ -302,6 +309,48 @@ export const loginWithGoogle = async () => {
 
   const googleCredential = GoogleAuthProvider.credential(idToken);
 
+  const userCredential = await signInWithCredential(auth, googleCredential);
+  const user = userCredential.user;
+
+  await createGoogleUserDocumentIfNeeded(user);
+const createGoogleUserDocumentIfNeeded = async (user) => {
+  const userRef = doc(db, "users", user.uid);
+  const userSnap = await getDoc(userRef);
+
+  if (!userSnap.exists()) {
+    await setDoc(userRef, {
+      uid: user.uid,
+      email: user.email || "",
+      loginId: "",
+      nickname: user.displayName || "",
+      provider: "google",
+      created_at: serverTimestamp(),
+    });
+  }
+};
+
+export const loginWithGoogle = async () => {
+  if (isWeb) {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+
+    const userCredential = await signInWithPopup(auth, provider);
+    const user = userCredential.user;
+
+    await createGoogleUserDocumentIfNeeded(user);
+
+    return user;
+  }
+
+  throw new Error("앱 Google 로그인은 Expo AuthSession 훅에서 처리해야 합니다.");
+};
+
+export const loginWithGoogleIdToken = async (idToken) => {
+  if (!idToken) {
+    throw new Error("Google ID 토큰을 받지 못했습니다. Firebase 설정을 확인하세요.");
+  }
+
+  const googleCredential = GoogleAuthProvider.credential(idToken);
   const userCredential = await signInWithCredential(auth, googleCredential);
   const user = userCredential.user;
 
