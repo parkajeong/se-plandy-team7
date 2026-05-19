@@ -1,8 +1,23 @@
 import { auth } from "./firebase";
 
 const APP_USER_STORAGE_KEY = "plandy.appUser";
+export const APP_USER_CHANGED_EVENT = "plandy.appUserChanged";
 
 let memoryAppUser = null;
+const appUserListeners = new Set();
+
+const notifyAppUserChanged = (user) => {
+  appUserListeners.forEach((listener) => listener(user));
+
+  if (
+    typeof globalThis.dispatchEvent === "function" &&
+    typeof CustomEvent === "function"
+  ) {
+    globalThis.dispatchEvent(
+      new CustomEvent(APP_USER_CHANGED_EVENT, { detail: user })
+    );
+  }
+};
 
 const getLocalStorage = () => {
   if (typeof globalThis === "undefined") return null;
@@ -16,6 +31,8 @@ export const setAppUser = async (user) => {
   if (storage) {
     storage.setItem(APP_USER_STORAGE_KEY, JSON.stringify(user));
   }
+
+  notifyAppUserChanged(user);
 };
 
 export const getAppUser = () => {
@@ -38,6 +55,15 @@ export const getAppUser = () => {
 export const clearAppUser = async () => {
   memoryAppUser = null;
   getLocalStorage()?.removeItem(APP_USER_STORAGE_KEY);
+  notifyAppUserChanged(null);
+};
+
+export const subscribeAppUserChange = (listener) => {
+  appUserListeners.add(listener);
+
+  return () => {
+    appUserListeners.delete(listener);
+  };
 };
 
 export const getCurrentAppUserIdOrNull = () => {

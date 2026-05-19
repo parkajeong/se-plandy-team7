@@ -14,6 +14,7 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { clearAppUser, setAppUser } from "./appSession";
 import { auth, db } from "./firebase";
@@ -80,6 +81,7 @@ export const signUpWithEmail = async ({ email, password, loginId, nickname }) =>
       email: trimmedEmail,
       loginId: trimmedLoginId,
       nickname: trimmedNickname,
+      photoURL: user.photoURL || "",
       provider: "email",
       created_at: serverTimestamp(),
     });
@@ -130,6 +132,9 @@ export const logout = async () => {
 const createGoogleUserDocumentIfNeeded = async (user) => {
   const userRef = doc(db, "users", user.uid);
   const userSnap = await getDoc(userRef);
+  const photoURL = user.photoURL || "";
+
+  console.log("[Google] login user.photoURL:", photoURL);
 
   if (!userSnap.exists()) {
     await setDoc(userRef, {
@@ -137,10 +142,24 @@ const createGoogleUserDocumentIfNeeded = async (user) => {
       email: user.email || "",
       loginId: "",
       nickname: user.displayName || "",
+      photoURL,
       provider: "google",
       created_at: serverTimestamp(),
     });
+
+    console.log("[Google] created users/{uid} photoURL:", photoURL);
+    return;
   }
+
+  await updateDoc(userRef, {
+    email: user.email || "",
+    nickname: user.displayName || "",
+    photoURL,
+    provider: "google",
+    updated_at: serverTimestamp(),
+  });
+
+  console.log("[Google] updated users/{uid} photoURL:", photoURL);
 };
 
 const createKakaoUserDocumentIfNeeded = async (user) => {
@@ -153,6 +172,7 @@ const createKakaoUserDocumentIfNeeded = async (user) => {
       email: user.email || "",
       loginId: "",
       nickname: user.nickname || "",
+      photoURL: user.photoURL || "",
       provider: "kakao",
       kakaoId: user.kakaoId,
       created_at: serverTimestamp(),
@@ -165,6 +185,7 @@ const createKakaoUserDocumentIfNeeded = async (user) => {
     {
       email: user.email || "",
       nickname: user.nickname || "",
+      photoURL: user.photoURL || "",
       provider: "kakao",
       kakaoId: user.kakaoId,
       updated_at: serverTimestamp(),
@@ -236,6 +257,12 @@ const fetchKakaoUser = async (accessToken) => {
     kakaoId,
     email: kakaoAccount.email || "",
     nickname: profileInfo.nickname || profile.properties?.nickname || "Kakao User",
+    photoURL:
+      profileInfo.profile_image_url ||
+      profileInfo.thumbnail_image_url ||
+      profile.properties?.profile_image ||
+      profile.properties?.thumbnail_image ||
+      "",
     provider: "kakao",
   };
 };
