@@ -18,6 +18,7 @@ import {
   createTodo,
   deleteTodo,
   fetchTodos,
+  getCurrentTodoUserIdOrNull,
   reopenTodo,
   updateTodo,
 } from '../../src/todoService';
@@ -49,6 +50,12 @@ export default function TodoScreen() {
   const [type, setType] = useState<TodoType>('assignment');
 
   const loadTodos = useCallback(async () => {
+    if (!getCurrentTodoUserIdOrNull()) {
+      setTodos([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const result = await fetchTodos();
@@ -75,6 +82,11 @@ export default function TodoScreen() {
   };
 
   const openCreateModal = () => {
+    if (!getCurrentTodoUserIdOrNull()) {
+      Alert.alert('로그인 필요', '로그인 후 이용해주세요.');
+      return;
+    }
+
     resetForm();
     setModalVisible(true);
   };

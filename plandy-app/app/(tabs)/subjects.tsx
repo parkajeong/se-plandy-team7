@@ -9,7 +9,7 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { auth } from "@/src/firebase";
+import { getCurrentAppUserIdOrNull } from "@/src/appSession";
 import {
   addSubject,
   getSubjects,
@@ -38,7 +38,7 @@ export default function SubjectsScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editGoal, setEditGoal] = useState("");
 
-  const userId = auth.currentUser?.uid;
+  const userId = getCurrentAppUserIdOrNull();
 
   const loadSubjects = async () => {
     if (!userId) return;

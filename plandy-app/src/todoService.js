@@ -11,15 +11,20 @@ import {
 } from 'firebase/firestore';
 
 import { auth, db } from './firebase';
+import { getCurrentAppUserIdOrNull } from './appSession';
+
+export function getCurrentTodoUserIdOrNull() {
+  return auth.currentUser?.uid || getCurrentAppUserIdOrNull();
+}
 
 function getCurrentUserId() {
-  const user = auth.currentUser;
+  const userId = getCurrentTodoUserIdOrNull();
 
-  if (!user) {
+  if (!userId) {
     throw new Error('로그인이 필요합니다.');
   }
 
-  return user.uid;
+  return userId;
 }
 
 function getTodoCollectionRef() {
@@ -43,6 +48,10 @@ export async function createTodo(todoInput) {
 }
 
 export async function fetchTodos() {
+  if (!getCurrentTodoUserIdOrNull()) {
+    return [];
+  }
+
   const todosRef = getTodoCollectionRef();
   const todosQuery = query(todosRef, orderBy('createdAt', 'desc'));
   const snapshot = await getDocs(todosQuery);

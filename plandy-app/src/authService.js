@@ -1,11 +1,12 @@
-import { auth, db } from "./firebase";
+import * as WebBrowser from "expo-web-browser";
+import { Platform } from "react-native";
 import {
   createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
   GoogleAuthProvider,
   signInWithCredential,
+  signInWithEmailAndPassword,
   signInWithPopup,
+  signOut,
 } from "firebase/auth";
 import {
   doc,
@@ -14,9 +15,15 @@ import {
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
-import { Platform } from "react-native";
+import { clearAppUser, setAppUser } from "./appSession";
+import { auth, db } from "./firebase";
+
+WebBrowser.maybeCompleteAuthSession();
 
 const isWeb = Platform.OS === "web";
+
+const KAKAO_REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY;
+const KAKAO_REDIRECT_URI = "http://localhost:8081/kakao-auth";
 
 export const signUpWithEmail = async ({ email, password, loginId, nickname }) => {
   console.log("[signUpWithEmail] called", {
@@ -116,6 +123,7 @@ export const loginWithIdOrEmail = async (idOrEmail, password) => {
 };
 
 export const logout = async () => {
+  await clearAppUser();
   await signOut(auth);
 };
 
@@ -133,6 +141,149 @@ const createGoogleUserDocumentIfNeeded = async (user) => {
       created_at: serverTimestamp(),
     });
   }
+};
+
+const createKakaoUserDocumentIfNeeded = async (user) => {
+  const userRef = doc(db, "users", user.uid);
+  const userSnap = await getDoc(userRef);
+
+  if (!userSnap.exists()) {
+    await setDoc(userRef, {
+      uid: user.uid,
+      email: user.email || "",
+      loginId: "",
+      nickname: user.nickname || "",
+      provider: "kakao",
+      kakaoId: user.kakaoId,
+      created_at: serverTimestamp(),
+    });
+    return;
+  }
+
+  await setDoc(
+    userRef,
+    {
+      email: user.email || "",
+      nickname: user.nickname || "",
+      provider: "kakao",
+      kakaoId: user.kakaoId,
+      updated_at: serverTimestamp(),
+    },
+    { merge: true }
+  );
+};
+
+const exchangeKakaoCodeForToken = async ({ code, redirectUri }) => {
+  const restApiKey = KAKAO_REST_API_KEY;
+
+  console.log("[Kakao] token request", {
+    grantType: "authorization_code",
+    restApiKeyExists: !!restApiKey,
+    redirectUri,
+    codeExists: !!code,
+    codePreview: code ? `${code.slice(0, 10)}...` : null,
+  });
+
+  const tokenRequestBody = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: restApiKey,
+    redirect_uri: redirectUri,
+    code,
+  });
+
+  const response = await fetch("https://kauth.kakao.com/oauth/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
+    },
+    body: tokenRequestBody.toString(),
+  });
+
+  const tokenData = await response.json();
+  console.log("[Kakao] token response", {
+    status: response.status,
+    ok: response.ok,
+    tokenData,
+  });
+
+  if (!response.ok) {
+    throw new Error(tokenData.error_description || tokenData.error || "카카오 토큰 발급에 실패했습니다.");
+  }
+
+  return tokenData.access_token;
+};
+
+const fetchKakaoUser = async (accessToken) => {
+  const response = await fetch("https://kapi.kakao.com/v2/user/me", {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
+    },
+  });
+
+  const profile = await response.json();
+
+  if (!response.ok) {
+    throw new Error(profile.msg || "카카오 사용자 정보를 가져오지 못했습니다.");
+  }
+
+  const kakaoAccount = profile.kakao_account || {};
+  const profileInfo = kakaoAccount.profile || {};
+  const kakaoId = String(profile.id);
+
+  return {
+    uid: `kakao:${kakaoId}`,
+    kakaoId,
+    email: kakaoAccount.email || "",
+    nickname: profileInfo.nickname || profile.properties?.nickname || "Kakao User",
+    provider: "kakao",
+  };
+};
+
+export const loginWithKakao = async () => {
+  const restApiKey = KAKAO_REST_API_KEY;
+
+  console.log("[loginWithKakao] service entered", {
+    hasRestApiKey: !!restApiKey,
+  });
+
+  if (!restApiKey) {
+    throw new Error("EXPO_PUBLIC_KAKAO_REST_API_KEY가 설정되지 않았습니다.");
+  }
+
+  const redirectUri = KAKAO_REDIRECT_URI;
+
+  console.log("[Kakao] restApiKey exists:", !!restApiKey);
+  console.log("[Kakao] redirectUri:", redirectUri);
+
+  const authUrl =
+    "https://kauth.kakao.com/oauth/authorize?" +
+    `response_type=code` +
+    `&client_id=${encodeURIComponent(restApiKey)}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+  const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+  console.log("[Kakao] auth result:", result);
+
+  if (result.type !== "success") {
+    throw new Error("카카오 로그인이 완료되지 않았습니다.");
+  }
+
+  const code = new URL(result.url).searchParams.get("code");
+
+  console.log("[Kakao] code exists:", !!code);
+
+  if (!code) {
+    throw new Error("카카오 인가 코드를 가져오지 못했습니다.");
+  }
+
+  const accessToken = await exchangeKakaoCodeForToken({ code, redirectUri });
+  const kakaoUser = await fetchKakaoUser(accessToken);
+
+  await createKakaoUserDocumentIfNeeded(kakaoUser);
+  await setAppUser(kakaoUser);
+
+  return kakaoUser;
 };
 
 export const loginWithGoogle = async () => {
