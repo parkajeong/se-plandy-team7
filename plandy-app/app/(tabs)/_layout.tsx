@@ -31,16 +31,6 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="paperplane.fill" color={color} />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
         name="subjects"
         options={{
           title: '과목',
@@ -49,6 +39,7 @@ export default function TabLayout() {
           ),
         }}
       />
+
       <Tabs.Screen
         name="todo"
         options={{
