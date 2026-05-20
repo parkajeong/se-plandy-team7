@@ -24,7 +24,7 @@ WebBrowser.maybeCompleteAuthSession();
 const isWeb = Platform.OS === "web";
 
 const KAKAO_REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY;
-const KAKAO_REDIRECT_URI = "http://localhost:8081/kakao-auth";
+const KAKAO_REDIRECT_URI = "https://se-plandy-app.vercel.app/kakao-auth.html";
 
 export const signUpWithEmail = async ({ email, password, loginId, nickname }) => {
   console.log("[signUpWithEmail] called", {
