@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Text, TextInput, View } from "react-native";
 import { onAuthStateChanged, User } from "firebase/auth";
 import {
-  loginWithIdOrEmail,
   loginWithGoogle,
+  loginWithIdOrEmail,
   loginWithKakao,
   logout,
   signUpWithEmail,
@@ -48,43 +48,6 @@ export default function HomeScreen() {
     });
   }, []);
 
-  useEffect(() => {
-    const loginWithGoogleResponse = async () => {
-      if (isWeb || !googleResponse) {
-        return;
-      }
-
-      if (googleResponse.type !== "success") {
-        if (googleResponse.type === "error") {
-          Alert.alert(
-            "구글 로그인 실패",
-            googleResponse.params?.error_description ||
-              googleResponse.params?.error ||
-              "Google 인증 중 오류가 발생했습니다."
-          );
-        }
-
-        return;
-      }
-
-      const idToken =
-        googleResponse.params?.id_token || googleResponse.authentication?.idToken;
-
-      if (!idToken && googleResponse.params?.code) {
-        return;
-      }
-
-      try {
-        await loginWithGoogleIdToken(idToken);
-        Alert.alert("구글 로그인 성공");
-      } catch (error: any) {
-        Alert.alert("구글 로그인 실패", error.message);
-      }
-    };
-
-    loginWithGoogleResponse();
-  }, [googleResponse, isWeb]);
-
   const resetForm = () => {
     setIdOrEmail("");
     setEmail("");
@@ -96,12 +59,6 @@ export default function HomeScreen() {
   };
 
   const handleSignUp = async () => {
-    console.log("[handleSignUp] clicked", {
-      email,
-      loginId,
-      nickname,
-      passwordLength: password.length,
-    });
     if (!email || !password || !nickname || !loginId) {
       Alert.alert("입력 오류", "아이디, 이메일, 비밀번호, 닉네임을 모두 입력하세요.");
       return;
@@ -136,10 +93,7 @@ export default function HomeScreen() {
   };
 
   const handleKakaoLogin = async () => {
-    console.log("[handleKakaoLogin] 카카오 버튼 클릭됨");
-
     if (kakaoLoginInProgressRef.current) {
-      console.log("[handleKakaoLogin] ignored duplicate click");
       return;
     }
 
@@ -307,10 +261,7 @@ export default function HomeScreen() {
         <>
           <View style={{ height: 12 }} />
 
-          <Button
-            title="구글로 로그인"
-            onPress={handleGoogleLogin}
-          />
+          <Button title="구글로 로그인" onPress={handleGoogleLogin} />
           <View style={{ height: 12 }} />
 
           <Button
