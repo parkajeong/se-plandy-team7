@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Kakao Login</title>
+  </head>
+  <body>
+    <p>카카오 로그인 처리 중입니다...</p>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const error = params.get("error");
+      const errorDescription = params.get("error_description");
+
+      if (error) {
+        window.location.href =
+          "plandy://kakao-auth?error=" +
+          encodeURIComponent(error) +
+          "&error_description=" +
+          encodeURIComponent(errorDescription || "");
+      } else if (code) {
+        window.location.href =
+          "plandy://kakao-auth?code=" + encodeURIComponent(code);
+      } else {
+        document.body.innerText = "카카오 인가 코드가 없습니다.";
+      }
+    </script>
+  </body>
+</html>
