@@ -1,6 +1,10 @@
 import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
 import {
+  GoogleSignin,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
+import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithCredential,
@@ -26,6 +30,32 @@ const isWeb = Platform.OS === "web";
 const KAKAO_REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY;
 const KAKAO_REDIRECT_URI = "https://se-plandy-app.vercel.app/kakao-auth.html";
 const KAKAO_APP_RETURN_URI = "plandy://kakao-auth";
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+
+let isGoogleSigninConfigured = false;
+
+const configureNativeGoogleSignIn = () => {
+  if (isGoogleSigninConfigured) {
+    return;
+  }
+
+  if (!GOOGLE_WEB_CLIENT_ID) {
+    throw new Error("EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID가 설정되지 않았습니다.");
+  }
+
+  const config = {
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    scopes: ["openid", "profile", "email"],
+  };
+
+  if (Platform.OS === "ios" && GOOGLE_IOS_CLIENT_ID) {
+    config.iosClientId = GOOGLE_IOS_CLIENT_ID;
+  }
+
+  GoogleSignin.configure(config);
+  isGoogleSigninConfigured = true;
+};
 
 export const signUpWithEmail = async ({ email, password, loginId, nickname }) => {
   console.log("[signUpWithEmail] called", {
@@ -127,6 +157,11 @@ export const loginWithIdOrEmail = async (idOrEmail, password) => {
 
 export const logout = async () => {
   await clearAppUser();
+
+  if (!isWeb && isGoogleSigninConfigured) {
+    await GoogleSignin.signOut().catch(() => null);
+  }
+
   await signOut(auth);
 };
 
@@ -331,7 +366,38 @@ export const loginWithGoogle = async () => {
     return user;
   }
 
-  throw new Error("앱 Google 로그인은 Expo AuthSession 훅에서 처리해야 합니다.");
+  configureNativeGoogleSignIn();
+
+  try {
+    if (Platform.OS === "android") {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    }
+
+    const signInResponse = await GoogleSignin.signIn();
+
+    if (signInResponse.type !== "success") {
+      throw new Error("Google 로그인이 취소되었습니다.");
+    }
+
+    const idToken =
+      signInResponse.data.idToken || (await GoogleSignin.getTokens()).idToken;
+
+    return loginWithGoogleIdToken(idToken);
+  } catch (error) {
+    if (error?.code === statusCodes.SIGN_IN_CANCELLED) {
+      throw new Error("Google 로그인이 취소되었습니다.");
+    }
+
+    if (error?.code === statusCodes.IN_PROGRESS) {
+      throw new Error("Google 로그인이 이미 진행 중입니다.");
+    }
+
+    if (error?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+      throw new Error("Google Play Services를 사용할 수 없습니다.");
+    }
+
+    throw error;
+  }
 };
 
 export const loginWithGoogleIdToken = async (idToken) => {
