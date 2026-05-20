@@ -14,7 +14,11 @@ import {
   collection,
   addDoc,
   getDocs,
+  query,
+  where,
 } from "firebase/firestore";
+
+import { getCurrentAppUserIdOrNull } from "@/src/appSession";
 
 const firebase = require("../../src/firebase");
 const db = firebase.db;
@@ -25,6 +29,9 @@ export default function ScheduleScreen() {
   const [type, setType] = useState("");
 
   const [schedules, setSchedules] = useState<any[]>([]);
+
+  // 현재 로그인 사용자 ID
+  const userId = getCurrentAppUserIdOrNull();
 
   // 달력 팝업 상태
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
@@ -45,17 +52,14 @@ export default function ScheduleScreen() {
       return "";
     }
 
-    // Firestore Timestamp인 경우
     if (value.toDate) {
       return formatDate(value.toDate());
     }
 
-    // Date 객체인 경우
     if (value instanceof Date) {
       return formatDate(value);
     }
 
-    // 기존 테스트 데이터처럼 문자열인 경우
     return value;
   };
 
@@ -97,7 +101,6 @@ export default function ScheduleScreen() {
       days.push(day);
     }
 
-    // 마지막 주도 7칸을 맞추기 위해 빈 칸 추가
     while (days.length % 7 !== 0) {
       days.push(null);
     }
@@ -145,10 +148,18 @@ export default function ScheduleScreen() {
 
   // 일정 조회 함수
   const fetchSchedules = async () => {
+    if (!userId) {
+      setSchedules([]);
+      return;
+    }
+
     try {
-      const querySnapshot = await getDocs(
-        collection(db, "schedules")
+      const q = query(
+        collection(db, "schedules"),
+        where("user_id", "==", userId)
       );
+
+      const querySnapshot = await getDocs(q);
 
       const data: any[] = [];
 
@@ -167,16 +178,22 @@ export default function ScheduleScreen() {
       setSchedules(data);
     } catch (error) {
       console.log(error);
+      Alert.alert("오류", "일정 조회 실패");
     }
   };
 
   // 화면 실행 시 일정 불러오기
   useEffect(() => {
     fetchSchedules();
-  }, []);
+  }, [userId]);
 
   // 일정 등록 함수
   const handleAddSchedule = async () => {
+    if (!userId) {
+      Alert.alert("오류", "로그인 후 일정을 등록할 수 있습니다.");
+      return;
+    }
+
     if (!title || !selectedDate || !type) {
       Alert.alert("오류", "모든 항목을 입력해주세요.");
       return;
@@ -184,7 +201,7 @@ export default function ScheduleScreen() {
 
     try {
       await addDoc(collection(db, "schedules"), {
-        user_id: "test-user",
+        user_id: userId,
         title: title,
         start_time: selectedDate,
         end_time: selectedDate,
@@ -194,12 +211,10 @@ export default function ScheduleScreen() {
 
       Alert.alert("성공", "일정이 등록되었습니다.");
 
-      // 입력창 초기화
       setTitle("");
       setSelectedDate(null);
       setType("");
 
-      // 등록 후 목록 새로고침
       fetchSchedules();
 
     } catch (error) {
@@ -215,6 +230,12 @@ export default function ScheduleScreen() {
 
       <Text style={styles.title}>일정 관리</Text>
 
+      {!userId && (
+        <Text style={styles.loginNotice}>
+          로그인 후 일정 등록 및 조회가 가능합니다.
+        </Text>
+      )}
+
       {/* 일정 제목 입력 */}
       <TextInput
         style={styles.input}
@@ -226,7 +247,14 @@ export default function ScheduleScreen() {
       {/* 날짜 선택 */}
       <TouchableOpacity
         style={styles.input}
-        onPress={() => setIsCalendarVisible(true)}
+        onPress={() => {
+          if (!userId) {
+            Alert.alert("오류", "로그인 후 날짜를 선택할 수 있습니다.");
+            return;
+          }
+
+          setIsCalendarVisible(true);
+        }}
       >
         <Text style={selectedDate ? styles.dateText : styles.placeholderText}>
           {selectedDate ? formatDate(selectedDate) : "날짜 선택"}
@@ -256,6 +284,13 @@ export default function ScheduleScreen() {
         data={schedules}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>
+            {userId
+              ? "등록된 일정이 없습니다."
+              : "로그인 후 등록된 일정을 확인할 수 있습니다."}
+          </Text>
+        }
         renderItem={({ item }) => (
           <View style={styles.card}>
 
@@ -354,6 +389,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
+  loginNotice: {
+    color: "#e53e3e",
+    marginBottom: 15,
+    fontSize: 15,
+  },
+
   input: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -395,6 +436,11 @@ const styles = StyleSheet.create({
 
   listContent: {
     paddingBottom: 100,
+  },
+
+  emptyText: {
+    color: "#777",
+    marginTop: 10,
   },
 
   card: {
