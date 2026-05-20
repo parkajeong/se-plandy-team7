@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "build": "mkdir -p dist && cp public/kakao-auth.html dist/kakao-auth.html"
+  }
+}
