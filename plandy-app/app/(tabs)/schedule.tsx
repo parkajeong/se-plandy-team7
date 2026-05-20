@@ -7,6 +7,7 @@ import {
   Alert,
   StyleSheet,
   FlatList,
+  Modal,
 } from "react-native";
 
 import {
@@ -20,10 +21,127 @@ const db = firebase.db;
 
 export default function ScheduleScreen() {
   const [title, setTitle] = useState("");
-  const [date, setDate] = useState("");
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [type, setType] = useState("");
 
   const [schedules, setSchedules] = useState<any[]>([]);
+
+  // 달력 팝업 상태
+  const [isCalendarVisible, setIsCalendarVisible] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  // 날짜를 YYYY-MM-DD 형식으로 변환
+  const formatDate = (targetDate: Date) => {
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, "0");
+    const day = String(targetDate.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
+
+  // Firestore Timestamp / Date / 문자열 날짜를 화면 표시용으로 변환
+  const formatScheduleDate = (value: any) => {
+    if (!value) {
+      return "";
+    }
+
+    // Firestore Timestamp인 경우
+    if (value.toDate) {
+      return formatDate(value.toDate());
+    }
+
+    // Date 객체인 경우
+    if (value instanceof Date) {
+      return formatDate(value);
+    }
+
+    // 기존 테스트 데이터처럼 문자열인 경우
+    return value;
+  };
+
+  // 정렬용 시간 값 변환
+  const getTimeValue = (value: any) => {
+    if (!value) {
+      return 0;
+    }
+
+    if (value.toDate) {
+      return value.toDate().getTime();
+    }
+
+    if (value instanceof Date) {
+      return value.getTime();
+    }
+
+    return new Date(value).getTime();
+  };
+
+  // 현재 달의 날짜 배열 생성
+  const getCalendarDays = () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    const firstDayOfWeek = firstDay.getDay();
+    const totalDays = lastDay.getDate();
+
+    const days: (number | null)[] = [];
+
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      days.push(null);
+    }
+
+    for (let day = 1; day <= totalDays; day++) {
+      days.push(day);
+    }
+
+    // 마지막 주도 7칸을 맞추기 위해 빈 칸 추가
+    while (days.length % 7 !== 0) {
+      days.push(null);
+    }
+
+    return days;
+  };
+
+  // 날짜 배열을 7개씩 나누어 주 단위 배열로 변환
+  const getCalendarWeeks = () => {
+    const days = getCalendarDays();
+    const weeks: (number | null)[][] = [];
+
+    for (let i = 0; i < days.length; i += 7) {
+      weeks.push(days.slice(i, i + 7));
+    }
+
+    return weeks;
+  };
+
+  // 이전 달 이동
+  const handlePrevMonth = () => {
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1)
+    );
+  };
+
+  // 다음 달 이동
+  const handleNextMonth = () => {
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1)
+    );
+  };
+
+  // 날짜 선택
+  const handleSelectDate = (day: number) => {
+    const date = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth(),
+      day
+    );
+
+    setSelectedDate(date);
+    setIsCalendarVisible(false);
+  };
 
   // 일정 조회 함수
   const fetchSchedules = async () => {
@@ -43,10 +161,7 @@ export default function ScheduleScreen() {
 
       // start_time 기준 날짜 빠른 순 정렬
       data.sort((a, b) => {
-        return (
-          new Date(a.start_time).getTime() -
-          new Date(b.start_time).getTime()
-        );
+        return getTimeValue(a.start_time) - getTimeValue(b.start_time);
       });
 
       setSchedules(data);
@@ -62,7 +177,7 @@ export default function ScheduleScreen() {
 
   // 일정 등록 함수
   const handleAddSchedule = async () => {
-    if (!title || !date || !type) {
+    if (!title || !selectedDate || !type) {
       Alert.alert("오류", "모든 항목을 입력해주세요.");
       return;
     }
@@ -71,8 +186,8 @@ export default function ScheduleScreen() {
       await addDoc(collection(db, "schedules"), {
         user_id: "test-user",
         title: title,
-        start_time: date,
-        end_time: date,
+        start_time: selectedDate,
+        end_time: selectedDate,
         description: type,
         created_at: new Date(),
       });
@@ -81,7 +196,7 @@ export default function ScheduleScreen() {
 
       // 입력창 초기화
       setTitle("");
-      setDate("");
+      setSelectedDate(null);
       setType("");
 
       // 등록 후 목록 새로고침
@@ -93,12 +208,14 @@ export default function ScheduleScreen() {
     }
   };
 
+  const calendarWeeks = getCalendarWeeks();
+
   return (
     <View style={styles.container}>
 
       <Text style={styles.title}>일정 관리</Text>
 
-      {/* 일정 등록 입력창 */}
+      {/* 일정 제목 입력 */}
       <TextInput
         style={styles.input}
         placeholder="일정 제목"
@@ -106,13 +223,17 @@ export default function ScheduleScreen() {
         onChangeText={setTitle}
       />
 
-      <TextInput
+      {/* 날짜 선택 */}
+      <TouchableOpacity
         style={styles.input}
-        placeholder="날짜 (2026-05-17)"
-        value={date}
-        onChangeText={setDate}
-      />
+        onPress={() => setIsCalendarVisible(true)}
+      >
+        <Text style={selectedDate ? styles.dateText : styles.placeholderText}>
+          {selectedDate ? formatDate(selectedDate) : "날짜 선택"}
+        </Text>
+      </TouchableOpacity>
 
+      {/* 일정 유형 입력 */}
       <TextInput
         style={styles.input}
         placeholder="유형 (시험 / 과제 / 공부)"
@@ -134,6 +255,7 @@ export default function ScheduleScreen() {
       <FlatList
         data={schedules}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
           <View style={styles.card}>
 
@@ -142,7 +264,7 @@ export default function ScheduleScreen() {
             </Text>
 
             <Text style={styles.scheduleText}>
-              날짜: {item.start_time}
+              날짜: {formatScheduleDate(item.start_time)}
             </Text>
 
             <Text style={styles.scheduleText}>
@@ -152,6 +274,68 @@ export default function ScheduleScreen() {
           </View>
         )}
       />
+
+      {/* 달력 팝업 */}
+      <Modal
+        visible={isCalendarVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsCalendarVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.calendarContainer}>
+
+            <View style={styles.calendarHeader}>
+              <TouchableOpacity onPress={handlePrevMonth}>
+                <Text style={styles.monthButton}>‹</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.monthTitle}>
+                {currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월
+              </Text>
+
+              <TouchableOpacity onPress={handleNextMonth}>
+                <Text style={styles.monthButton}>›</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.weekRow}>
+              {["일", "월", "화", "수", "목", "금", "토"].map((weekDay) => (
+                <Text key={weekDay} style={styles.weekText}>
+                  {weekDay}
+                </Text>
+              ))}
+            </View>
+
+            <View style={styles.daysContainer}>
+              {calendarWeeks.map((week, weekIndex) => (
+                <View key={weekIndex} style={styles.dayRow}>
+                  {week.map((day, dayIndex) => (
+                    <TouchableOpacity
+                      key={dayIndex}
+                      style={styles.dayBox}
+                      disabled={day === null}
+                      onPress={() => day && handleSelectDate(day)}
+                    >
+                      <Text style={styles.dayText}>
+                        {day || ""}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setIsCalendarVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>닫기</Text>
+            </TouchableOpacity>
+
+          </View>
+        </View>
+      </Modal>
 
     </View>
   );
@@ -176,6 +360,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 15,
     marginBottom: 15,
+    justifyContent: "center",
+  },
+
+  dateText: {
+    fontSize: 16,
+    color: "#000",
+  },
+
+  placeholderText: {
+    fontSize: 16,
+    color: "#999",
   },
 
   button: {
@@ -198,6 +393,10 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
 
+  listContent: {
+    paddingBottom: 100,
+  },
+
   card: {
     backgroundColor: "#F2F2F2",
     padding: 15,
@@ -213,5 +412,83 @@ const styles = StyleSheet.create({
 
   scheduleText: {
     fontSize: 16,
+  },
+
+  modalBackground: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+
+  calendarContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    padding: 20,
+  },
+
+  calendarHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+
+  monthButton: {
+    fontSize: 32,
+    fontWeight: "bold",
+    paddingHorizontal: 15,
+  },
+
+  monthTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+
+  weekRow: {
+    flexDirection: "row",
+    marginBottom: 10,
+  },
+
+  weekText: {
+    flex: 1,
+    textAlign: "center",
+    fontWeight: "bold",
+    color: "#555",
+  },
+
+  daysContainer: {
+    width: "100%",
+  },
+
+  dayRow: {
+    flexDirection: "row",
+  },
+
+  dayBox: {
+    flex: 1,
+    height: 42,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  dayText: {
+    fontSize: 16,
+  },
+
+  closeButton: {
+    marginTop: 20,
+    backgroundColor: "#4A90E2",
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  closeButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
