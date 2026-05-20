@@ -12,7 +12,7 @@ import {
   signUpWithEmail,
   loginWithGoogleIdToken,
 } from "../../src/authService";
-import { getAppUser } from "../../src/appSession";
+import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
 import { auth } from "../../src/firebase";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -58,6 +58,18 @@ export default function HomeScreen() {
     });
 
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const storedAppUser = getAppUser();
+
+    if (storedAppUser) {
+      setCurrentAppUser(storedAppUser);
+    }
+
+    return subscribeAppUserChange((user: any | null) => {
+      setCurrentAppUser(user);
+    });
   }, []);
 
   useEffect(() => {

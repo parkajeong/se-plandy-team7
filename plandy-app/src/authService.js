@@ -25,7 +25,9 @@ const isWeb = Platform.OS === "web";
 
 const KAKAO_REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY;
 const KAKAO_REDIRECT_URI = "https://se-plandy-app.vercel.app/kakao-auth.html";
+const KAKAO_WEB_CALLBACK_ORIGIN = new URL(KAKAO_REDIRECT_URI).origin;
 const KAKAO_APP_RETURN_URI = "plandy://kakao-auth";
+const KAKAO_AUTH_PROMPT = "select_account";
 
 export const signUpWithEmail = async ({ email, password, loginId, nickname }) => {
   console.log("[signUpWithEmail] called", {
@@ -268,6 +270,110 @@ const fetchKakaoUser = async (accessToken) => {
   };
 };
 
+const openKakaoAuthPopup = (authUrl) => {
+  if (typeof window === "undefined") {
+    throw new Error("웹 브라우저 환경에서만 카카오 팝업 로그인을 사용할 수 있습니다.");
+  }
+
+  let settled = false;
+  const popupWidth = 480;
+  const popupHeight = 720;
+  const popupLeft = window.screenX + (window.outerWidth - popupWidth) / 2;
+  const popupTop = window.screenY + (window.outerHeight - popupHeight) / 2;
+
+  return new Promise((resolve, reject) => {
+    let popup = null;
+    let popupClosedInterval = null;
+
+    const cleanup = () => {
+      if (popupClosedInterval) {
+        window.clearInterval(popupClosedInterval);
+      }
+
+      window.removeEventListener("message", handleMessage);
+    };
+
+    const finishWithError = (error) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+
+    const finishWithCode = (code) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup();
+      resolve(code);
+    };
+
+    const handleMessage = (event) => {
+      if (
+        event.origin !== KAKAO_WEB_CALLBACK_ORIGIN ||
+        event.data?.source !== "plandy-kakao-auth"
+      ) {
+        return;
+      }
+
+      popup?.close();
+
+      if (event.data.error) {
+        finishWithError(
+          new Error(
+            event.data.errorDescription ||
+              event.data.error ||
+              "카카오 로그인 중 오류가 발생했습니다."
+          )
+        );
+        return;
+      }
+
+      if (!event.data.code) {
+        finishWithError(new Error("카카오 인가 코드를 가져오지 못했습니다."));
+        return;
+      }
+
+      finishWithCode(event.data.code);
+    };
+
+    window.addEventListener("message", handleMessage);
+
+    popup = window.open(
+      authUrl,
+      "plandy-kakao-login",
+      [
+        `width=${popupWidth}`,
+        `height=${popupHeight}`,
+        `left=${Math.max(0, popupLeft)}`,
+        `top=${Math.max(0, popupTop)}`,
+        "resizable=yes",
+        "scrollbars=yes",
+      ].join(",")
+    );
+
+    if (!popup) {
+      finishWithError(
+        new Error("카카오 로그인 팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.")
+      );
+      return;
+    }
+
+    popup.focus();
+
+    popupClosedInterval = window.setInterval(() => {
+      if (!settled && popup.closed) {
+        finishWithError(new Error("카카오 로그인이 완료되지 않았습니다."));
+      }
+    }, 500);
+  });
+};
+
 export const loginWithKakao = async () => {
   const restApiKey = KAKAO_REST_API_KEY;
 
@@ -289,19 +395,34 @@ export const loginWithKakao = async () => {
     "https://kauth.kakao.com/oauth/authorize?" +
     `response_type=code` +
     `&client_id=${encodeURIComponent(restApiKey)}` +
-    `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&prompt=${encodeURIComponent(KAKAO_AUTH_PROMPT)}`;
 
-  const result = await WebBrowser.openAuthSessionAsync(
-    authUrl,
-    KAKAO_APP_RETURN_URI
-  );
-  console.log("[Kakao] auth result:", result);
+  let code;
 
-  if (result.type !== "success") {
-    throw new Error("카카오 로그인이 완료되지 않았습니다.");
+  if (isWeb) {
+    code = await openKakaoAuthPopup(authUrl);
+  } else {
+    const result = await WebBrowser.openAuthSessionAsync(
+      authUrl,
+      KAKAO_APP_RETURN_URI
+    );
+    console.log("[Kakao] auth result:", result);
+
+    if (result.type !== "success") {
+      throw new Error("카카오 로그인이 완료되지 않았습니다.");
+    }
+
+    const resultUrl = new URL(result.url);
+    const error = resultUrl.searchParams.get("error");
+    const errorDescription = resultUrl.searchParams.get("error_description");
+
+    if (error) {
+      throw new Error(errorDescription || error);
+    }
+
+    code = resultUrl.searchParams.get("code");
   }
-
-  const code = new URL(result.url).searchParams.get("code");
 
   console.log("[Kakao] code exists:", !!code);
 
