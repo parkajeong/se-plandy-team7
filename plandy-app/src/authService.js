@@ -25,6 +25,7 @@ const isWeb = Platform.OS === "web";
 
 const KAKAO_REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY;
 const KAKAO_REDIRECT_URI = "https://se-plandy-app.vercel.app/kakao-auth.html";
+const KAKAO_APP_RETURN_URI = "plandy://kakao-auth";
 
 export const signUpWithEmail = async ({ email, password, loginId, nickname }) => {
   console.log("[signUpWithEmail] called", {
@@ -282,6 +283,7 @@ export const loginWithKakao = async () => {
 
   console.log("[Kakao] restApiKey exists:", !!restApiKey);
   console.log("[Kakao] redirectUri:", redirectUri);
+  console.log("[Kakao] appReturnUri:", KAKAO_APP_RETURN_URI);
 
   const authUrl =
     "https://kauth.kakao.com/oauth/authorize?" +
@@ -289,7 +291,10 @@ export const loginWithKakao = async () => {
     `&client_id=${encodeURIComponent(restApiKey)}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
-  const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+  const result = await WebBrowser.openAuthSessionAsync(
+    authUrl,
+    KAKAO_APP_RETURN_URI
+  );
   console.log("[Kakao] auth result:", result);
 
   if (result.type !== "success") {
