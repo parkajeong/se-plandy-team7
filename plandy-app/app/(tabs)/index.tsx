@@ -8,7 +8,7 @@ import {
   logout,
   signUpWithEmail,
 } from "../../src/authService";
-import { getAppUser } from "../../src/appSession";
+import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
 import { auth } from "../../src/firebase";
 
 export default function HomeScreen() {
@@ -35,6 +35,55 @@ export default function HomeScreen() {
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    const storedAppUser = getAppUser();
+
+    if (storedAppUser) {
+      setCurrentAppUser(storedAppUser);
+    }
+
+    return subscribeAppUserChange((user: any | null) => {
+      setCurrentAppUser(user);
+    });
+  }, []);
+
+  useEffect(() => {
+    const loginWithGoogleResponse = async () => {
+      if (isWeb || !googleResponse) {
+        return;
+      }
+
+      if (googleResponse.type !== "success") {
+        if (googleResponse.type === "error") {
+          Alert.alert(
+            "구글 로그인 실패",
+            googleResponse.params?.error_description ||
+              googleResponse.params?.error ||
+              "Google 인증 중 오류가 발생했습니다."
+          );
+        }
+
+        return;
+      }
+
+      const idToken =
+        googleResponse.params?.id_token || googleResponse.authentication?.idToken;
+
+      if (!idToken && googleResponse.params?.code) {
+        return;
+      }
+
+      try {
+        await loginWithGoogleIdToken(idToken);
+        Alert.alert("구글 로그인 성공");
+      } catch (error: any) {
+        Alert.alert("구글 로그인 실패", error.message);
+      }
+    };
+
+    loginWithGoogleResponse();
+  }, [googleResponse, isWeb]);
 
   const resetForm = () => {
     setIdOrEmail("");
