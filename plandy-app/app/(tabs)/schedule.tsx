@@ -16,6 +16,9 @@ import {
   getDocs,
   query,
   where,
+  doc,
+  updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 
 import { getCurrentAppUserIdOrNull } from "@/src/appSession";
@@ -37,6 +40,16 @@ export default function ScheduleScreen() {
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
+  // 날짜 선택 대상: 등록용인지 수정용인지 구분
+  const [calendarTarget, setCalendarTarget] = useState<"add" | "edit">("add");
+
+  // 일정 수정 모달 상태
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDate, setEditDate] = useState<Date | null>(null);
+  const [editType, setEditType] = useState("");
+
   // 날짜를 YYYY-MM-DD 형식으로 변환
   const formatDate = (targetDate: Date) => {
     const year = targetDate.getFullYear();
@@ -46,38 +59,49 @@ export default function ScheduleScreen() {
     return `${year}-${month}-${day}`;
   };
 
-  // Firestore Timestamp / Date / 문자열 날짜를 화면 표시용으로 변환
-  const formatScheduleDate = (value: any) => {
+  // Firestore Timestamp / Date / 문자열 날짜를 Date 객체로 변환
+  const toDateObject = (value: any) => {
     if (!value) {
-      return "";
+      return null;
     }
 
     if (value.toDate) {
-      return formatDate(value.toDate());
+      return value.toDate();
     }
 
     if (value instanceof Date) {
-      return formatDate(value);
+      return value;
     }
 
-    return value;
+    const convertedDate = new Date(value);
+
+    if (Number.isNaN(convertedDate.getTime())) {
+      return null;
+    }
+
+    return convertedDate;
+  };
+
+  // Firestore Timestamp / Date / 문자열 날짜를 화면 표시용으로 변환
+  const formatScheduleDate = (value: any) => {
+    const date = toDateObject(value);
+
+    if (!date) {
+      return "";
+    }
+
+    return formatDate(date);
   };
 
   // 정렬용 시간 값 변환
   const getTimeValue = (value: any) => {
-    if (!value) {
+    const date = toDateObject(value);
+
+    if (!date) {
       return 0;
     }
 
-    if (value.toDate) {
-      return value.toDate().getTime();
-    }
-
-    if (value instanceof Date) {
-      return value.getTime();
-    }
-
-    return new Date(value).getTime();
+    return date.getTime();
   };
 
   // 현재 달의 날짜 배열 생성
@@ -142,7 +166,12 @@ export default function ScheduleScreen() {
       day
     );
 
-    setSelectedDate(date);
+    if (calendarTarget === "add") {
+      setSelectedDate(date);
+    } else {
+      setEditDate(date);
+    }
+
     setIsCalendarVisible(false);
   };
 
@@ -223,6 +252,85 @@ export default function ScheduleScreen() {
     }
   };
 
+  // 일정 수정 모달 열기
+  const handleOpenEditModal = (schedule: any) => {
+    setEditingScheduleId(schedule.id);
+    setEditTitle(schedule.title || "");
+    setEditDate(toDateObject(schedule.start_time));
+    setEditType(schedule.description || "");
+    setIsEditModalVisible(true);
+  };
+
+  // 일정 수정
+  const handleUpdateSchedule = async () => {
+    if (!userId) {
+      Alert.alert("오류", "로그인 후 일정을 수정할 수 있습니다.");
+      return;
+    }
+
+    if (!editingScheduleId || !editTitle || !editDate || !editType) {
+      Alert.alert("오류", "모든 항목을 입력해주세요.");
+      return;
+    }
+
+    try {
+      const scheduleRef = doc(db, "schedules", editingScheduleId);
+
+      await updateDoc(scheduleRef, {
+        title: editTitle,
+        start_time: editDate,
+        end_time: editDate,
+        description: editType,
+      });
+
+      Alert.alert("성공", "일정이 수정되었습니다.");
+
+      setIsEditModalVisible(false);
+      setEditingScheduleId(null);
+      setEditTitle("");
+      setEditDate(null);
+      setEditType("");
+
+      fetchSchedules();
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "일정 수정 실패");
+    }
+  };
+
+  // 일정 삭제
+  const handleDeleteSchedule = (scheduleId: string) => {
+    if (!userId) {
+      Alert.alert("오류", "로그인 후 일정을 삭제할 수 있습니다.");
+      return;
+    }
+
+    Alert.alert(
+      "일정 삭제",
+      "이 일정을 삭제하시겠습니까?",
+      [
+        {
+          text: "취소",
+          style: "cancel",
+        },
+        {
+          text: "삭제",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteDoc(doc(db, "schedules", scheduleId));
+              Alert.alert("성공", "일정이 삭제되었습니다.");
+              fetchSchedules();
+            } catch (error) {
+              console.log(error);
+              Alert.alert("오류", "일정 삭제 실패");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const calendarWeeks = getCalendarWeeks();
 
   return (
@@ -253,6 +361,7 @@ export default function ScheduleScreen() {
             return;
           }
 
+          setCalendarTarget("add");
           setIsCalendarVisible(true);
         }}
       >
@@ -306,9 +415,81 @@ export default function ScheduleScreen() {
               유형: {item.description}
             </Text>
 
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => handleOpenEditModal(item)}
+              >
+                <Text style={styles.editButtonText}>수정</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={() => handleDeleteSchedule(item.id)}
+              >
+                <Text style={styles.deleteButtonText}>삭제</Text>
+              </TouchableOpacity>
+            </View>
+
           </View>
         )}
       />
+
+      {/* 일정 수정 모달 */}
+      <Modal
+        visible={isEditModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsEditModalVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.editModalContainer}>
+
+            <Text style={styles.modalTitle}>일정 수정</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="일정 제목"
+              value={editTitle}
+              onChangeText={setEditTitle}
+            />
+
+            <TouchableOpacity
+              style={styles.input}
+              onPress={() => {
+                setCalendarTarget("edit");
+                setIsCalendarVisible(true);
+              }}
+            >
+              <Text style={editDate ? styles.dateText : styles.placeholderText}>
+                {editDate ? formatDate(editDate) : "날짜 선택"}
+              </Text>
+            </TouchableOpacity>
+
+            <TextInput
+              style={styles.input}
+              placeholder="유형 (시험 / 과제 / 공부)"
+              value={editType}
+              onChangeText={setEditType}
+            />
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleUpdateSchedule}
+            >
+              <Text style={styles.buttonText}>수정 완료</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setIsEditModalVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>취소</Text>
+            </TouchableOpacity>
+
+          </View>
+        </View>
+      </Modal>
 
       {/* 달력 팝업 */}
       <Modal
@@ -419,7 +600,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 15,
   },
 
   buttonText: {
@@ -460,12 +641,72 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
+  actionRow: {
+    flexDirection: "row",
+    marginTop: 12,
+    gap: 8,
+  },
+
+  editButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#4A90E2",
+    borderRadius: 8,
+    padding: 10,
+    alignItems: "center",
+  },
+
+  editButtonText: {
+    color: "#4A90E2",
+    fontWeight: "bold",
+  },
+
+  deleteButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#e53e3e",
+    borderRadius: 8,
+    padding: 10,
+    alignItems: "center",
+  },
+
+  deleteButtonText: {
+    color: "#e53e3e",
+    fontWeight: "bold",
+  },
+
   modalBackground: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.4)",
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
+  },
+
+  editModalContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    padding: 20,
+  },
+
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 15,
+  },
+
+  cancelButton: {
+    backgroundColor: "#F2F2F2",
+    padding: 15,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  cancelButtonText: {
+    color: "#555",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 
   calendarContainer: {
