@@ -16,6 +16,9 @@ import {
   getDocs,
   query,
   where,
+  doc,
+  updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 
 import { getCurrentAppUserIdOrNull } from "@/src/appSession";
@@ -49,6 +52,15 @@ export default function NoteScreen() {
   const [isSearchSubjectModalVisible, setIsSearchSubjectModalVisible] =
     useState(false);
 
+  // 노트 수정 모달 상태
+  const [isEditNoteModalVisible, setIsEditNoteModalVisible] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editNoteTitle, setEditNoteTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [editSubject, setEditSubject] = useState<Subject | null>(null);
+  const [isEditSubjectModalVisible, setIsEditSubjectModalVisible] =
+    useState(false);
+
   const userId = getCurrentAppUserIdOrNull();
 
   const fetchSubjects = async () => {
@@ -68,7 +80,7 @@ export default function NoteScreen() {
 
   useEffect(() => {
     fetchSubjects();
-  }, []);
+  }, [userId]);
 
   const handleAddNote = async () => {
     if (!userId) {
@@ -142,6 +154,95 @@ export default function NoteScreen() {
     return subject ? subject.title : subjectId;
   };
 
+  const getSubjectById = (subjectId: string) => {
+    return subjects.find((item) => item.id === subjectId) || null;
+  };
+
+  // 노트 수정 모달 열기
+  const handleOpenEditNoteModal = async (note: any) => {
+    await fetchSubjects();
+
+    setEditingNoteId(note.id);
+    setEditNoteTitle(note.title || "");
+    setEditContent(note.content || "");
+    setEditSubject(getSubjectById(note.subject_id));
+    setIsEditNoteModalVisible(true);
+  };
+
+  // 노트 수정
+  const handleUpdateNote = async () => {
+    if (!userId) {
+      Alert.alert("오류", "로그인 후 노트를 수정할 수 있습니다.");
+      return;
+    }
+
+    if (!editingNoteId || !editSubject || !editNoteTitle || !editContent) {
+      Alert.alert("오류", "과목, 노트 제목, 노트 내용을 모두 입력해주세요.");
+      return;
+    }
+
+    try {
+      const noteRef = doc(db, "notes", editingNoteId);
+
+      await updateDoc(noteRef, {
+        subject_id: editSubject.id,
+        title: editNoteTitle,
+        content: editContent,
+        updated_at: new Date(),
+      });
+
+      Alert.alert("성공", "노트가 수정되었습니다.");
+
+      setIsEditNoteModalVisible(false);
+      setEditingNoteId(null);
+      setEditSubject(null);
+      setEditNoteTitle("");
+      setEditContent("");
+
+      handleSearchNotes();
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "노트 수정 실패");
+    }
+  };
+
+  // 노트 삭제
+  const handleDeleteNote = (noteId: string) => {
+    if (!userId) {
+      Alert.alert("오류", "로그인 후 노트를 삭제할 수 있습니다.");
+      return;
+    }
+
+    Alert.alert(
+      "노트 삭제",
+      "이 노트를 삭제하시겠습니까?",
+      [
+        {
+          text: "취소",
+          style: "cancel",
+        },
+        {
+          text: "삭제",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteDoc(doc(db, "notes", noteId));
+
+              Alert.alert("성공", "노트가 삭제되었습니다.");
+
+              setNotes((prevNotes) =>
+                prevNotes.filter((note) => note.id !== noteId)
+              );
+            } catch (error) {
+              console.log(error);
+              Alert.alert("오류", "노트 삭제 실패");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>노트 관리</Text>
@@ -190,12 +291,13 @@ export default function NoteScreen() {
 
           <TouchableOpacity
             style={styles.input}
-            onPress={() => {
+            onPress={async () => {
               if (!userId) {
                 Alert.alert("오류", "로그인 후 과목을 선택할 수 있습니다.");
                 return;
               }
 
+              await fetchSubjects();
               setIsWriteSubjectModalVisible(true);
             }}
           >
@@ -234,12 +336,13 @@ export default function NoteScreen() {
 
           <TouchableOpacity
             style={styles.input}
-            onPress={() => {
+            onPress={async () => {
               if (!userId) {
                 Alert.alert("오류", "로그인 후 과목을 선택할 수 있습니다.");
                 return;
               }
 
+              await fetchSubjects();
               setIsSearchSubjectModalVisible(true);
             }}
           >
@@ -276,6 +379,22 @@ export default function NoteScreen() {
                 <Text style={styles.noteText}>
                   {item.content}
                 </Text>
+
+                <View style={styles.actionRow}>
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() => handleOpenEditNoteModal(item)}
+                  >
+                    <Text style={styles.editButtonText}>수정</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeleteNote(item.id)}
+                  >
+                    <Text style={styles.deleteButtonText}>삭제</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
           />
@@ -359,6 +478,103 @@ export default function NoteScreen() {
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setIsSearchSubjectModalVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 노트 수정 모달 */}
+      <Modal
+        visible={isEditNoteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsEditNoteModalVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>노트 수정</Text>
+
+            <TouchableOpacity
+              style={styles.input}
+              onPress={async () => {
+                await fetchSubjects();
+                setIsEditSubjectModalVisible(true);
+              }}
+            >
+              <Text style={editSubject ? styles.selectedText : styles.placeholderText}>
+                {editSubject ? editSubject.title : "과목 선택"}
+              </Text>
+            </TouchableOpacity>
+
+            <TextInput
+              style={styles.input}
+              placeholder="노트 제목"
+              value={editNoteTitle}
+              onChangeText={setEditNoteTitle}
+            />
+
+            <TextInput
+              style={styles.noteInput}
+              placeholder="학습 노트 내용을 입력하세요"
+              value={editContent}
+              onChangeText={setEditContent}
+              multiline
+            />
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleUpdateNote}
+            >
+              <Text style={styles.buttonText}>수정 완료</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setIsEditNoteModalVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 노트 수정용 과목 선택 모달 */}
+      <Modal
+        visible={isEditSubjectModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsEditSubjectModalVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>수정할 과목 선택</Text>
+
+            <FlatList
+              data={subjects}
+              keyExtractor={(item) => item.id}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>
+                  등록된 과목이 없습니다.
+                </Text>
+              }
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.subjectItem}
+                  onPress={() => {
+                    setEditSubject(item);
+                    setIsEditSubjectModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.subjectItemText}>{item.title}</Text>
+                </TouchableOpacity>
+              )}
+            />
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setIsEditSubjectModalVisible(false)}
             >
               <Text style={styles.closeButtonText}>닫기</Text>
             </TouchableOpacity>
@@ -458,7 +674,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
-    marginBottom: 25,
+    marginBottom: 15,
   },
 
   searchButton: {
@@ -501,6 +717,53 @@ const styles = StyleSheet.create({
   noteText: {
     fontSize: 16,
     lineHeight: 22,
+  },
+
+  actionRow: {
+    flexDirection: "row",
+    marginTop: 12,
+    gap: 8,
+  },
+
+  editButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#4A90E2",
+    borderRadius: 8,
+    padding: 10,
+    alignItems: "center",
+  },
+
+  editButtonText: {
+    color: "#4A90E2",
+    fontWeight: "bold",
+  },
+
+  deleteButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#e53e3e",
+    borderRadius: 8,
+    padding: 10,
+    alignItems: "center",
+  },
+
+  deleteButtonText: {
+    color: "#e53e3e",
+    fontWeight: "bold",
+  },
+
+  cancelButton: {
+    backgroundColor: "#F2F2F2",
+    padding: 15,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  cancelButtonText: {
+    color: "#555",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 
   emptyText: {
