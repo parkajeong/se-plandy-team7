@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   FlatList,
   Modal,
 } from "react-native";
+
+import { useFocusEffect } from "expo-router";
 
 import {
   collection,
@@ -21,11 +23,12 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 
-import { getCurrentAppUserIdOrNull } from "@/src/appSession";
+import { onAuthStateChanged } from "firebase/auth";
 import { getSubjects } from "@/src/subjectService";
 
 const firebase = require("../../src/firebase");
 const db = firebase.db;
+const auth = firebase.auth;
 
 type Subject = {
   id: string;
@@ -35,6 +38,8 @@ type Subject = {
 };
 
 export default function NoteScreen() {
+  const [userId, setUserId] = useState<string | null>(null);
+
   const [mode, setMode] = useState<"write" | "search">("write");
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -52,7 +57,6 @@ export default function NoteScreen() {
   const [isSearchSubjectModalVisible, setIsSearchSubjectModalVisible] =
     useState(false);
 
-  // 노트 수정 모달 상태
   const [isEditNoteModalVisible, setIsEditNoteModalVisible] = useState(false);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editNoteTitle, setEditNoteTitle] = useState("");
@@ -61,7 +65,25 @@ export default function NoteScreen() {
   const [isEditSubjectModalVisible, setIsEditSubjectModalVisible] =
     useState(false);
 
-  const userId = getCurrentAppUserIdOrNull();
+  const [isDeleteNoteModalVisible, setIsDeleteNoteModalVisible] =
+    useState(false);
+  const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUserId(user.uid);
+      } else {
+        setUserId(null);
+        setSubjects([]);
+        setNotes([]);
+        setSelectedSubject(null);
+        setSearchSubject(null);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
 
   const fetchSubjects = async () => {
     if (!userId) {
@@ -81,6 +103,52 @@ export default function NoteScreen() {
   useEffect(() => {
     fetchSubjects();
   }, [userId]);
+
+  const fetchNotesBySubject = async (
+    targetSubject: Subject,
+    showEmptyAlert: boolean = true
+  ) => {
+    if (!userId) {
+      if (showEmptyAlert) {
+        Alert.alert("오류", "로그인 후 노트를 조회할 수 있습니다.");
+      }
+      return;
+    }
+
+    try {
+      const q = query(
+        collection(db, "notes"),
+        where("user_id", "==", userId),
+        where("subject_id", "==", targetSubject.id)
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      const data: any[] = [];
+
+      querySnapshot.forEach((doc) => {
+        data.push({
+          id: doc.id,
+          ...doc.data(),
+        });
+      });
+
+      setNotes(data);
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "노트 조회 실패");
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchSubjects();
+
+      if (searchSubject) {
+        fetchNotesBySubject(searchSubject, false);
+      }
+    }, [userId, searchSubject])
+  );
 
   const handleAddNote = async () => {
     if (!userId) {
@@ -124,29 +192,7 @@ export default function NoteScreen() {
       return;
     }
 
-    try {
-      const q = query(
-        collection(db, "notes"),
-        where("user_id", "==", userId),
-        where("subject_id", "==", searchSubject.id)
-      );
-
-      const querySnapshot = await getDocs(q);
-
-      const data: any[] = [];
-
-      querySnapshot.forEach((doc) => {
-        data.push({
-          id: doc.id,
-          ...doc.data(),
-        });
-      });
-
-      setNotes(data);
-    } catch (error) {
-      console.log(error);
-      Alert.alert("오류", "노트 조회 실패");
-    }
+    await fetchNotesBySubject(searchSubject);
   };
 
   const getSubjectTitle = (subjectId: string) => {
@@ -158,7 +204,6 @@ export default function NoteScreen() {
     return subjects.find((item) => item.id === subjectId) || null;
   };
 
-  // 노트 수정 모달 열기
   const handleOpenEditNoteModal = async (note: any) => {
     await fetchSubjects();
 
@@ -169,7 +214,6 @@ export default function NoteScreen() {
     setIsEditNoteModalVisible(true);
   };
 
-  // 노트 수정
   const handleUpdateNote = async () => {
     if (!userId) {
       Alert.alert("오류", "로그인 후 노트를 수정할 수 있습니다.");
@@ -199,48 +243,41 @@ export default function NoteScreen() {
       setEditNoteTitle("");
       setEditContent("");
 
-      handleSearchNotes();
+      if (searchSubject) {
+        fetchNotesBySubject(searchSubject, false);
+      }
     } catch (error) {
       console.log(error);
       Alert.alert("오류", "노트 수정 실패");
     }
   };
 
-  // 노트 삭제
+  const deleteNote = async (noteId: string) => {
+    try {
+      await deleteDoc(doc(db, "notes", noteId));
+
+      setNotes((prevNotes) =>
+        prevNotes.filter((note) => note.id !== noteId)
+      );
+
+      setIsDeleteNoteModalVisible(false);
+      setDeletingNoteId(null);
+
+      Alert.alert("성공", "노트가 삭제되었습니다.");
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "노트 삭제 실패");
+    }
+  };
+
   const handleDeleteNote = (noteId: string) => {
     if (!userId) {
       Alert.alert("오류", "로그인 후 노트를 삭제할 수 있습니다.");
       return;
     }
 
-    Alert.alert(
-      "노트 삭제",
-      "이 노트를 삭제하시겠습니까?",
-      [
-        {
-          text: "취소",
-          style: "cancel",
-        },
-        {
-          text: "삭제",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteDoc(doc(db, "notes", noteId));
-
-              Alert.alert("성공", "노트가 삭제되었습니다.");
-
-              setNotes((prevNotes) =>
-                prevNotes.filter((note) => note.id !== noteId)
-              );
-            } catch (error) {
-              console.log(error);
-              Alert.alert("오류", "노트 삭제 실패");
-            }
-          },
-        },
-      ]
-    );
+    setDeletingNoteId(noteId);
+    setIsDeleteNoteModalVisible(true);
   };
 
   return (
@@ -253,7 +290,6 @@ export default function NoteScreen() {
         </Text>
       )}
 
-      {/* 작성 / 조회 전환 버튼 */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[styles.tabButton, mode === "write" && styles.activeTabButton]}
@@ -284,7 +320,6 @@ export default function NoteScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 노트 작성 화면 */}
       {mode === "write" && (
         <View>
           <Text style={styles.sectionTitle}>노트 작성</Text>
@@ -329,7 +364,6 @@ export default function NoteScreen() {
         </View>
       )}
 
-      {/* 노트 조회 화면 */}
       {mode === "search" && (
         <View style={styles.searchContainer}>
           <Text style={styles.sectionTitle}>과목별 노트 조회</Text>
@@ -372,13 +406,9 @@ export default function NoteScreen() {
                   {getSubjectTitle(item.subject_id)}
                 </Text>
 
-                <Text style={styles.noteTitle}>
-                  {item.title}
-                </Text>
+                <Text style={styles.noteTitle}>{item.title}</Text>
 
-                <Text style={styles.noteText}>
-                  {item.content}
-                </Text>
+                <Text style={styles.noteText}>{item.content}</Text>
 
                 <View style={styles.actionRow}>
                   <TouchableOpacity
@@ -416,9 +446,7 @@ export default function NoteScreen() {
               data={subjects}
               keyExtractor={(item) => item.id}
               ListEmptyComponent={
-                <Text style={styles.emptyText}>
-                  등록된 과목이 없습니다.
-                </Text>
+                <Text style={styles.emptyText}>등록된 과목이 없습니다.</Text>
               }
               renderItem={({ item }) => (
                 <TouchableOpacity
@@ -458,9 +486,7 @@ export default function NoteScreen() {
               data={subjects}
               keyExtractor={(item) => item.id}
               ListEmptyComponent={
-                <Text style={styles.emptyText}>
-                  등록된 과목이 없습니다.
-                </Text>
+                <Text style={styles.emptyText}>등록된 과목이 없습니다.</Text>
               }
               renderItem={({ item }) => (
                 <TouchableOpacity
@@ -523,10 +549,7 @@ export default function NoteScreen() {
               multiline
             />
 
-            <TouchableOpacity
-              style={styles.button}
-              onPress={handleUpdateNote}
-            >
+            <TouchableOpacity style={styles.button} onPress={handleUpdateNote}>
               <Text style={styles.buttonText}>수정 완료</Text>
             </TouchableOpacity>
 
@@ -555,9 +578,7 @@ export default function NoteScreen() {
               data={subjects}
               keyExtractor={(item) => item.id}
               ListEmptyComponent={
-                <Text style={styles.emptyText}>
-                  등록된 과목이 없습니다.
-                </Text>
+                <Text style={styles.emptyText}>등록된 과목이 없습니다.</Text>
               }
               renderItem={({ item }) => (
                 <TouchableOpacity
@@ -578,6 +599,50 @@ export default function NoteScreen() {
             >
               <Text style={styles.closeButtonText}>닫기</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 노트 삭제 확인 모달 */}
+      <Modal
+        visible={isDeleteNoteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setIsDeleteNoteModalVisible(false);
+          setDeletingNoteId(null);
+        }}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.deleteModalContainer}>
+            <Text style={styles.modalTitle}>노트 삭제</Text>
+
+            <Text style={styles.deleteModalText}>
+              이 노트를 삭제하시겠습니까?
+            </Text>
+
+            <View style={styles.deleteModalButtonRow}>
+              <TouchableOpacity
+                style={styles.deleteCancelButton}
+                onPress={() => {
+                  setIsDeleteNoteModalVisible(false);
+                  setDeletingNoteId(null);
+                }}
+              >
+                <Text style={styles.deleteCancelButtonText}>취소</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.deleteConfirmButton}
+                onPress={() => {
+                  if (deletingNoteId) {
+                    deleteNote(deletingNoteId);
+                  }
+                }}
+              >
+                <Text style={styles.deleteConfirmButtonText}>삭제</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -812,6 +877,52 @@ const styles = StyleSheet.create({
   },
 
   closeButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  deleteModalContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    padding: 20,
+  },
+
+  deleteModalText: {
+    fontSize: 16,
+    marginBottom: 20,
+    color: "#333",
+  },
+
+  deleteModalButtonRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  deleteCancelButton: {
+    flex: 1,
+    backgroundColor: "#F2F2F2",
+    padding: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  deleteCancelButtonText: {
+    color: "#555",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  deleteConfirmButton: {
+    flex: 1,
+    backgroundColor: "#e53e3e",
+    padding: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  deleteConfirmButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",

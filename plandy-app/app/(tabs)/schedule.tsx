@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Platform,
 } from "react-native";
 
+import { useFocusEffect } from "expo-router";
 import * as Notifications from "expo-notifications";
 
 import {
@@ -24,10 +25,11 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 
-import { getCurrentAppUserIdOrNull } from "@/src/appSession";
+import { onAuthStateChanged } from "firebase/auth";
 
 const firebase = require("../../src/firebase");
 const db = firebase.db;
+const auth = firebase.auth;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -49,6 +51,8 @@ type ReminderType =
 type ReminderUnit = "minute" | "hour" | "day";
 
 export default function ScheduleScreen() {
+  const [userId, setUserId] = useState<string | null>(null);
+
   const [title, setTitle] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedHour, setSelectedHour] = useState(9);
@@ -56,7 +60,6 @@ export default function ScheduleScreen() {
   const [type, setType] = useState("");
 
   const [schedules, setSchedules] = useState<any[]>([]);
-  const userId = getCurrentAppUserIdOrNull();
 
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -71,7 +74,9 @@ export default function ScheduleScreen() {
     useState<ReminderUnit>("minute");
 
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(
+    null
+  );
   const [editingNotificationId, setEditingNotificationId] =
     useState<string | null>(null);
 
@@ -86,6 +91,22 @@ export default function ScheduleScreen() {
   const [editCustomReminderValue, setEditCustomReminderValue] = useState("1");
   const [editCustomReminderUnit, setEditCustomReminderUnit] =
     useState<ReminderUnit>("minute");
+
+  const [isDeleteScheduleModalVisible, setIsDeleteScheduleModalVisible] =
+    useState(false);
+  const [deletingSchedule, setDeletingSchedule] = useState<any | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUserId(user.uid);
+      } else {
+        setUserId(null);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
 
   const formatDate = (targetDate: Date) => {
     const year = targetDate.getFullYear();
@@ -223,6 +244,10 @@ export default function ScheduleScreen() {
   };
 
   const requestNotificationPermission = async () => {
+    if (Platform.OS === "web") {
+      return false;
+    }
+
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync("schedule-reminder", {
         name: "일정 알림",
@@ -307,8 +332,11 @@ export default function ScheduleScreen() {
     targetCustomValue: string,
     targetCustomUnit: ReminderUnit
   ) => {
+    if (Platform.OS === "web") {
+      return null;
+    }
+
     if (targetReminderType === "none") {
-      console.log("알림 설정 없음: 예약하지 않음");
       return null;
     }
 
@@ -319,13 +347,6 @@ export default function ScheduleScreen() {
       targetCustomUnit
     );
 
-    console.log("일정 시간:", scheduleDateTime);
-    console.log("알림 설정:", targetReminderType);
-    console.log("직접 설정 값:", targetCustomValue);
-    console.log("직접 설정 단위:", targetCustomUnit);
-    console.log("계산된 알림 시간:", reminderDate);
-    console.log("현재 시간:", new Date());
-
     if (!reminderDate) {
       Alert.alert("오류", "알림 설정 값을 확인해주세요.");
       return null;
@@ -334,8 +355,6 @@ export default function ScheduleScreen() {
     const secondsUntilReminder = Math.ceil(
       (reminderDate.getTime() - Date.now()) / 1000
     );
-
-    console.log("알림까지 남은 초:", secondsUntilReminder);
 
     if (secondsUntilReminder < 60) {
       Alert.alert(
@@ -371,18 +390,6 @@ export default function ScheduleScreen() {
         channelId: "schedule-reminder",
       } as any,
     });
-
-    console.log("예약된 알림 ID:", notificationId);
-
-    const scheduledNotifications =
-      await Notifications.getAllScheduledNotificationsAsync();
-
-    console.log("현재 예약된 알림 목록:", scheduledNotifications);
-
-    Alert.alert(
-      "알림 예약 완료",
-      `알림 예정 시간: ${reminderDate.toLocaleString()}`
-    );
 
     return notificationId;
   };
@@ -532,6 +539,12 @@ export default function ScheduleScreen() {
     fetchSchedules();
   }, [userId]);
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchSchedules();
+    }, [userId])
+  );
+
   const validateCustomReminder = (
     targetReminderType: ReminderType,
     targetCustomValue: string
@@ -649,7 +662,7 @@ export default function ScheduleScreen() {
     }
 
     try {
-      if (editingNotificationId) {
+      if (editingNotificationId && Platform.OS !== "web") {
         await Notifications.cancelScheduledNotificationAsync(
           editingNotificationId
         );
@@ -705,42 +718,35 @@ export default function ScheduleScreen() {
     }
   };
 
+  const deleteSchedule = async (schedule: any) => {
+    try {
+      if (schedule.notification_id && Platform.OS !== "web") {
+        await Notifications.cancelScheduledNotificationAsync(
+          schedule.notification_id
+        );
+      }
+
+      await deleteDoc(doc(db, "schedules", schedule.id));
+
+      setIsDeleteScheduleModalVisible(false);
+      setDeletingSchedule(null);
+
+      Alert.alert("성공", "일정이 삭제되었습니다.");
+      fetchSchedules();
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "일정 삭제 실패");
+    }
+  };
+
   const handleDeleteSchedule = (schedule: any) => {
     if (!userId) {
       Alert.alert("오류", "로그인 후 일정을 삭제할 수 있습니다.");
       return;
     }
 
-    Alert.alert(
-      "일정 삭제",
-      "이 일정을 삭제하시겠습니까?",
-      [
-        {
-          text: "취소",
-          style: "cancel",
-        },
-        {
-          text: "삭제",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              if (schedule.notification_id) {
-                await Notifications.cancelScheduledNotificationAsync(
-                  schedule.notification_id
-                );
-              }
-
-              await deleteDoc(doc(db, "schedules", schedule.id));
-              Alert.alert("성공", "일정이 삭제되었습니다.");
-              fetchSchedules();
-            } catch (error) {
-              console.log(error);
-              Alert.alert("오류", "일정 삭제 실패");
-            }
-          },
-        },
-      ]
-    );
+    setDeletingSchedule(schedule);
+    setIsDeleteScheduleModalVisible(true);
   };
 
   const calendarWeeks = getCalendarWeeks();
@@ -785,7 +791,10 @@ export default function ScheduleScreen() {
       >
         <Text style={selectedDate ? styles.dateText : styles.placeholderText}>
           {selectedDate
-            ? `${formatDate(selectedDate)} ${formatTime(selectedHour, selectedMinute)}`
+            ? `${formatDate(selectedDate)} ${formatTime(
+                selectedHour,
+                selectedMinute
+              )}`
             : "날짜 및 시간 선택"}
         </Text>
       </TouchableOpacity>
@@ -810,7 +819,8 @@ export default function ScheduleScreen() {
         }}
       >
         <Text style={styles.dateText}>
-          알림: {getReminderLabel(
+          알림:{" "}
+          {getReminderLabel(
             reminderType,
             customReminderValue,
             customReminderUnit
@@ -818,10 +828,7 @@ export default function ScheduleScreen() {
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={handleAddSchedule}
-      >
+      <TouchableOpacity style={styles.button} onPress={handleAddSchedule}>
         <Text style={styles.buttonText}>등록하기</Text>
       </TouchableOpacity>
 
@@ -841,25 +848,19 @@ export default function ScheduleScreen() {
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.scheduleTitle}>
-                {item.title}
-              </Text>
-
-              <Text style={styles.ddayText}>
-                {getDdayText(item.start_time)}
-              </Text>
+              <Text style={styles.scheduleTitle}>{item.title}</Text>
+              <Text style={styles.ddayText}>{getDdayText(item.start_time)}</Text>
             </View>
 
             <Text style={styles.scheduleText}>
               날짜/시간: {formatScheduleDate(item.start_time)}
             </Text>
 
-            <Text style={styles.scheduleText}>
-              유형: {item.description}
-            </Text>
+            <Text style={styles.scheduleText}>유형: {item.description}</Text>
 
             <Text style={styles.scheduleText}>
-              알림: {getReminderLabel(
+              알림:{" "}
+              {getReminderLabel(
                 item.reminder_type || "none",
                 item.custom_reminder_value
                   ? String(item.custom_reminder_value)
@@ -887,6 +888,7 @@ export default function ScheduleScreen() {
         )}
       />
 
+      {/* 일정 수정 모달 */}
       <Modal
         visible={isEditModalVisible}
         transparent
@@ -933,7 +935,8 @@ export default function ScheduleScreen() {
               }}
             >
               <Text style={styles.dateText}>
-                알림: {getReminderLabel(
+                알림:{" "}
+                {getReminderLabel(
                   editReminderType,
                   editCustomReminderValue,
                   editCustomReminderUnit
@@ -958,6 +961,7 @@ export default function ScheduleScreen() {
         </View>
       </Modal>
 
+      {/* 알림 설정 모달 */}
       <Modal
         visible={isReminderModalVisible}
         transparent
@@ -1083,6 +1087,7 @@ export default function ScheduleScreen() {
         </View>
       </Modal>
 
+      {/* 달력 + 시간 선택 모달 */}
       <Modal
         visible={isCalendarVisible}
         transparent
@@ -1114,13 +1119,15 @@ export default function ScheduleScreen() {
             </View>
 
             <View style={styles.daysContainer}>
-              {calendarWeeks.map((week, weekIndex) => (
+              {getCalendarWeeks().map((week, weekIndex) => (
                 <View key={weekIndex} style={styles.dayRow}>
                   {week.map((day, dayIndex) => {
                     const isSelected =
                       currentSelectedDate &&
-                      currentSelectedDate.getFullYear() === currentMonth.getFullYear() &&
-                      currentSelectedDate.getMonth() === currentMonth.getMonth() &&
+                      currentSelectedDate.getFullYear() ===
+                        currentMonth.getFullYear() &&
+                      currentSelectedDate.getMonth() ===
+                        currentMonth.getMonth() &&
                       currentSelectedDate.getDate() === day;
 
                     return (
@@ -1203,6 +1210,50 @@ export default function ScheduleScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* 일정 삭제 확인 모달 */}
+      <Modal
+        visible={isDeleteScheduleModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setIsDeleteScheduleModalVisible(false);
+          setDeletingSchedule(null);
+        }}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.deleteModalContainer}>
+            <Text style={styles.modalTitle}>일정 삭제</Text>
+
+            <Text style={styles.deleteModalText}>
+              이 일정을 삭제하시겠습니까?
+            </Text>
+
+            <View style={styles.deleteModalButtonRow}>
+              <TouchableOpacity
+                style={styles.deleteCancelButton}
+                onPress={() => {
+                  setIsDeleteScheduleModalVisible(false);
+                  setDeletingSchedule(null);
+                }}
+              >
+                <Text style={styles.deleteCancelButtonText}>취소</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.deleteConfirmButton}
+                onPress={() => {
+                  if (deletingSchedule) {
+                    deleteSchedule(deletingSchedule);
+                  }
+                }}
+              >
+                <Text style={styles.deleteConfirmButtonText}>삭제</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1211,6 +1262,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: "#fff" },
   title: { fontSize: 28, fontWeight: "bold", marginBottom: 20 },
   loginNotice: { color: "#e53e3e", marginBottom: 15, fontSize: 15 },
+
   input: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -1219,8 +1271,10 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     justifyContent: "center",
   },
+
   dateText: { fontSize: 16, color: "#000" },
   placeholderText: { fontSize: 16, color: "#999" },
+
   button: {
     backgroundColor: "#4A90E2",
     padding: 15,
@@ -1228,35 +1282,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 15,
   },
+
   buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
   listTitle: { fontSize: 22, fontWeight: "bold", marginBottom: 15 },
   listContent: { paddingBottom: 100 },
   emptyText: { color: "#777", marginTop: 10 },
+
   card: {
     backgroundColor: "#F2F2F2",
     padding: 15,
     borderRadius: 10,
     marginBottom: 15,
   },
+
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
+
   scheduleTitle: {
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 5,
     flex: 1,
   },
+
   ddayText: {
     fontSize: 16,
     fontWeight: "bold",
     color: "#e53e3e",
     marginLeft: 10,
   },
+
   scheduleText: { fontSize: 16, marginTop: 2 },
   actionRow: { flexDirection: "row", marginTop: 12, gap: 8 },
+
   editButton: {
     flex: 1,
     borderWidth: 1,
@@ -1265,7 +1326,9 @@ const styles = StyleSheet.create({
     padding: 10,
     alignItems: "center",
   },
+
   editButtonText: { color: "#4A90E2", fontWeight: "bold" },
+
   deleteButton: {
     flex: 1,
     borderWidth: 1,
@@ -1274,7 +1337,9 @@ const styles = StyleSheet.create({
     padding: 10,
     alignItems: "center",
   },
+
   deleteButtonText: { color: "#e53e3e", fontWeight: "bold" },
+
   modalBackground: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.4)",
@@ -1282,12 +1347,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
   },
+
   editModalContainer: {
     width: "100%",
     backgroundColor: "#fff",
     borderRadius: 15,
     padding: 20,
   },
+
   reminderModalContainer: {
     width: "100%",
     maxHeight: "80%",
@@ -1295,20 +1362,26 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 20,
   },
+
   modalTitle: { fontSize: 22, fontWeight: "bold", marginBottom: 15 },
+
   reminderOption: {
     paddingVertical: 13,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
+
   reminderOptionText: { fontSize: 16 },
+
   customReminderBox: {
     marginTop: 15,
     padding: 15,
     backgroundColor: "#F2F2F2",
     borderRadius: 10,
   },
+
   customReminderTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 10 },
+
   customNumberInput: {
     backgroundColor: "#fff",
     borderWidth: 1,
@@ -1317,7 +1390,9 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
   },
+
   unitRow: { flexDirection: "row", gap: 8 },
+
   unitButton: {
     flex: 1,
     borderWidth: 1,
@@ -1327,40 +1402,50 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#fff",
   },
+
   selectedUnitButton: { backgroundColor: "#4A90E2" },
   unitButtonText: { color: "#4A90E2", fontWeight: "bold" },
   selectedUnitButtonText: { color: "#fff" },
+
   customReminderGuide: { marginTop: 10, color: "#777", fontSize: 13 },
+
   cancelButton: {
     backgroundColor: "#F2F2F2",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
   },
+
   cancelButtonText: { color: "#555", fontSize: 16, fontWeight: "bold" },
+
   calendarContainer: {
     width: "100%",
     backgroundColor: "#fff",
     borderRadius: 15,
     padding: 20,
   },
+
   calendarHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
   },
+
   monthButton: { fontSize: 32, fontWeight: "bold", paddingHorizontal: 15 },
   monthTitle: { fontSize: 20, fontWeight: "bold" },
   weekRow: { flexDirection: "row", marginBottom: 10 },
+
   weekText: {
     flex: 1,
     textAlign: "center",
     fontWeight: "bold",
     color: "#555",
   },
+
   daysContainer: { width: "100%" },
   dayRow: { flexDirection: "row" },
+
   dayBox: {
     flex: 1,
     height: 38,
@@ -1368,23 +1453,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 20,
   },
+
   selectedDayBox: { backgroundColor: "#4A90E2" },
   dayText: { fontSize: 16 },
   selectedDayText: { color: "#fff", fontWeight: "bold" },
+
   timeSelector: {
     marginTop: 20,
     padding: 15,
     backgroundColor: "#F2F2F2",
     borderRadius: 10,
   },
+
   timeSelectorTitle: {
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 12,
     textAlign: "center",
   },
+
   timeRow: { flexDirection: "row", gap: 12 },
   timeControl: { flex: 1, alignItems: "center" },
+
   timeButton: {
     width: "100%",
     backgroundColor: "#fff",
@@ -1394,8 +1484,10 @@ const styles = StyleSheet.create({
     padding: 8,
     alignItems: "center",
   },
+
   timeButtonText: { color: "#4A90E2", fontSize: 18, fontWeight: "bold" },
   timeValue: { fontSize: 18, fontWeight: "bold", marginVertical: 8 },
+
   closeButton: {
     marginTop: 20,
     backgroundColor: "#4A90E2",
@@ -1403,5 +1495,52 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
   },
+
   closeButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+
+  deleteModalContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    padding: 20,
+  },
+
+  deleteModalText: {
+    fontSize: 16,
+    marginBottom: 20,
+    color: "#333",
+  },
+
+  deleteModalButtonRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  deleteCancelButton: {
+    flex: 1,
+    backgroundColor: "#F2F2F2",
+    padding: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  deleteCancelButtonText: {
+    color: "#555",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  deleteConfirmButton: {
+    flex: 1,
+    backgroundColor: "#e53e3e",
+    padding: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  deleteConfirmButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
 });
