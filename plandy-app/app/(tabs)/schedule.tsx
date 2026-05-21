@@ -104,6 +104,42 @@ export default function ScheduleScreen() {
     return date.getTime();
   };
 
+  // D-day 계산 함수
+  const getDdayText = (value: any) => {
+    const targetDate = toDateObject(value);
+
+    if (!targetDate) {
+      return "";
+    }
+
+    const today = new Date();
+
+    const todayStart = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+
+    const targetStart = new Date(
+      targetDate.getFullYear(),
+      targetDate.getMonth(),
+      targetDate.getDate()
+    );
+
+    const diffTime = targetStart.getTime() - todayStart.getTime();
+    const diffDay = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDay > 0) {
+      return `D-${diffDay}`;
+    }
+
+    if (diffDay === 0) {
+      return "D-Day";
+    }
+
+    return `D+${Math.abs(diffDay)}`;
+  };
+
   // 현재 달의 날짜 배열 생성
   const getCalendarDays = () => {
     const year = currentMonth.getFullYear();
@@ -403,9 +439,15 @@ export default function ScheduleScreen() {
         renderItem={({ item }) => (
           <View style={styles.card}>
 
-            <Text style={styles.scheduleTitle}>
-              {item.title}
-            </Text>
+            <View style={styles.cardHeader}>
+              <Text style={styles.scheduleTitle}>
+                {item.title}
+              </Text>
+
+              <Text style={styles.ddayText}>
+                {getDdayText(item.start_time)}
+              </Text>
+            </View>
 
             <Text style={styles.scheduleText}>
               날짜: {formatScheduleDate(item.start_time)}
@@ -631,10 +673,24 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
 
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
   scheduleTitle: {
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 5,
+    flex: 1,
+  },
+
+  ddayText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#e53e3e",
+    marginLeft: 10,
   },
 
   scheduleText: {
