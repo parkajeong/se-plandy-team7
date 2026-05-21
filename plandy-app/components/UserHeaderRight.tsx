@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 import { onAuthStateChanged } from "firebase/auth";
 
@@ -22,31 +22,50 @@ type UserProfile = {
 
 export default function UserHeaderRight() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const profileLoadIdRef = useRef(0);
 
   useEffect(() => {
     let isMounted = true;
 
     const loadProfile = async () => {
+      const profileLoadId = profileLoadIdRef.current + 1;
+      profileLoadIdRef.current = profileLoadId;
+
       try {
         const nextProfile = await getCurrentUserProfile();
-        if (isMounted) {
+        if (isMounted && profileLoadId === profileLoadIdRef.current) {
           setProfile(nextProfile);
         }
       } catch (error) {
         console.error("[UserHeaderRight] failed to load profile", error);
-        if (isMounted) {
+        if (isMounted && profileLoadId === profileLoadIdRef.current) {
           setProfile(normalizeUserProfile(getAppUser()));
         }
       }
     };
 
-    const unsubscribeAuth = onAuthStateChanged(auth, () => {
+    const clearProfile = () => {
+      profileLoadIdRef.current += 1;
+      setProfile(null);
+    };
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (!user && !getAppUser()) {
+        clearProfile();
+        return;
+      }
+
       loadProfile();
     });
 
     const handleAppUserChanged = (nextUser: UserProfile | null) => {
+      if (!nextUser) {
+        clearProfile();
+        return;
+      }
+
+      profileLoadIdRef.current += 1;
       setProfile(normalizeUserProfile(nextUser));
-      loadProfile();
     };
 
     const unsubscribeAppUser = subscribeAppUserChange(handleAppUserChanged);
