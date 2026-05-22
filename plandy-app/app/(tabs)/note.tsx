@@ -25,6 +25,7 @@ import {
 
 import { onAuthStateChanged } from "firebase/auth";
 import { getSubjects } from "@/src/subjectService";
+import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
 
 const firebase = require("../../src/firebase");
 const db = firebase.db;
@@ -69,21 +70,70 @@ export default function NoteScreen() {
     useState(false);
   const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
 
+  const getAppUserIdOrNull = useCallback(() => {
+    const appUser = getAppUser();
+
+    if (appUser?.uid) {
+      return String(appUser.uid);
+    }
+
+    if (appUser?.id) {
+      return String(appUser.id);
+    }
+
+    if (appUser?.user_id) {
+      return String(appUser.user_id);
+    }
+
+    if (appUser?.userId) {
+      return String(appUser.userId);
+    }
+
+    return null;
+  }, []);
+
+  const clearUserData = () => {
+    setSubjects([]);
+    setNotes([]);
+    setSelectedSubject(null);
+    setSearchSubject(null);
+  };
+
+  const syncUserId = useCallback(() => {
+    const firebaseUser = auth.currentUser;
+
+    if (firebaseUser) {
+      setUserId(firebaseUser.uid);
+      return;
+    }
+
+    const appUserId = getAppUserIdOrNull();
+
+    if (appUserId) {
+      setUserId(appUserId);
+      return;
+    }
+
+    setUserId(null);
+    clearUserData();
+  }, [getAppUserIdOrNull]);
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUserId(user.uid);
-      } else {
-        setUserId(null);
-        setSubjects([]);
-        setNotes([]);
-        setSelectedSubject(null);
-        setSearchSubject(null);
-      }
+    const unsubscribeFirebase = onAuthStateChanged(auth, () => {
+      syncUserId();
     });
 
-    return unsubscribe;
-  }, []);
+    const unsubscribeAppUser = subscribeAppUserChange(() => {
+      syncUserId();
+    });
+
+    syncUserId();
+
+    return () => {
+      unsubscribeFirebase();
+      unsubscribeAppUser();
+    };
+  }, [syncUserId]);
 
   const fetchSubjects = async () => {
     if (!userId) {
@@ -142,12 +192,13 @@ export default function NoteScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      syncUserId();
       fetchSubjects();
 
       if (searchSubject) {
         fetchNotesBySubject(searchSubject, false);
       }
-    }, [userId, searchSubject])
+    }, [syncUserId, userId, searchSubject])
   );
 
   const handleAddNote = async () => {
@@ -431,7 +482,6 @@ export default function NoteScreen() {
         </View>
       )}
 
-      {/* 노트 작성용 과목 선택 모달 */}
       <Modal
         visible={isWriteSubjectModalVisible}
         transparent
@@ -471,7 +521,6 @@ export default function NoteScreen() {
         </View>
       </Modal>
 
-      {/* 노트 조회용 과목 선택 모달 */}
       <Modal
         visible={isSearchSubjectModalVisible}
         transparent
@@ -511,7 +560,6 @@ export default function NoteScreen() {
         </View>
       </Modal>
 
-      {/* 노트 수정 모달 */}
       <Modal
         visible={isEditNoteModalVisible}
         transparent
@@ -563,7 +611,6 @@ export default function NoteScreen() {
         </View>
       </Modal>
 
-      {/* 노트 수정용 과목 선택 모달 */}
       <Modal
         visible={isEditSubjectModalVisible}
         transparent
@@ -603,7 +650,6 @@ export default function NoteScreen() {
         </View>
       </Modal>
 
-      {/* 노트 삭제 확인 모달 */}
       <Modal
         visible={isDeleteNoteModalVisible}
         transparent
