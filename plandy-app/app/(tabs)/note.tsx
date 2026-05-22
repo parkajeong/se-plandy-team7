@@ -194,11 +194,7 @@ export default function NoteScreen() {
     useCallback(() => {
       syncUserId();
       fetchSubjects();
-
-      if (searchSubject) {
-        fetchNotesBySubject(searchSubject, false);
-      }
-    }, [syncUserId, userId, searchSubject])
+    }, [syncUserId, userId])
   );
 
   const handleAddNote = async () => {
@@ -542,6 +538,7 @@ export default function NoteScreen() {
                   style={styles.subjectItem}
                   onPress={() => {
                     setSearchSubject(item);
+                    setNotes([]);
                     setIsSearchSubjectModalVisible(false);
                   }}
                 >
