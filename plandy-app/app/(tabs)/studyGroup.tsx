@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,17 +6,161 @@ import {
   TouchableOpacity,
   StyleSheet,
   FlatList,
+  Alert,
 } from "react-native";
 
+import { onAuthStateChanged } from "firebase/auth";
+import { addDoc, collection } from "firebase/firestore";
+import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
+
+const firebase = require("../../src/firebase");
+const db = firebase.db;
+const auth = firebase.auth;
+
+type StudyGroup = {
+  id: string;
+  name: string;
+  host_id: string;
+  members: string[];
+  schedules: any[];
+  available_times: Record<string, any>;
+  invite_code: string;
+  created_at: Date;
+};
+
 export default function StudyGroupScreen() {
+  const [userId, setUserId] = useState<string | null>(null);
+
   const [groupName, setGroupName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
 
-  const groups: any[] = [];
+  const [groups, setGroups] = useState<StudyGroup[]>([]);
+
+  const getAppUserIdOrNull = useCallback(() => {
+    const appUser = getAppUser();
+
+    if (appUser?.uid) {
+      return String(appUser.uid);
+    }
+
+    if (appUser?.id) {
+      return String(appUser.id);
+    }
+
+    if (appUser?.user_id) {
+      return String(appUser.user_id);
+    }
+
+    if (appUser?.userId) {
+      return String(appUser.userId);
+    }
+
+    return null;
+  }, []);
+
+  const syncUserId = useCallback(() => {
+    const firebaseUser = auth.currentUser;
+
+    if (firebaseUser) {
+      setUserId(firebaseUser.uid);
+      return;
+    }
+
+    const appUserId = getAppUserIdOrNull();
+
+    if (appUserId) {
+      setUserId(appUserId);
+      return;
+    }
+
+    setUserId(null);
+    setGroups([]);
+  }, [getAppUserIdOrNull]);
+
+  useEffect(() => {
+    const unsubscribeFirebase = onAuthStateChanged(auth, () => {
+      syncUserId();
+    });
+
+    const unsubscribeAppUser = subscribeAppUserChange(() => {
+      syncUserId();
+    });
+
+    syncUserId();
+
+    return () => {
+      unsubscribeFirebase();
+      unsubscribeAppUser();
+    };
+  }, [syncUserId]);
+
+  const generateInviteCode = () => {
+    const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let code = "";
+
+    for (let i = 0; i < 6; i++) {
+      const randomIndex = Math.floor(Math.random() * characters.length);
+      code += characters[randomIndex];
+    }
+
+    return code;
+  };
+
+  const handleCreateGroup = async () => {
+    if (!userId) {
+      Alert.alert("오류", "로그인 후 스터디 그룹을 생성할 수 있습니다.");
+      return;
+    }
+
+    const trimmedGroupName = groupName.trim();
+
+    if (!trimmedGroupName) {
+      Alert.alert("오류", "스터디 그룹 이름을 입력해주세요.");
+      return;
+    }
+
+    try {
+      const newInviteCode = generateInviteCode();
+
+      const groupData = {
+        name: trimmedGroupName,
+        host_id: userId,
+        members: [userId],
+        schedules: [],
+        available_times: {},
+        invite_code: newInviteCode,
+        created_at: new Date(),
+      };
+
+      const docRef = await addDoc(collection(db, "study_groups"), groupData);
+
+      const createdGroup: StudyGroup = {
+        id: docRef.id,
+        ...groupData,
+      };
+
+      setGroups((prevGroups) => [createdGroup, ...prevGroups]);
+      setGroupName("");
+
+      Alert.alert(
+        "성공",
+        `스터디 그룹이 생성되었습니다.\n초대코드: ${newInviteCode}`
+      );
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "스터디 그룹 생성 실패");
+    }
+  };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>스터디 그룹</Text>
+
+      {!userId && (
+        <Text style={styles.loginNotice}>
+          로그인 후 스터디 그룹을 생성하고 참여할 수 있습니다.
+        </Text>
+      )}
 
       <Text style={styles.sectionTitle}>스터디 그룹 생성</Text>
 
@@ -27,7 +171,7 @@ export default function StudyGroupScreen() {
         onChangeText={setGroupName}
       />
 
-      <TouchableOpacity style={styles.button}>
+      <TouchableOpacity style={styles.button} onPress={handleCreateGroup}>
         <Text style={styles.buttonText}>그룹 생성하기</Text>
       </TouchableOpacity>
 
@@ -57,6 +201,13 @@ export default function StudyGroupScreen() {
           <View style={styles.card}>
             <Text style={styles.groupName}>{item.name}</Text>
             <Text style={styles.groupInfo}>초대코드: {item.invite_code}</Text>
+            <Text style={styles.groupInfo}>
+              참여 인원: {item.members.length}명
+            </Text>
+
+            {item.host_id === userId && (
+              <Text style={styles.hostText}>내가 만든 그룹</Text>
+            )}
           </View>
         )}
       />
@@ -75,6 +226,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "bold",
     marginBottom: 20,
+  },
+
+  loginNotice: {
+    color: "#e53e3e",
+    marginBottom: 15,
+    fontSize: 15,
   },
 
   sectionTitle: {
@@ -144,5 +301,12 @@ const styles = StyleSheet.create({
   groupInfo: {
     fontSize: 15,
     color: "#555",
+    marginTop: 2,
+  },
+
+  hostText: {
+    marginTop: 8,
+    color: "#4A90E2",
+    fontWeight: "bold",
   },
 });
