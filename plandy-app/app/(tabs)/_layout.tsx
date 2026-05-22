@@ -51,6 +51,26 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      <Tabs.Screen
+        name="schedule"
+        options={{
+          title: '일정',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="calendar-outline" size={size ?? 28} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="note"
+        options={{
+          title: '노트',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="document-text-outline" size={size ?? 28} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
