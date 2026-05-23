@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,11 @@ import {
   StyleSheet,
   FlatList,
   Modal,
+  Platform,
 } from "react-native";
+
+import { useFocusEffect } from "expo-router";
+import * as Notifications from "expo-notifications";
 
 import {
   collection,
@@ -16,28 +20,94 @@ import {
   getDocs,
   query,
   where,
+  doc,
+  updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 
-import { getCurrentAppUserIdOrNull } from "@/src/appSession";
+import { onAuthStateChanged } from "firebase/auth";
 
 const firebase = require("../../src/firebase");
 const db = firebase.db;
+const auth = firebase.auth;
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
+type ReminderType =
+  | "none"
+  | "at_time"
+  | "ten_minutes_before"
+  | "one_hour_before"
+  | "one_day_before"
+  | "custom";
+
+type ReminderUnit = "minute" | "hour" | "day";
 
 export default function ScheduleScreen() {
+  const [userId, setUserId] = useState<string | null>(null);
+
   const [title, setTitle] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedHour, setSelectedHour] = useState(9);
+  const [selectedMinute, setSelectedMinute] = useState(0);
   const [type, setType] = useState("");
 
   const [schedules, setSchedules] = useState<any[]>([]);
 
-  // 현재 로그인 사용자 ID
-  const userId = getCurrentAppUserIdOrNull();
-
-  // 달력 팝업 상태
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [calendarTarget, setCalendarTarget] = useState<"add" | "edit">("add");
 
-  // 날짜를 YYYY-MM-DD 형식으로 변환
+  const [isReminderModalVisible, setIsReminderModalVisible] = useState(false);
+  const [reminderTarget, setReminderTarget] = useState<"add" | "edit">("add");
+
+  const [reminderType, setReminderType] = useState<ReminderType>("none");
+  const [customReminderValue, setCustomReminderValue] = useState("1");
+  const [customReminderUnit, setCustomReminderUnit] =
+    useState<ReminderUnit>("minute");
+
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(
+    null
+  );
+  const [editingNotificationId, setEditingNotificationId] =
+    useState<string | null>(null);
+
+  const [editTitle, setEditTitle] = useState("");
+  const [editDate, setEditDate] = useState<Date | null>(null);
+  const [editHour, setEditHour] = useState(9);
+  const [editMinute, setEditMinute] = useState(0);
+  const [editType, setEditType] = useState("");
+
+  const [editReminderType, setEditReminderType] =
+    useState<ReminderType>("none");
+  const [editCustomReminderValue, setEditCustomReminderValue] = useState("1");
+  const [editCustomReminderUnit, setEditCustomReminderUnit] =
+    useState<ReminderUnit>("minute");
+
+  const [isDeleteScheduleModalVisible, setIsDeleteScheduleModalVisible] =
+    useState(false);
+  const [deletingSchedule, setDeletingSchedule] = useState<any | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUserId(user.uid);
+      } else {
+        setUserId(null);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
   const formatDate = (targetDate: Date) => {
     const year = targetDate.getFullYear();
     const month = String(targetDate.getMonth() + 1).padStart(2, "0");
@@ -46,41 +116,284 @@ export default function ScheduleScreen() {
     return `${year}-${month}-${day}`;
   };
 
-  // Firestore Timestamp / Date / 문자열 날짜를 화면 표시용으로 변환
-  const formatScheduleDate = (value: any) => {
+  const formatTime = (hour: number, minute: number) => {
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  };
+
+  const toDateObject = (value: any) => {
     if (!value) {
+      return null;
+    }
+
+    if (value.toDate) {
+      return value.toDate();
+    }
+
+    if (value instanceof Date) {
+      return value;
+    }
+
+    const convertedDate = new Date(value);
+
+    if (Number.isNaN(convertedDate.getTime())) {
+      return null;
+    }
+
+    return convertedDate;
+  };
+
+  const combineDateAndTime = (date: Date, hour: number, minute: number) => {
+    return new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      hour,
+      minute,
+      0
+    );
+  };
+
+  const formatScheduleDate = (value: any) => {
+    const date = toDateObject(value);
+
+    if (!date) {
       return "";
     }
 
-    if (value.toDate) {
-      return formatDate(value.toDate());
-    }
-
-    if (value instanceof Date) {
-      return formatDate(value);
-    }
-
-    return value;
+    return `${formatDate(date)} ${formatTime(date.getHours(), date.getMinutes())}`;
   };
 
-  // 정렬용 시간 값 변환
   const getTimeValue = (value: any) => {
-    if (!value) {
+    const date = toDateObject(value);
+
+    if (!date) {
       return 0;
     }
 
-    if (value.toDate) {
-      return value.toDate().getTime();
-    }
-
-    if (value instanceof Date) {
-      return value.getTime();
-    }
-
-    return new Date(value).getTime();
+    return date.getTime();
   };
 
-  // 현재 달의 날짜 배열 생성
+  const getDdayText = (value: any) => {
+    const targetDate = toDateObject(value);
+
+    if (!targetDate) {
+      return "";
+    }
+
+    const today = new Date();
+
+    const todayStart = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+
+    const targetStart = new Date(
+      targetDate.getFullYear(),
+      targetDate.getMonth(),
+      targetDate.getDate()
+    );
+
+    const diffTime = targetStart.getTime() - todayStart.getTime();
+    const diffDay = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDay > 0) {
+      return `D-${diffDay}`;
+    }
+
+    if (diffDay === 0) {
+      return "D-Day";
+    }
+
+    return `D+${Math.abs(diffDay)}`;
+  };
+
+  const getReminderLabel = (
+    targetReminderType: ReminderType,
+    targetCustomValue: string,
+    targetCustomUnit: ReminderUnit
+  ) => {
+    if (targetReminderType === "none") {
+      return "알림 없음";
+    }
+
+    if (targetReminderType === "at_time") {
+      return "일정 시작시간";
+    }
+
+    if (targetReminderType === "ten_minutes_before") {
+      return "10분 전";
+    }
+
+    if (targetReminderType === "one_hour_before") {
+      return "1시간 전";
+    }
+
+    if (targetReminderType === "one_day_before") {
+      return "1일 전";
+    }
+
+    const unitLabel =
+      targetCustomUnit === "minute"
+        ? "분"
+        : targetCustomUnit === "hour"
+          ? "시간"
+          : "일";
+
+    return `${targetCustomValue}${unitLabel} 전`;
+  };
+
+  const requestNotificationPermission = async () => {
+    if (Platform.OS === "web") {
+      return false;
+    }
+
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("schedule-reminder", {
+        name: "일정 알림",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+      });
+    }
+
+    const { status: existingStatus } =
+      await Notifications.getPermissionsAsync();
+
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== "granted") {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    return finalStatus === "granted";
+  };
+
+  const getReminderDate = (
+    scheduleDateTime: Date,
+    targetReminderType: ReminderType,
+    targetCustomValue: string,
+    targetCustomUnit: ReminderUnit
+  ) => {
+    if (targetReminderType === "none") {
+      return null;
+    }
+
+    const reminderDate = new Date(scheduleDateTime);
+
+    if (targetReminderType === "at_time") {
+      return reminderDate;
+    }
+
+    if (targetReminderType === "ten_minutes_before") {
+      reminderDate.setMinutes(reminderDate.getMinutes() - 10);
+      return reminderDate;
+    }
+
+    if (targetReminderType === "one_hour_before") {
+      reminderDate.setHours(reminderDate.getHours() - 1);
+      return reminderDate;
+    }
+
+    if (targetReminderType === "one_day_before") {
+      reminderDate.setDate(reminderDate.getDate() - 1);
+      return reminderDate;
+    }
+
+    const customValue = Number(targetCustomValue);
+
+    if (
+      !Number.isInteger(customValue) ||
+      customValue < 1 ||
+      customValue > 365
+    ) {
+      return null;
+    }
+
+    if (targetCustomUnit === "minute") {
+      reminderDate.setMinutes(reminderDate.getMinutes() - customValue);
+    }
+
+    if (targetCustomUnit === "hour") {
+      reminderDate.setHours(reminderDate.getHours() - customValue);
+    }
+
+    if (targetCustomUnit === "day") {
+      reminderDate.setDate(reminderDate.getDate() - customValue);
+    }
+
+    return reminderDate;
+  };
+
+  const scheduleReminderNotification = async (
+    scheduleTitle: string,
+    scheduleDateTime: Date,
+    targetReminderType: ReminderType,
+    targetCustomValue: string,
+    targetCustomUnit: ReminderUnit
+  ) => {
+    if (Platform.OS === "web") {
+      return null;
+    }
+
+    if (targetReminderType === "none") {
+      return null;
+    }
+
+    const reminderDate = getReminderDate(
+      scheduleDateTime,
+      targetReminderType,
+      targetCustomValue,
+      targetCustomUnit
+    );
+
+    if (!reminderDate) {
+      Alert.alert("오류", "알림 설정 값을 확인해주세요.");
+      return null;
+    }
+
+    const secondsUntilReminder = Math.ceil(
+      (reminderDate.getTime() - Date.now()) / 1000
+    );
+
+    if (secondsUntilReminder < 60) {
+      Alert.alert(
+        "알림 예약 불가",
+        "알림 시간이 너무 가깝거나 이미 지났습니다. 최소 1분 이후로 설정해주세요."
+      );
+      return null;
+    }
+
+    const hasPermission = await requestNotificationPermission();
+
+    if (!hasPermission) {
+      Alert.alert(
+        "알림 권한 필요",
+        "일정 알림을 받으려면 알림 권한을 허용해주세요."
+      );
+      return null;
+    }
+
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "일정 알림",
+        body: `${scheduleTitle} 일정이 예정되어 있습니다.`,
+        sound: "default",
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        data: {
+          screen: "schedule",
+        },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: secondsUntilReminder,
+        channelId: "schedule-reminder",
+      } as any,
+    });
+
+    return notificationId;
+  };
+
   const getCalendarDays = () => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -108,7 +421,6 @@ export default function ScheduleScreen() {
     return days;
   };
 
-  // 날짜 배열을 7개씩 나누어 주 단위 배열로 변환
   const getCalendarWeeks = () => {
     const days = getCalendarDays();
     const weeks: (number | null)[][] = [];
@@ -120,21 +432,18 @@ export default function ScheduleScreen() {
     return weeks;
   };
 
-  // 이전 달 이동
   const handlePrevMonth = () => {
     setCurrentMonth(
       new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1)
     );
   };
 
-  // 다음 달 이동
   const handleNextMonth = () => {
     setCurrentMonth(
       new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1)
     );
   };
 
-  // 날짜 선택
   const handleSelectDate = (day: number) => {
     const date = new Date(
       currentMonth.getFullYear(),
@@ -142,11 +451,56 @@ export default function ScheduleScreen() {
       day
     );
 
-    setSelectedDate(date);
+    if (calendarTarget === "add") {
+      setSelectedDate(date);
+    } else {
+      setEditDate(date);
+    }
+  };
+
+  const increaseHour = () => {
+    if (calendarTarget === "add") {
+      setSelectedHour((prev) => (prev + 1) % 24);
+    } else {
+      setEditHour((prev) => (prev + 1) % 24);
+    }
+  };
+
+  const decreaseHour = () => {
+    if (calendarTarget === "add") {
+      setSelectedHour((prev) => (prev - 1 + 24) % 24);
+    } else {
+      setEditHour((prev) => (prev - 1 + 24) % 24);
+    }
+  };
+
+  const increaseMinute = () => {
+    if (calendarTarget === "add") {
+      setSelectedMinute((prev) => (prev + 5) % 60);
+    } else {
+      setEditMinute((prev) => (prev + 5) % 60);
+    }
+  };
+
+  const decreaseMinute = () => {
+    if (calendarTarget === "add") {
+      setSelectedMinute((prev) => (prev - 5 + 60) % 60);
+    } else {
+      setEditMinute((prev) => (prev - 5 + 60) % 60);
+    }
+  };
+
+  const handleConfirmCalendar = () => {
+    const targetDate = calendarTarget === "add" ? selectedDate : editDate;
+
+    if (!targetDate) {
+      Alert.alert("오류", "날짜를 선택해주세요.");
+      return;
+    }
+
     setIsCalendarVisible(false);
   };
 
-  // 일정 조회 함수
   const fetchSchedules = async () => {
     if (!userId) {
       setSchedules([]);
@@ -170,7 +524,6 @@ export default function ScheduleScreen() {
         });
       });
 
-      // start_time 기준 날짜 빠른 순 정렬
       data.sort((a, b) => {
         return getTimeValue(a.start_time) - getTimeValue(b.start_time);
       });
@@ -182,12 +535,29 @@ export default function ScheduleScreen() {
     }
   };
 
-  // 화면 실행 시 일정 불러오기
   useEffect(() => {
     fetchSchedules();
   }, [userId]);
 
-  // 일정 등록 함수
+  useFocusEffect(
+    useCallback(() => {
+      fetchSchedules();
+    }, [userId])
+  );
+
+  const validateCustomReminder = (
+    targetReminderType: ReminderType,
+    targetCustomValue: string
+  ) => {
+    if (targetReminderType !== "custom") {
+      return true;
+    }
+
+    const value = Number(targetCustomValue);
+
+    return Number.isInteger(value) && value >= 1 && value <= 365;
+  };
+
   const handleAddSchedule = async () => {
     if (!userId) {
       Alert.alert("오류", "로그인 후 일정을 등록할 수 있습니다.");
@@ -199,35 +569,199 @@ export default function ScheduleScreen() {
       return;
     }
 
+    if (!validateCustomReminder(reminderType, customReminderValue)) {
+      Alert.alert("오류", "직접 설정 숫자는 1부터 365까지 입력해주세요.");
+      return;
+    }
+
     try {
+      const scheduleDateTime = combineDateAndTime(
+        selectedDate,
+        selectedHour,
+        selectedMinute
+      );
+
+      const notificationId = await scheduleReminderNotification(
+        title,
+        scheduleDateTime,
+        reminderType,
+        customReminderValue,
+        customReminderUnit
+      );
+
       await addDoc(collection(db, "schedules"), {
         user_id: userId,
         title: title,
-        start_time: selectedDate,
-        end_time: selectedDate,
+        start_time: scheduleDateTime,
+        end_time: scheduleDateTime,
         description: type,
         created_at: new Date(),
+        reminder_type: reminderType,
+        custom_reminder_value:
+          reminderType === "custom" ? Number(customReminderValue) : null,
+        custom_reminder_unit:
+          reminderType === "custom" ? customReminderUnit : null,
+        notification_id: notificationId,
       });
 
       Alert.alert("성공", "일정이 등록되었습니다.");
 
       setTitle("");
       setSelectedDate(null);
+      setSelectedHour(9);
+      setSelectedMinute(0);
       setType("");
+      setReminderType("none");
+      setCustomReminderValue("1");
+      setCustomReminderUnit("minute");
 
       fetchSchedules();
-
     } catch (error) {
       console.log(error);
       Alert.alert("오류", "일정 등록 실패");
     }
   };
 
+  const handleOpenEditModal = (schedule: any) => {
+    const scheduleDate = toDateObject(schedule.start_time) || new Date();
+
+    setEditingScheduleId(schedule.id);
+    setEditingNotificationId(schedule.notification_id || null);
+
+    setEditTitle(schedule.title || "");
+    setEditDate(scheduleDate);
+    setEditHour(scheduleDate.getHours());
+    setEditMinute(scheduleDate.getMinutes());
+    setEditType(schedule.description || "");
+
+    setEditReminderType(schedule.reminder_type || "none");
+    setEditCustomReminderValue(
+      schedule.custom_reminder_value
+        ? String(schedule.custom_reminder_value)
+        : "1"
+    );
+    setEditCustomReminderUnit(schedule.custom_reminder_unit || "minute");
+
+    setIsEditModalVisible(true);
+  };
+
+  const handleUpdateSchedule = async () => {
+    if (!userId) {
+      Alert.alert("오류", "로그인 후 일정을 수정할 수 있습니다.");
+      return;
+    }
+
+    if (!editingScheduleId || !editTitle || !editDate || !editType) {
+      Alert.alert("오류", "모든 항목을 입력해주세요.");
+      return;
+    }
+
+    if (!validateCustomReminder(editReminderType, editCustomReminderValue)) {
+      Alert.alert("오류", "직접 설정 숫자는 1부터 365까지 입력해주세요.");
+      return;
+    }
+
+    try {
+      if (editingNotificationId && Platform.OS !== "web") {
+        await Notifications.cancelScheduledNotificationAsync(
+          editingNotificationId
+        );
+      }
+
+      const scheduleDateTime = combineDateAndTime(
+        editDate,
+        editHour,
+        editMinute
+      );
+
+      const notificationId = await scheduleReminderNotification(
+        editTitle,
+        scheduleDateTime,
+        editReminderType,
+        editCustomReminderValue,
+        editCustomReminderUnit
+      );
+
+      const scheduleRef = doc(db, "schedules", editingScheduleId);
+
+      await updateDoc(scheduleRef, {
+        title: editTitle,
+        start_time: scheduleDateTime,
+        end_time: scheduleDateTime,
+        description: editType,
+        reminder_type: editReminderType,
+        custom_reminder_value:
+          editReminderType === "custom" ? Number(editCustomReminderValue) : null,
+        custom_reminder_unit:
+          editReminderType === "custom" ? editCustomReminderUnit : null,
+        notification_id: notificationId,
+      });
+
+      Alert.alert("성공", "일정이 수정되었습니다.");
+
+      setIsEditModalVisible(false);
+      setEditingScheduleId(null);
+      setEditingNotificationId(null);
+      setEditTitle("");
+      setEditDate(null);
+      setEditHour(9);
+      setEditMinute(0);
+      setEditType("");
+      setEditReminderType("none");
+      setEditCustomReminderValue("1");
+      setEditCustomReminderUnit("minute");
+
+      fetchSchedules();
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "일정 수정 실패");
+    }
+  };
+
+  const deleteSchedule = async (schedule: any) => {
+    try {
+      if (schedule.notification_id && Platform.OS !== "web") {
+        await Notifications.cancelScheduledNotificationAsync(
+          schedule.notification_id
+        );
+      }
+
+      await deleteDoc(doc(db, "schedules", schedule.id));
+
+      setIsDeleteScheduleModalVisible(false);
+      setDeletingSchedule(null);
+
+      Alert.alert("성공", "일정이 삭제되었습니다.");
+      fetchSchedules();
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "일정 삭제 실패");
+    }
+  };
+
+  const handleDeleteSchedule = (schedule: any) => {
+    if (!userId) {
+      Alert.alert("오류", "로그인 후 일정을 삭제할 수 있습니다.");
+      return;
+    }
+
+    setDeletingSchedule(schedule);
+    setIsDeleteScheduleModalVisible(true);
+  };
+
   const calendarWeeks = getCalendarWeeks();
+
+  const currentSelectedDate =
+    calendarTarget === "add" ? selectedDate : editDate;
+
+  const currentSelectedHour =
+    calendarTarget === "add" ? selectedHour : editHour;
+
+  const currentSelectedMinute =
+    calendarTarget === "add" ? selectedMinute : editMinute;
 
   return (
     <View style={styles.container}>
-
       <Text style={styles.title}>일정 관리</Text>
 
       {!userId && (
@@ -236,7 +770,6 @@ export default function ScheduleScreen() {
         </Text>
       )}
 
-      {/* 일정 제목 입력 */}
       <TextInput
         style={styles.input}
         placeholder="일정 제목"
@@ -244,24 +777,28 @@ export default function ScheduleScreen() {
         onChangeText={setTitle}
       />
 
-      {/* 날짜 선택 */}
       <TouchableOpacity
         style={styles.input}
         onPress={() => {
           if (!userId) {
-            Alert.alert("오류", "로그인 후 날짜를 선택할 수 있습니다.");
+            Alert.alert("오류", "로그인 후 날짜와 시간을 선택할 수 있습니다.");
             return;
           }
 
+          setCalendarTarget("add");
           setIsCalendarVisible(true);
         }}
       >
         <Text style={selectedDate ? styles.dateText : styles.placeholderText}>
-          {selectedDate ? formatDate(selectedDate) : "날짜 선택"}
+          {selectedDate
+            ? `${formatDate(selectedDate)} ${formatTime(
+                selectedHour,
+                selectedMinute
+              )}`
+            : "날짜 및 시간 선택"}
         </Text>
       </TouchableOpacity>
 
-      {/* 일정 유형 입력 */}
       <TextInput
         style={styles.input}
         placeholder="유형 (시험 / 과제 / 공부)"
@@ -269,15 +806,32 @@ export default function ScheduleScreen() {
         onChangeText={setType}
       />
 
-      {/* 등록 버튼 */}
       <TouchableOpacity
-        style={styles.button}
-        onPress={handleAddSchedule}
+        style={styles.input}
+        onPress={() => {
+          if (!userId) {
+            Alert.alert("오류", "로그인 후 알림을 설정할 수 있습니다.");
+            return;
+          }
+
+          setReminderTarget("add");
+          setIsReminderModalVisible(true);
+        }}
       >
+        <Text style={styles.dateText}>
+          알림:{" "}
+          {getReminderLabel(
+            reminderType,
+            customReminderValue,
+            customReminderUnit
+          )}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.button} onPress={handleAddSchedule}>
         <Text style={styles.buttonText}>등록하기</Text>
       </TouchableOpacity>
 
-      {/* 일정 목록 */}
       <Text style={styles.listTitle}>등록된 일정</Text>
 
       <FlatList
@@ -293,24 +847,247 @@ export default function ScheduleScreen() {
         }
         renderItem={({ item }) => (
           <View style={styles.card}>
-
-            <Text style={styles.scheduleTitle}>
-              {item.title}
-            </Text>
-
-            <Text style={styles.scheduleText}>
-              날짜: {formatScheduleDate(item.start_time)}
-            </Text>
+            <View style={styles.cardHeader}>
+              <Text style={styles.scheduleTitle}>{item.title}</Text>
+              <Text style={styles.ddayText}>{getDdayText(item.start_time)}</Text>
+            </View>
 
             <Text style={styles.scheduleText}>
-              유형: {item.description}
+              날짜/시간: {formatScheduleDate(item.start_time)}
             </Text>
 
+            <Text style={styles.scheduleText}>유형: {item.description}</Text>
+
+            <Text style={styles.scheduleText}>
+              알림:{" "}
+              {getReminderLabel(
+                item.reminder_type || "none",
+                item.custom_reminder_value
+                  ? String(item.custom_reminder_value)
+                  : "1",
+                item.custom_reminder_unit || "minute"
+              )}
+            </Text>
+
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => handleOpenEditModal(item)}
+              >
+                <Text style={styles.editButtonText}>수정</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={() => handleDeleteSchedule(item)}
+              >
+                <Text style={styles.deleteButtonText}>삭제</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       />
 
-      {/* 달력 팝업 */}
+      {/* 일정 수정 모달 */}
+      <Modal
+        visible={isEditModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsEditModalVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.editModalContainer}>
+            <Text style={styles.modalTitle}>일정 수정</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="일정 제목"
+              value={editTitle}
+              onChangeText={setEditTitle}
+            />
+
+            <TouchableOpacity
+              style={styles.input}
+              onPress={() => {
+                setCalendarTarget("edit");
+                setIsCalendarVisible(true);
+              }}
+            >
+              <Text style={editDate ? styles.dateText : styles.placeholderText}>
+                {editDate
+                  ? `${formatDate(editDate)} ${formatTime(editHour, editMinute)}`
+                  : "날짜 및 시간 선택"}
+              </Text>
+            </TouchableOpacity>
+
+            <TextInput
+              style={styles.input}
+              placeholder="유형 (시험 / 과제 / 공부)"
+              value={editType}
+              onChangeText={setEditType}
+            />
+
+            <TouchableOpacity
+              style={styles.input}
+              onPress={() => {
+                setReminderTarget("edit");
+                setIsReminderModalVisible(true);
+              }}
+            >
+              <Text style={styles.dateText}>
+                알림:{" "}
+                {getReminderLabel(
+                  editReminderType,
+                  editCustomReminderValue,
+                  editCustomReminderUnit
+                )}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleUpdateSchedule}
+            >
+              <Text style={styles.buttonText}>수정 완료</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setIsEditModalVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 알림 설정 모달 */}
+      <Modal
+        visible={isReminderModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsReminderModalVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.reminderModalContainer}>
+            <Text style={styles.modalTitle}>알림 설정</Text>
+
+            {[
+              { label: "알림 없음", value: "none" },
+              { label: "일정 시작시간", value: "at_time" },
+              { label: "10분 전", value: "ten_minutes_before" },
+              { label: "1시간 전", value: "one_hour_before" },
+              { label: "1일 전", value: "one_day_before" },
+              { label: "직접 설정", value: "custom" },
+            ].map((item) => {
+              const currentValue =
+                reminderTarget === "add" ? reminderType : editReminderType;
+
+              const isSelected = currentValue === item.value;
+
+              return (
+                <TouchableOpacity
+                  key={item.value}
+                  style={styles.reminderOption}
+                  onPress={() => {
+                    if (reminderTarget === "add") {
+                      setReminderType(item.value as ReminderType);
+                    } else {
+                      setEditReminderType(item.value as ReminderType);
+                    }
+                  }}
+                >
+                  <Text style={styles.reminderOptionText}>
+                    {isSelected ? "●" : "○"} {item.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+
+            {(reminderTarget === "add"
+              ? reminderType === "custom"
+              : editReminderType === "custom") && (
+              <View style={styles.customReminderBox}>
+                <Text style={styles.customReminderTitle}>직접 설정</Text>
+
+                <TextInput
+                  style={styles.customNumberInput}
+                  keyboardType="number-pad"
+                  placeholder="1~365"
+                  value={
+                    reminderTarget === "add"
+                      ? customReminderValue
+                      : editCustomReminderValue
+                  }
+                  onChangeText={(text) => {
+                    const onlyNumber = text.replace(/[^0-9]/g, "");
+
+                    if (reminderTarget === "add") {
+                      setCustomReminderValue(onlyNumber);
+                    } else {
+                      setEditCustomReminderValue(onlyNumber);
+                    }
+                  }}
+                />
+
+                <View style={styles.unitRow}>
+                  {[
+                    { label: "분", value: "minute" },
+                    { label: "시간", value: "hour" },
+                    { label: "일", value: "day" },
+                  ].map((unit) => {
+                    const currentUnit =
+                      reminderTarget === "add"
+                        ? customReminderUnit
+                        : editCustomReminderUnit;
+
+                    const isSelected = currentUnit === unit.value;
+
+                    return (
+                      <TouchableOpacity
+                        key={unit.value}
+                        style={[
+                          styles.unitButton,
+                          isSelected && styles.selectedUnitButton,
+                        ]}
+                        onPress={() => {
+                          if (reminderTarget === "add") {
+                            setCustomReminderUnit(unit.value as ReminderUnit);
+                          } else {
+                            setEditCustomReminderUnit(unit.value as ReminderUnit);
+                          }
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.unitButtonText,
+                            isSelected && styles.selectedUnitButtonText,
+                          ]}
+                        >
+                          {unit.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.customReminderGuide}>
+                  1부터 365까지 입력할 수 있습니다.
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setIsReminderModalVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>확인</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 달력 + 시간 선택 모달 */}
       <Modal
         visible={isCalendarVisible}
         transparent
@@ -319,7 +1096,6 @@ export default function ScheduleScreen() {
       >
         <View style={styles.modalBackground}>
           <View style={styles.calendarContainer}>
-
             <View style={styles.calendarHeader}>
               <TouchableOpacity onPress={handlePrevMonth}>
                 <Text style={styles.monthButton}>‹</Text>
@@ -343,57 +1119,149 @@ export default function ScheduleScreen() {
             </View>
 
             <View style={styles.daysContainer}>
-              {calendarWeeks.map((week, weekIndex) => (
+              {getCalendarWeeks().map((week, weekIndex) => (
                 <View key={weekIndex} style={styles.dayRow}>
-                  {week.map((day, dayIndex) => (
-                    <TouchableOpacity
-                      key={dayIndex}
-                      style={styles.dayBox}
-                      disabled={day === null}
-                      onPress={() => day && handleSelectDate(day)}
-                    >
-                      <Text style={styles.dayText}>
-                        {day || ""}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {week.map((day, dayIndex) => {
+                    const isSelected =
+                      currentSelectedDate &&
+                      currentSelectedDate.getFullYear() ===
+                        currentMonth.getFullYear() &&
+                      currentSelectedDate.getMonth() ===
+                        currentMonth.getMonth() &&
+                      currentSelectedDate.getDate() === day;
+
+                    return (
+                      <TouchableOpacity
+                        key={dayIndex}
+                        style={[
+                          styles.dayBox,
+                          isSelected && styles.selectedDayBox,
+                        ]}
+                        disabled={day === null}
+                        onPress={() => day && handleSelectDate(day)}
+                      >
+                        <Text
+                          style={[
+                            styles.dayText,
+                            isSelected && styles.selectedDayText,
+                          ]}
+                        >
+                          {day || ""}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               ))}
             </View>
 
+            <View style={styles.timeSelector}>
+              <Text style={styles.timeSelectorTitle}>시간 선택</Text>
+
+              <View style={styles.timeRow}>
+                <View style={styles.timeControl}>
+                  <TouchableOpacity
+                    style={styles.timeButton}
+                    onPress={increaseHour}
+                  >
+                    <Text style={styles.timeButtonText}>＋</Text>
+                  </TouchableOpacity>
+
+                  <Text style={styles.timeValue}>
+                    {String(currentSelectedHour).padStart(2, "0")}시
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.timeButton}
+                    onPress={decreaseHour}
+                  >
+                    <Text style={styles.timeButtonText}>－</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.timeControl}>
+                  <TouchableOpacity
+                    style={styles.timeButton}
+                    onPress={increaseMinute}
+                  >
+                    <Text style={styles.timeButtonText}>＋</Text>
+                  </TouchableOpacity>
+
+                  <Text style={styles.timeValue}>
+                    {String(currentSelectedMinute).padStart(2, "0")}분
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.timeButton}
+                    onPress={decreaseMinute}
+                  >
+                    <Text style={styles.timeButtonText}>－</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setIsCalendarVisible(false)}
+              onPress={handleConfirmCalendar}
             >
-              <Text style={styles.closeButtonText}>닫기</Text>
+              <Text style={styles.closeButtonText}>확인</Text>
             </TouchableOpacity>
-
           </View>
         </View>
       </Modal>
 
+      {/* 일정 삭제 확인 모달 */}
+      <Modal
+        visible={isDeleteScheduleModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setIsDeleteScheduleModalVisible(false);
+          setDeletingSchedule(null);
+        }}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.deleteModalContainer}>
+            <Text style={styles.modalTitle}>일정 삭제</Text>
+
+            <Text style={styles.deleteModalText}>
+              이 일정을 삭제하시겠습니까?
+            </Text>
+
+            <View style={styles.deleteModalButtonRow}>
+              <TouchableOpacity
+                style={styles.deleteCancelButton}
+                onPress={() => {
+                  setIsDeleteScheduleModalVisible(false);
+                  setDeletingSchedule(null);
+                }}
+              >
+                <Text style={styles.deleteCancelButtonText}>취소</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.deleteConfirmButton}
+                onPress={() => {
+                  if (deletingSchedule) {
+                    deleteSchedule(deletingSchedule);
+                  }
+                }}
+              >
+                <Text style={styles.deleteConfirmButtonText}>삭제</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: "#fff",
-  },
-
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 20,
-  },
-
-  loginNotice: {
-    color: "#e53e3e",
-    marginBottom: 15,
-    fontSize: 15,
-  },
+  container: { flex: 1, padding: 20, backgroundColor: "#fff" },
+  title: { fontSize: 28, fontWeight: "bold", marginBottom: 20 },
+  loginNotice: { color: "#e53e3e", marginBottom: 15, fontSize: 15 },
 
   input: {
     borderWidth: 1,
@@ -404,44 +1272,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  dateText: {
-    fontSize: 16,
-    color: "#000",
-  },
-
-  placeholderText: {
-    fontSize: 16,
-    color: "#999",
-  },
+  dateText: { fontSize: 16, color: "#000" },
+  placeholderText: { fontSize: 16, color: "#999" },
 
   button: {
     backgroundColor: "#4A90E2",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
-    marginBottom: 30,
-  },
-
-  buttonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-
-  listTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
     marginBottom: 15,
   },
 
-  listContent: {
-    paddingBottom: 100,
-  },
-
-  emptyText: {
-    color: "#777",
-    marginTop: 10,
-  },
+  buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
+  listTitle: { fontSize: 22, fontWeight: "bold", marginBottom: 15 },
+  listContent: { paddingBottom: 100 },
+  emptyText: { color: "#777", marginTop: 10 },
 
   card: {
     backgroundColor: "#F2F2F2",
@@ -450,15 +1295,50 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
 
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
   scheduleTitle: {
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 5,
+    flex: 1,
   },
 
-  scheduleText: {
+  ddayText: {
     fontSize: 16,
+    fontWeight: "bold",
+    color: "#e53e3e",
+    marginLeft: 10,
   },
+
+  scheduleText: { fontSize: 16, marginTop: 2 },
+  actionRow: { flexDirection: "row", marginTop: 12, gap: 8 },
+
+  editButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#4A90E2",
+    borderRadius: 8,
+    padding: 10,
+    alignItems: "center",
+  },
+
+  editButtonText: { color: "#4A90E2", fontWeight: "bold" },
+
+  deleteButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#e53e3e",
+    borderRadius: 8,
+    padding: 10,
+    alignItems: "center",
+  },
+
+  deleteButtonText: { color: "#e53e3e", fontWeight: "bold" },
 
   modalBackground: {
     flex: 1,
@@ -467,6 +1347,76 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
   },
+
+  editModalContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    padding: 20,
+  },
+
+  reminderModalContainer: {
+    width: "100%",
+    maxHeight: "80%",
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    padding: 20,
+  },
+
+  modalTitle: { fontSize: 22, fontWeight: "bold", marginBottom: 15 },
+
+  reminderOption: {
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+
+  reminderOptionText: { fontSize: 16 },
+
+  customReminderBox: {
+    marginTop: 15,
+    padding: 15,
+    backgroundColor: "#F2F2F2",
+    borderRadius: 10,
+  },
+
+  customReminderTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 10 },
+
+  customNumberInput: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+
+  unitRow: { flexDirection: "row", gap: 8 },
+
+  unitButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#4A90E2",
+    borderRadius: 8,
+    padding: 10,
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+
+  selectedUnitButton: { backgroundColor: "#4A90E2" },
+  unitButtonText: { color: "#4A90E2", fontWeight: "bold" },
+  selectedUnitButtonText: { color: "#fff" },
+
+  customReminderGuide: { marginTop: 10, color: "#777", fontSize: 13 },
+
+  cancelButton: {
+    backgroundColor: "#F2F2F2",
+    padding: 15,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  cancelButtonText: { color: "#555", fontSize: 16, fontWeight: "bold" },
 
   calendarContainer: {
     width: "100%",
@@ -482,21 +1432,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  monthButton: {
-    fontSize: 32,
-    fontWeight: "bold",
-    paddingHorizontal: 15,
-  },
-
-  monthTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-
-  weekRow: {
-    flexDirection: "row",
-    marginBottom: 10,
-  },
+  monthButton: { fontSize: 32, fontWeight: "bold", paddingHorizontal: 15 },
+  monthTitle: { fontSize: 20, fontWeight: "bold" },
+  weekRow: { flexDirection: "row", marginBottom: 10 },
 
   weekText: {
     flex: 1,
@@ -505,24 +1443,50 @@ const styles = StyleSheet.create({
     color: "#555",
   },
 
-  daysContainer: {
-    width: "100%",
-  },
-
-  dayRow: {
-    flexDirection: "row",
-  },
+  daysContainer: { width: "100%" },
+  dayRow: { flexDirection: "row" },
 
   dayBox: {
     flex: 1,
-    height: 42,
+    height: 38,
     justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 20,
+  },
+
+  selectedDayBox: { backgroundColor: "#4A90E2" },
+  dayText: { fontSize: 16 },
+  selectedDayText: { color: "#fff", fontWeight: "bold" },
+
+  timeSelector: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: "#F2F2F2",
+    borderRadius: 10,
+  },
+
+  timeSelectorTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+
+  timeRow: { flexDirection: "row", gap: 12 },
+  timeControl: { flex: 1, alignItems: "center" },
+
+  timeButton: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#4A90E2",
+    borderRadius: 8,
+    padding: 8,
     alignItems: "center",
   },
 
-  dayText: {
-    fontSize: 16,
-  },
+  timeButtonText: { color: "#4A90E2", fontSize: 18, fontWeight: "bold" },
+  timeValue: { fontSize: 18, fontWeight: "bold", marginVertical: 8 },
 
   closeButton: {
     marginTop: 20,
@@ -532,7 +1496,49 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  closeButtonText: {
+  closeButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+
+  deleteModalContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    padding: 20,
+  },
+
+  deleteModalText: {
+    fontSize: 16,
+    marginBottom: 20,
+    color: "#333",
+  },
+
+  deleteModalButtonRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  deleteCancelButton: {
+    flex: 1,
+    backgroundColor: "#F2F2F2",
+    padding: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  deleteCancelButtonText: {
+    color: "#555",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  deleteConfirmButton: {
+    flex: 1,
+    backgroundColor: "#e53e3e",
+    padding: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  deleteConfirmButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
