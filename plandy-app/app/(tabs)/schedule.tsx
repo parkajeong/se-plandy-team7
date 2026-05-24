@@ -26,6 +26,7 @@ import {
 } from "firebase/firestore";
 
 import { onAuthStateChanged } from "firebase/auth";
+import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
 
 const firebase = require("../../src/firebase");
 const db = firebase.db;
@@ -96,17 +97,62 @@ export default function ScheduleScreen() {
     useState(false);
   const [deletingSchedule, setDeletingSchedule] = useState<any | null>(null);
 
+  const getAppUserIdOrNull = useCallback(() => {
+    const appUser = getAppUser();
+
+    if (appUser?.uid) {
+      return String(appUser.uid);
+    }
+
+    if (appUser?.id) {
+      return String(appUser.id);
+    }
+
+    if (appUser?.user_id) {
+      return String(appUser.user_id);
+    }
+
+    if (appUser?.userId) {
+      return String(appUser.userId);
+    }
+
+    return null;
+  }, []);
+
+  const syncUserId = useCallback(() => {
+    const firebaseUser = auth.currentUser;
+
+    if (firebaseUser) {
+      setUserId(firebaseUser.uid);
+      return;
+    }
+
+    const appUserId = getAppUserIdOrNull();
+
+    if (appUserId) {
+      setUserId(appUserId);
+      return;
+    }
+
+    setUserId(null);
+  }, [getAppUserIdOrNull]);
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUserId(user.uid);
-      } else {
-        setUserId(null);
-      }
+    const unsubscribeFirebase = onAuthStateChanged(auth, () => {
+      syncUserId();
     });
 
-    return unsubscribe;
-  }, []);
+    const unsubscribeAppUser = subscribeAppUserChange(() => {
+      syncUserId();
+    });
+
+    syncUserId();
+
+    return () => {
+      unsubscribeFirebase();
+      unsubscribeAppUser();
+    };
+  }, [syncUserId]);
 
   const formatDate = (targetDate: Date) => {
     const year = targetDate.getFullYear();
@@ -541,8 +587,9 @@ export default function ScheduleScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      syncUserId();
       fetchSchedules();
-    }, [userId])
+    }, [syncUserId, userId])
   );
 
   const validateCustomReminder = (
