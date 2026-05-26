@@ -11,7 +11,8 @@ import {
   where,
 } from 'firebase/firestore';
 
-import { auth, db } from './firebase';
+import { getCurrentAppUserId } from './appSession';
+import { db } from './firebase';
 
 const TODO_COLLECTION_NAME = 'todos';
 const SUBJECT_COLLECTION_NAME = 'subjects';
@@ -19,13 +20,7 @@ const SUBJECT_COLLECTION_NAME = 'subjects';
 const TODO_CATEGORIES = ['시험', '과제', '복습', '기타'];
 
 function getCurrentUserId() {
-  const user = auth.currentUser;
-
-  if (!user) {
-    throw new Error('로그인이 필요합니다.');
-  }
-
-  return user.uid;
+  return getCurrentAppUserId();
 }
 
 function convertDateStringToTimestamp(dateString) {
@@ -45,6 +40,11 @@ function convertDateStringToTimestamp(dateString) {
 function convertFirestoreDateToDate(value) {
   if (!value) {
     return null;
+  }
+
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
   }
 
   if (value instanceof Date) {
@@ -68,6 +68,10 @@ function convertFirestoreDateToDate(value) {
   }
 
   return null;
+}
+
+function getTodoDeadlineValue(data) {
+  return data.deadline || data.dueDate || data.due_date || data.deadline_at;
 }
 
 function convertFirestoreDateToDateString(value) {
@@ -150,13 +154,15 @@ export async function createTodo(todoInput) {
 
   const userId = getCurrentUserId();
   const todosRef = collection(db, TODO_COLLECTION_NAME);
+  const deadlineTimestamp = convertDateStringToTimestamp(todoInput.deadline);
 
   const docRef = await addDoc(todosRef, {
     user_id: userId,
     subject_id: todoInput.subject_id.trim(),
     title: todoInput.title.trim(),
     is_completed: false,
-    deadline: convertDateStringToTimestamp(todoInput.deadline),
+    deadline: deadlineTimestamp,
+    dueDate: deadlineTimestamp,
     priority: Number(todoInput.priority),
     created_at: serverTimestamp(),
     description: todoInput.description?.trim() || '',
@@ -175,6 +181,7 @@ export async function fetchTodos() {
   return snapshot.docs
     .map((todoDocument) => {
       const data = todoDocument.data();
+      const deadlineValue = getTodoDeadlineValue(data);
 
       return {
         id: todoDocument.id,
@@ -182,12 +189,12 @@ export async function fetchTodos() {
         subject_id: data.subject_id || '',
         title: data.title || '',
         is_completed: Boolean(data.is_completed),
-        deadline: convertFirestoreDateToDateString(data.deadline),
+        deadline: convertFirestoreDateToDateString(deadlineValue),
         priority: Number(data.priority || 3),
         created_at: convertFirestoreDateToDateString(data.created_at),
         description: data.description || '',
         category: data.category || '기타',
-        deadline_millis: getMillisFromFirestoreDate(data.deadline),
+        deadline_millis: getMillisFromFirestoreDate(deadlineValue),
         created_at_millis: getMillisFromFirestoreDate(data.created_at),
       };
     })
@@ -212,11 +219,13 @@ export async function updateTodo(todoId, todoInput) {
   validateTodoInput(todoInput);
 
   const todoRef = doc(db, TODO_COLLECTION_NAME, todoId);
+  const deadlineTimestamp = convertDateStringToTimestamp(todoInput.deadline);
 
   await updateDoc(todoRef, {
     subject_id: todoInput.subject_id.trim(),
     title: todoInput.title.trim(),
-    deadline: convertDateStringToTimestamp(todoInput.deadline),
+    deadline: deadlineTimestamp,
+    dueDate: deadlineTimestamp,
     priority: Number(todoInput.priority),
     description: todoInput.description?.trim() || '',
     category: todoInput.category,
@@ -246,5 +255,10 @@ export async function deleteTodo(todoId) {
 
   const todoRef = doc(db, TODO_COLLECTION_NAME, todoId);
 
-  await deleteDoc(todoRef);
+  try {
+    await deleteDoc(todoRef);
+  } catch (error) {
+    console.error(`[todoService] Failed to delete todo ${todoId}:`, error);
+    throw error;
+  }
 }
