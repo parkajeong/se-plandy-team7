@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
@@ -141,6 +143,14 @@ function getErrorMessage(error: unknown) {
   return '알 수 없는 오류가 발생했습니다.';
 }
 
+function confirmOnWeb(message: string) {
+  if (Platform.OS !== 'web') {
+    return false;
+  }
+
+  return window.confirm(message);
+}
+
 export default function TodoScreen() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -176,19 +186,30 @@ export default function TodoScreen() {
       setSubjects(subjectList);
       setTodos(todoList);
     } catch (error) {
+      console.error('[TodoScreen] Failed to load todos or subjects:', error);
       Alert.alert('조회 실패', getErrorMessage(error));
     }
   }, []);
 
-  useEffect(() => {
-    async function init() {
-      setIsLoading(true);
-      await loadData();
-      setIsLoading(false);
-    }
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
 
-    init();
-  }, [loadData]);
+      async function init() {
+        setIsLoading(true);
+        await loadData();
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+
+      init();
+
+      return () => {
+        isActive = false;
+      };
+    }, [loadData])
+  );
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -281,6 +302,7 @@ export default function TodoScreen() {
       await loadData();
       closeTodoModal();
     } catch (error) {
+      console.error('[TodoScreen] Failed to save todo:', error);
       Alert.alert('저장 실패', getErrorMessage(error));
     } finally {
       setIsSaving(false);
@@ -297,11 +319,45 @@ export default function TodoScreen() {
 
       await loadData();
     } catch (error) {
+      console.error('[TodoScreen] Failed to toggle todo completion:', error);
       Alert.alert('상태 변경 실패', getErrorMessage(error));
     }
   };
 
+  const performDeleteTodo = async (todoId: string) => {
+    if (!todoId) {
+      const error = new Error('Todo id is missing. Cannot delete todo.');
+      console.error('[TodoScreen] Failed to delete todo:', error);
+      Alert.alert('삭제 실패', getErrorMessage(error));
+      return;
+    }
+
+    const previousTodos = todos;
+
+    try {
+      setTodos((currentTodos) =>
+        currentTodos.filter((item) => item.id !== todoId)
+      );
+
+      await deleteTodo(todoId);
+      await loadData();
+    } catch (error) {
+      setTodos(previousTodos);
+      console.error(`[TodoScreen] Failed to delete todo ${todoId}:`, error);
+      Alert.alert('삭제 실패', getErrorMessage(error));
+    }
+  };
+
   const handleDeleteTodo = (todo: Todo) => {
+    const todoId = todo.id;
+
+    if (Platform.OS === 'web') {
+      if (confirmOnWeb('이 할 일을 삭제할까요?')) {
+        void performDeleteTodo(todoId);
+      }
+      return;
+    }
+
     Alert.alert('할 일 삭제', '이 할 일을 삭제할까요?', [
       {
         text: '취소',
@@ -311,22 +367,15 @@ export default function TodoScreen() {
         text: '삭제',
         style: 'destructive',
         onPress: async () => {
-          const previousTodos = todos;
-
-          try {
-            setTodos((currentTodos) =>
-              currentTodos.filter((item) => item.id !== todo.id)
-            );
-
-            await deleteTodo(todo.id);
-            await loadData();
-          } catch (error) {
-            setTodos(previousTodos);
-            Alert.alert('삭제 실패', getErrorMessage(error));
-          }
+          await performDeleteTodo(todoId);
         },
       },
     ]);
+  };
+
+  const handleGoToSubjects = () => {
+    closeTodoModal();
+    router.push('/subjects');
   };
 
   const renderTodoItem = ({ item }: { item: Todo }) => {
@@ -368,8 +417,12 @@ export default function TodoScreen() {
         )}
 
         <View style={styles.todoInfoRow}>
-          <Text style={styles.todoInfo}>마감일: {item.deadline}</Text>
-          <Text style={styles.todoInfo}>
+          <View style={styles.deadlineBadge}>
+            <Text style={styles.deadlineText}>
+              마감일: {item.deadline || '미설정'}
+            </Text>
+          </View>
+          <Text style={styles.todoStatus}>
             {item.is_completed ? '완료' : '진행 중'}
           </Text>
         </View>
@@ -442,7 +495,14 @@ export default function TodoScreen() {
         visible={isTodoModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={closeTodoModal}
+        onRequestClose={() => {
+          if (isCalendarVisible) {
+            setIsCalendarVisible(false);
+            return;
+          }
+
+          closeTodoModal();
+        }}
       >
         <KeyboardAvoidingView
           style={styles.modalOverlay}
@@ -504,8 +564,16 @@ export default function TodoScreen() {
               ) : (
                 <View style={styles.warningBox}>
                   <Text style={styles.warningText}>
-                    등록된 과목이 없습니다. 과목 데이터의 user_id 필드를 확인하세요.
+                    등록된 과목이 없습니다. Todo를 만들려면 먼저 과목을 등록해주세요.
                   </Text>
+                  <Pressable
+                    style={styles.warningButton}
+                    onPress={handleGoToSubjects}
+                  >
+                    <Text style={styles.warningButtonText}>
+                      과목 등록하러 가기
+                    </Text>
+                  </Pressable>
                 </View>
               )}
 
@@ -630,84 +698,79 @@ export default function TodoScreen() {
               </View>
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
 
-      <Modal
-        visible={isCalendarVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsCalendarVisible(false)}
-      >
-        <View style={styles.calendarModalBackground}>
-          <View style={styles.calendarContainer}>
-            <View style={styles.calendarHeader}>
-              <Pressable onPress={handlePrevMonth}>
-                <Text style={styles.monthButton}>‹</Text>
-              </Pressable>
+          {isCalendarVisible && (
+            <View style={styles.calendarModalBackground}>
+              <View style={styles.calendarContainer}>
+                <View style={styles.calendarHeader}>
+                  <Pressable onPress={handlePrevMonth}>
+                    <Text style={styles.monthButton}>‹</Text>
+                  </Pressable>
 
-              <Text style={styles.monthTitle}>
-                {currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월
-              </Text>
+                  <Text style={styles.monthTitle}>
+                    {currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월
+                  </Text>
 
-              <Pressable onPress={handleNextMonth}>
-                <Text style={styles.monthButton}>›</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.weekRow}>
-              {['일', '월', '화', '수', '목', '금', '토'].map((weekDay) => (
-                <Text key={weekDay} style={styles.weekText}>
-                  {weekDay}
-                </Text>
-              ))}
-            </View>
-
-            <View style={styles.daysContainer}>
-              {calendarWeeks.map((week, weekIndex) => (
-                <View key={weekIndex} style={styles.dayRow}>
-                  {week.map((day, dayIndex) => {
-                    const isSelected =
-                      !!day &&
-                      !!form.deadline &&
-                      form.deadline.getFullYear() ===
-                        currentMonth.getFullYear() &&
-                      form.deadline.getMonth() === currentMonth.getMonth() &&
-                      form.deadline.getDate() === day;
-
-                    return (
-                      <Pressable
-                        key={`${weekIndex}-${dayIndex}`}
-                        style={[
-                          styles.dayBox,
-                          isSelected && styles.selectedDayBox,
-                        ]}
-                        disabled={day === null}
-                        onPress={() => day && handleSelectDate(day)}
-                      >
-                        <Text
-                          style={[
-                            styles.dayText,
-                            isSelected && styles.selectedDayText,
-                          ]}
-                        >
-                          {day || ''}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+                  <Pressable onPress={handleNextMonth}>
+                    <Text style={styles.monthButton}>›</Text>
+                  </Pressable>
                 </View>
-              ))}
-            </View>
 
-            <Pressable
-              style={styles.closeCalendarButton}
-              onPress={() => setIsCalendarVisible(false)}
-            >
-              <Text style={styles.closeCalendarButtonText}>닫기</Text>
-            </Pressable>
-          </View>
-        </View>
+                <View style={styles.weekRow}>
+                  {['일', '월', '화', '수', '목', '금', '토'].map((weekDay) => (
+                    <Text key={weekDay} style={styles.weekText}>
+                      {weekDay}
+                    </Text>
+                  ))}
+                </View>
+
+                <View style={styles.daysContainer}>
+                  {calendarWeeks.map((week, weekIndex) => (
+                    <View key={weekIndex} style={styles.dayRow}>
+                      {week.map((day, dayIndex) => {
+                        const isSelected =
+                          !!day &&
+                          !!form.deadline &&
+                          form.deadline.getFullYear() ===
+                            currentMonth.getFullYear() &&
+                          form.deadline.getMonth() === currentMonth.getMonth() &&
+                          form.deadline.getDate() === day;
+
+                        return (
+                          <Pressable
+                            key={`${weekIndex}-${dayIndex}`}
+                            style={[
+                              styles.dayBox,
+                              isSelected && styles.selectedDayBox,
+                            ]}
+                            disabled={day === null}
+                            onPress={() => day && handleSelectDate(day)}
+                          >
+                            <Text
+                              style={[
+                                styles.dayText,
+                                isSelected && styles.selectedDayText,
+                              ]}
+                            >
+                              {day || ''}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ))}
+                </View>
+
+                <Pressable
+                  style={styles.closeCalendarButton}
+                  onPress={() => setIsCalendarVisible(false)}
+                >
+                  <Text style={styles.closeCalendarButtonText}>닫기</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -838,9 +901,24 @@ const styles = StyleSheet.create({
   todoInfoRow: {
     marginTop: 14,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
   },
-  todoInfo: {
+  deadlineBadge: {
+    flexShrink: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#eef2ff',
+  },
+  deadlineText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#3730a3',
+  },
+  todoStatus: {
+    flexShrink: 0,
     fontSize: 13,
     color: '#374151',
   },
@@ -960,6 +1038,19 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: '#9a3412',
   },
+  warningButton: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#ea580c',
+  },
+  warningButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
   dateSelectButton: {
     marginBottom: 14,
     paddingHorizontal: 14,
@@ -1006,7 +1097,11 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   calendarModalBackground: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
