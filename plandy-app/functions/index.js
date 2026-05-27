@@ -20,21 +20,28 @@ exports.getStudyRecommendation = onCall(
     // Firestore에서 데이터 조회
     const [subjectsSnap, todosSnap, schedulesSnap] = await Promise.all([
       db.collection("subjects").where("user_id", "==", userId).get(),
-      db.collection("users").doc(userId).collection("todos").get(),
+      db.collection("todos").where("user_id", "==", userId).get(),
       db.collection("schedules").where("user_id", "==", userId).get(),
     ]);
 
     const subjects = subjectsSnap.docs.map((d) => ({
+      id: d.id,
       title: d.data().title,
       goal: d.data().goal,
     }));
 
+    const subjectTitleById = subjects.reduce((acc, subject) => {
+      acc[subject.id] = subject.title;
+      return acc;
+    }, {});
+
     const todos = todosSnap.docs.map((d) => ({
       title: d.data().title,
-      courseName: d.data().courseName,
-      status: d.data().status,
+      subject_id: d.data().subject_id || "",
+      subject: subjectTitleById[d.data().subject_id] || "과목 정보 없음",
+      status: d.data().status || (d.data().is_completed ? "completed" : "open"),
       dueDate: d.data().dueDate,
-      type: d.data().type,
+      type: d.data().type || d.data().category,
     }));
 
     const schedules = schedulesSnap.docs.map((d) => ({

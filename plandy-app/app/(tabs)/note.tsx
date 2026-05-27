@@ -26,6 +26,7 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { getSubjects } from "@/src/subjectService";
 import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
+import SubjectDropdown from "../../components/SubjectDropdown";
 
 const firebase = require("../../src/firebase");
 const db = firebase.db;
@@ -53,18 +54,11 @@ export default function NoteScreen() {
 
   const [notes, setNotes] = useState<any[]>([]);
 
-  const [isWriteSubjectModalVisible, setIsWriteSubjectModalVisible] =
-    useState(false);
-  const [isSearchSubjectModalVisible, setIsSearchSubjectModalVisible] =
-    useState(false);
-
   const [isEditNoteModalVisible, setIsEditNoteModalVisible] = useState(false);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editNoteTitle, setEditNoteTitle] = useState("");
   const [editContent, setEditContent] = useState("");
   const [editSubject, setEditSubject] = useState<Subject | null>(null);
-  const [isEditSubjectModalVisible, setIsEditSubjectModalVisible] =
-    useState(false);
 
   const [isDeleteNoteModalVisible, setIsDeleteNoteModalVisible] =
     useState(false);
@@ -138,15 +132,17 @@ export default function NoteScreen() {
   const fetchSubjects = async () => {
     if (!userId) {
       setSubjects([]);
-      return;
+      return [];
     }
 
     try {
       const data = await getSubjects(userId);
       setSubjects(data as Subject[]);
+      return data as Subject[];
     } catch (error) {
       console.log(error);
       Alert.alert("오류", "과목 목록 조회 실패");
+      return [];
     }
   };
 
@@ -203,6 +199,11 @@ export default function NoteScreen() {
       return;
     }
 
+    if (subjects.length === 0) {
+      Alert.alert("과목 필요", "먼저 과목을 등록해주세요.");
+      return;
+    }
+
     if (!selectedSubject || !noteTitle || !content) {
       Alert.alert("오류", "과목, 노트 제목, 노트 내용을 모두 입력해주세요.");
       return;
@@ -244,7 +245,7 @@ export default function NoteScreen() {
 
   const getSubjectTitle = (subjectId: string) => {
     const subject = subjects.find((item) => item.id === subjectId);
-    return subject ? subject.title : subjectId;
+    return subject ? subject.title : "과목 정보 없음";
   };
 
   const getSubjectById = (subjectId: string) => {
@@ -252,18 +253,26 @@ export default function NoteScreen() {
   };
 
   const handleOpenEditNoteModal = async (note: any) => {
-    await fetchSubjects();
+    const latestSubjects = await fetchSubjects();
 
     setEditingNoteId(note.id);
     setEditNoteTitle(note.title || "");
     setEditContent(note.content || "");
-    setEditSubject(getSubjectById(note.subject_id));
+    setEditSubject(
+      latestSubjects.find((subject) => subject.id === note.subject_id) ||
+        getSubjectById(note.subject_id)
+    );
     setIsEditNoteModalVisible(true);
   };
 
   const handleUpdateNote = async () => {
     if (!userId) {
       Alert.alert("오류", "로그인 후 노트를 수정할 수 있습니다.");
+      return;
+    }
+
+    if (subjects.length === 0) {
+      Alert.alert("과목 필요", "먼저 과목을 등록해주세요.");
       return;
     }
 
@@ -371,24 +380,20 @@ export default function NoteScreen() {
         <View>
           <Text style={styles.sectionTitle}>노트 작성</Text>
 
-          <TouchableOpacity
-            style={styles.input}
-            onPress={async () => {
-              if (!userId) {
-                Alert.alert("오류", "로그인 후 과목을 선택할 수 있습니다.");
-                return;
-              }
+          <SubjectDropdown
+            subjects={subjects}
+            selectedSubjectId={selectedSubject?.id}
+            placeholder="과목 선택"
+            disabled={!userId || subjects.length === 0}
+            onOpen={fetchSubjects}
+            onSelect={(subject) => setSelectedSubject(subject as Subject)}
+          />
 
-              await fetchSubjects();
-              setIsWriteSubjectModalVisible(true);
-            }}
-          >
-            <Text
-              style={selectedSubject ? styles.selectedText : styles.placeholderText}
-            >
-              {selectedSubject ? selectedSubject.title : "과목 선택"}
+          {userId && subjects.length === 0 && (
+            <Text style={styles.subjectNotice}>
+              먼저 과목을 등록해주세요.
             </Text>
-          </TouchableOpacity>
+          )}
 
           <TextInput
             style={styles.input}
@@ -405,7 +410,14 @@ export default function NoteScreen() {
             multiline
           />
 
-          <TouchableOpacity style={styles.button} onPress={handleAddNote}>
+          <TouchableOpacity
+            style={[
+              styles.button,
+              (!userId || subjects.length === 0) && styles.disabledButton,
+            ]}
+            onPress={handleAddNote}
+            disabled={!userId || subjects.length === 0}
+          >
             <Text style={styles.buttonText}>저장하기</Text>
           </TouchableOpacity>
         </View>
@@ -415,28 +427,31 @@ export default function NoteScreen() {
         <View style={styles.searchContainer}>
           <Text style={styles.sectionTitle}>과목별 노트 조회</Text>
 
-          <TouchableOpacity
-            style={styles.input}
-            onPress={async () => {
-              if (!userId) {
-                Alert.alert("오류", "로그인 후 과목을 선택할 수 있습니다.");
-                return;
-              }
-
-              await fetchSubjects();
-              setIsSearchSubjectModalVisible(true);
+          <SubjectDropdown
+            subjects={subjects}
+            selectedSubjectId={searchSubject?.id}
+            placeholder="조회할 과목 선택"
+            disabled={!userId || subjects.length === 0}
+            onOpen={fetchSubjects}
+            onSelect={(subject) => {
+              setSearchSubject(subject as Subject);
+              setNotes([]);
             }}
-          >
-            <Text
-              style={searchSubject ? styles.selectedText : styles.placeholderText}
-            >
-              {searchSubject ? searchSubject.title : "조회할 과목 선택"}
+          />
+
+          {userId && subjects.length === 0 && (
+            <Text style={styles.subjectNotice}>
+              먼저 과목을 등록해주세요.
             </Text>
-          </TouchableOpacity>
+          )}
 
           <TouchableOpacity
-            style={styles.searchButton}
+            style={[
+              styles.searchButton,
+              (!userId || subjects.length === 0) && styles.disabledButton,
+            ]}
             onPress={handleSearchNotes}
+            disabled={!userId || subjects.length === 0}
           >
             <Text style={styles.buttonText}>조회하기</Text>
           </TouchableOpacity>
@@ -479,85 +494,6 @@ export default function NoteScreen() {
       )}
 
       <Modal
-        visible={isWriteSubjectModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsWriteSubjectModalVisible(false)}
-      >
-        <View style={styles.modalBackground}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>과목 선택</Text>
-
-            <FlatList
-              data={subjects}
-              keyExtractor={(item) => item.id}
-              ListEmptyComponent={
-                <Text style={styles.emptyText}>등록된 과목이 없습니다.</Text>
-              }
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.subjectItem}
-                  onPress={() => {
-                    setSelectedSubject(item);
-                    setIsWriteSubjectModalVisible(false);
-                  }}
-                >
-                  <Text style={styles.subjectItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              )}
-            />
-
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setIsWriteSubjectModalVisible(false)}
-            >
-              <Text style={styles.closeButtonText}>닫기</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={isSearchSubjectModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsSearchSubjectModalVisible(false)}
-      >
-        <View style={styles.modalBackground}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>조회할 과목 선택</Text>
-
-            <FlatList
-              data={subjects}
-              keyExtractor={(item) => item.id}
-              ListEmptyComponent={
-                <Text style={styles.emptyText}>등록된 과목이 없습니다.</Text>
-              }
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.subjectItem}
-                  onPress={() => {
-                    setSearchSubject(item);
-                    setNotes([]);
-                    setIsSearchSubjectModalVisible(false);
-                  }}
-                >
-                  <Text style={styles.subjectItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              )}
-            />
-
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setIsSearchSubjectModalVisible(false)}
-            >
-              <Text style={styles.closeButtonText}>닫기</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
         visible={isEditNoteModalVisible}
         transparent
         animationType="fade"
@@ -567,17 +503,20 @@ export default function NoteScreen() {
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>노트 수정</Text>
 
-            <TouchableOpacity
-              style={styles.input}
-              onPress={async () => {
-                await fetchSubjects();
-                setIsEditSubjectModalVisible(true);
-              }}
-            >
-              <Text style={editSubject ? styles.selectedText : styles.placeholderText}>
-                {editSubject ? editSubject.title : "과목 선택"}
+            <SubjectDropdown
+              subjects={subjects}
+              selectedSubjectId={editSubject?.id}
+              placeholder="과목 선택"
+              disabled={subjects.length === 0}
+              onOpen={fetchSubjects}
+              onSelect={(subject) => setEditSubject(subject as Subject)}
+            />
+
+            {subjects.length === 0 && (
+              <Text style={styles.subjectNotice}>
+                먼저 과목을 등록해주세요.
               </Text>
-            </TouchableOpacity>
+            )}
 
             <TextInput
               style={styles.input}
@@ -594,7 +533,14 @@ export default function NoteScreen() {
               multiline
             />
 
-            <TouchableOpacity style={styles.button} onPress={handleUpdateNote}>
+            <TouchableOpacity
+              style={[
+                styles.button,
+                subjects.length === 0 && styles.disabledButton,
+              ]}
+              onPress={handleUpdateNote}
+              disabled={subjects.length === 0}
+            >
               <Text style={styles.buttonText}>수정 완료</Text>
             </TouchableOpacity>
 
@@ -603,45 +549,6 @@ export default function NoteScreen() {
               onPress={() => setIsEditNoteModalVisible(false)}
             >
               <Text style={styles.cancelButtonText}>취소</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={isEditSubjectModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsEditSubjectModalVisible(false)}
-      >
-        <View style={styles.modalBackground}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>수정할 과목 선택</Text>
-
-            <FlatList
-              data={subjects}
-              keyExtractor={(item) => item.id}
-              ListEmptyComponent={
-                <Text style={styles.emptyText}>등록된 과목이 없습니다.</Text>
-              }
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.subjectItem}
-                  onPress={() => {
-                    setEditSubject(item);
-                    setIsEditSubjectModalVisible(false);
-                  }}
-                >
-                  <Text style={styles.subjectItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              )}
-            />
-
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setIsEditSubjectModalVisible(false)}
-            >
-              <Text style={styles.closeButtonText}>닫기</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -877,6 +784,17 @@ const styles = StyleSheet.create({
   emptyText: {
     color: "#777",
     marginTop: 10,
+  },
+
+  subjectNotice: {
+    color: "#9a3412",
+    marginTop: -8,
+    marginBottom: 12,
+    fontSize: 14,
+  },
+
+  disabledButton: {
+    backgroundColor: "#9ca3af",
   },
 
   modalBackground: {
