@@ -1,18 +1,29 @@
-import { useEffect, useRef, useState } from "react";
-import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { onAuthStateChanged } from "firebase/auth";
 import { router } from "expo-router";
+import { onAuthStateChanged } from "firebase/auth";
+import { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import {
+  beginAppLogout,
   getAppUser,
   subscribeAppUserChange,
 } from "@/src/appSession";
-import { logout } from "@/src/authService";
+import { logoutExternalProviders } from "@/src/authService";
 import { auth } from "@/src/firebase";
 import {
   getCurrentUserProfile,
   normalizeUserProfile,
 } from "@/src/userService";
+
+const LOGIN_ROUTE = "/";
 
 type UserProfile = {
   uid?: string;
@@ -22,12 +33,27 @@ type UserProfile = {
   photoURL?: string;
 };
 
+const replaceToLogin = () => {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    window.location.replace(LOGIN_ROUTE);
+    return;
+  }
+
+  router.replace(LOGIN_ROUTE);
+};
+
 export default function UserHeaderRight() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const profileLoadIdRef = useRef(0);
 
   useEffect(() => {
     let isMounted = true;
+
+    const clearProfile = () => {
+      profileLoadIdRef.current += 1;
+      setProfile(null);
+    };
 
     const loadProfile = async () => {
       const profileLoadId = profileLoadIdRef.current + 1;
@@ -46,11 +72,6 @@ export default function UserHeaderRight() {
       }
     };
 
-    const clearProfile = () => {
-      profileLoadIdRef.current += 1;
-      setProfile(null);
-    };
-
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (!user && !getAppUser()) {
         clearProfile();
@@ -60,7 +81,7 @@ export default function UserHeaderRight() {
       loadProfile();
     });
 
-    const handleAppUserChanged = (nextUser: UserProfile | null) => {
+    const unsubscribeAppUser = subscribeAppUserChange((nextUser: UserProfile | null) => {
       if (!nextUser) {
         clearProfile();
         return;
@@ -68,9 +89,8 @@ export default function UserHeaderRight() {
 
       profileLoadIdRef.current += 1;
       setProfile(normalizeUserProfile(nextUser));
-    };
+    });
 
-    const unsubscribeAppUser = subscribeAppUserChange(handleAppUserChanged);
     loadProfile();
 
     return () => {
@@ -80,26 +100,39 @@ export default function UserHeaderRight() {
     };
   }, []);
 
-  if (!profile) {
+  const handleLogout = () => {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    profileLoadIdRef.current += 1;
+    setProfile(null);
+
+    try {
+      beginAppLogout();
+      replaceToLogin();
+    } catch (error) {
+      console.warn("[UserHeaderRight] local logout cleanup failed", error);
+      replaceToLogin();
+    }
+
+    void logoutExternalProviders().catch((error) => {
+      console.warn("[UserHeaderRight] external logout cleanup failed", error);
+    });
+  };
+
+  if (!profile && !isLoggingOut) {
     return null;
   }
 
-  const nickname = profile.nickname || "User";
-  const loginId = profile.loginId || profile.email || profile.uid || "";
+  const nickname = profile?.nickname || "User";
+  const loginId = profile?.loginId || profile?.email || profile?.uid || "";
   const initial = nickname.trim().charAt(0).toUpperCase() || "U";
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      router.replace("/");
-    } catch (error: any) {
-      Alert.alert("로그아웃 실패", error.message);
-    }
-  };
 
   return (
     <View style={styles.container}>
-      {profile.photoURL ? (
+      {profile?.photoURL ? (
         <Image source={{ uri: profile.photoURL }} style={styles.avatar} />
       ) : (
         <View style={[styles.avatar, styles.avatarFallback]}>
@@ -116,8 +149,16 @@ export default function UserHeaderRight() {
         </Text>
       </View>
 
-      <Pressable style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutButtonText}>로그아웃</Text>
+      <Pressable
+        disabled={isLoggingOut}
+        style={[styles.logoutButton, isLoggingOut && styles.logoutButtonDisabled]}
+        onPress={handleLogout}
+      >
+        {isLoggingOut ? (
+          <ActivityIndicator size="small" color="#374151" />
+        ) : (
+          <Text style={styles.logoutButtonText}>로그아웃</Text>
+        )}
       </Pressable>
     </View>
   );
@@ -160,11 +201,18 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   logoutButton: {
+    alignItems: "center",
     borderColor: "#d1d5db",
     borderRadius: 8,
     borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 32,
+    minWidth: 72,
     paddingHorizontal: 8,
     paddingVertical: 6,
+  },
+  logoutButtonDisabled: {
+    opacity: 0.65,
   },
   logoutButtonText: {
     color: "#374151",

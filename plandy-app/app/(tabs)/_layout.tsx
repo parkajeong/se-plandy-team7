@@ -1,16 +1,23 @@
-import { Tabs, router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { ActivityIndicator, SafeAreaView, StyleSheet, Text } from 'react-native';
-import { onAuthStateChanged } from 'firebase/auth';
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { Tabs } from "expo-router";
+import { onAuthStateChanged } from "firebase/auth";
+import React, { useEffect, useState } from "react";
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import UserHeaderRight from '@/components/UserHeaderRight';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { auth } from '@/src/firebase';
-import { getAppUser, subscribeAppUserChange } from '@/src/appSession';
+import UserHeaderRight from "@/components/UserHeaderRight";
+import { HapticTab } from "@/components/haptic-tab";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import {
+  getAppUser,
+  hasActiveSession,
+  isAppLogoutInProgress,
+  subscribeAppLogoutChange,
+  subscribeAppUserChange,
+} from "@/src/appSession";
+import { auth } from "@/src/firebase";
+
+const AUTH_CHECK_TIMEOUT_MS = 2000;
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -18,44 +25,59 @@ export default function TabLayout() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const syncAuthState = () => {
-      const hasSession = Boolean(auth.currentUser || getAppUser());
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-      setIsAuthenticated(hasSession);
-      setIsCheckingAuth(false);
-
-      if (!hasSession) {
-        router.replace('/');
+    const clearAuthTimeout = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
       }
     };
 
-    const unsubscribeAuth = onAuthStateChanged(auth, syncAuthState);
-    const unsubscribeAppUser = subscribeAppUserChange(syncAuthState);
+    const syncAuthState = () => {
+      setIsAuthenticated(hasActiveSession());
+      setIsCheckingAuth(false);
+    };
 
-    if (getAppUser()) {
+    timeoutId = setTimeout(syncAuthState, AUTH_CHECK_TIMEOUT_MS);
+
+    const unsubscribeAuth = onAuthStateChanged(auth, () => {
+      clearAuthTimeout();
+      syncAuthState();
+    });
+
+    const unsubscribeAppUser = subscribeAppUserChange(() => {
+      clearAuthTimeout();
+      syncAuthState();
+    });
+
+    const unsubscribeLogout = subscribeAppLogoutChange(() => {
+      clearAuthTimeout();
+      syncAuthState();
+    });
+
+    if (getAppUser() || isAppLogoutInProgress()) {
+      clearAuthTimeout();
       syncAuthState();
     }
 
     return () => {
+      clearAuthTimeout();
       unsubscribeAuth();
       unsubscribeAppUser();
+      unsubscribeLogout();
     };
   }, []);
 
   if (isCheckingAuth || !isAuthenticated) {
-    return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
-        <Text style={styles.loadingText}>로그인 상태를 확인하는 중입니다.</Text>
-      </SafeAreaView>
-    );
+    return null;
   }
 
   return (
     <Tabs
       initialRouteName="subjects"
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
         headerShown: true,
         headerRight: () => <UserHeaderRight />,
         tabBarButton: HapticTab,
@@ -71,7 +93,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="subjects"
         options={{
-          title: '과목',
+          title: "과목",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="book.fill" color={color} />
           ),
@@ -81,9 +103,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="todo"
         options={{
-          title: 'TodoList',
-          tabBarActiveTintColor: '#a8a8aaf4',
-          tabBarInactiveTintColor: '#a0a6b0f7',
+          title: "TodoList",
+          tabBarActiveTintColor: "#a8a8aaf4",
+          tabBarInactiveTintColor: "#a0a6b0f7",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="checkbox-outline" size={size ?? 28} color={color} />
           ),
@@ -93,7 +115,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="schedule"
         options={{
-          title: '일정',
+          title: "일정",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" size={size ?? 28} color={color} />
           ),
@@ -103,7 +125,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="note"
         options={{
-          title: '노트',
+          title: "노트",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="document-text-outline" size={size ?? 28} color={color} />
           ),
@@ -112,17 +134,3 @@ export default function TabLayout() {
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#ffffff',
-  },
-  loadingText: {
-    marginTop: 12,
-    color: '#6b7280',
-    fontSize: 14,
-  },
-});

@@ -20,7 +20,7 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore";
-import { clearAppUser, setAppUser } from "./appSession";
+import { cancelAppLogout, setAppUser } from "./appSession";
 import { auth, db } from "./firebase";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -34,8 +34,17 @@ const KAKAO_APP_RETURN_URI = "plandy://kakao-auth";
 const KAKAO_AUTH_PROMPT = "select_account";
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+const LOGOUT_TASK_TIMEOUT_MS = 2000;
 
 let isGoogleSigninConfigured = false;
+
+const withTimeout = (promise, ms = LOGOUT_TASK_TIMEOUT_MS) =>
+  Promise.race([
+    promise,
+    new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    }),
+  ]);
 
 const configureNativeGoogleSignIn = () => {
   if (isGoogleSigninConfigured) {
@@ -60,6 +69,8 @@ const configureNativeGoogleSignIn = () => {
 };
 
 export const signUpWithEmail = async ({ email, password, loginId, nickname }) => {
+  cancelAppLogout();
+
   console.log("[signUpWithEmail] called", {
     email,
     loginId,
@@ -130,6 +141,8 @@ export const signUpWithEmail = async ({ email, password, loginId, nickname }) =>
 };
 
 export const loginWithIdOrEmail = async (idOrEmail, password) => {
+  cancelAppLogout();
+
   let loginEmail = idOrEmail.trim();
 
   if (!loginEmail || !password) {
@@ -157,15 +170,29 @@ export const loginWithIdOrEmail = async (idOrEmail, password) => {
   return userCredential.user;
 };
 
-export const logout = async () => {
-  await clearAppUser();
+export const logoutExternalProviders = async () => {
+  const logoutTasks = [];
 
   if (!isWeb && isGoogleSigninConfigured) {
-    await GoogleSignin.signOut().catch(() => null);
+    logoutTasks.push(
+      withTimeout(GoogleSignin.signOut()).catch((error) => {
+        console.warn("[logout] Google signOut failed", error);
+      })
+    );
   }
 
-  await signOut(auth);
+  logoutTasks.push(
+    withTimeout(
+      signOut(auth)
+    ).catch((error) => {
+      console.warn("[logout] Firebase signOut failed", error);
+    })
+  );
+
+  await Promise.allSettled(logoutTasks);
 };
+
+export const logout = logoutExternalProviders;
 
 const createGoogleUserDocumentIfNeeded = async (user) => {
   const userRef = doc(db, "users", user.uid);
@@ -410,6 +437,8 @@ const openKakaoAuthPopup = (authUrl) => {
 };
 
 export const loginWithKakao = async () => {
+  cancelAppLogout();
+
   const restApiKey = KAKAO_REST_API_KEY;
 
   console.log("[loginWithKakao] service entered", {
@@ -475,6 +504,8 @@ export const loginWithKakao = async () => {
 };
 
 export const loginWithGoogle = async () => {
+  cancelAppLogout();
+
   if (isWeb) {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
