@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { onAuthStateChanged } from "firebase/auth";
+import { router } from "expo-router";
 
 import {
   getAppUser,
   subscribeAppUserChange,
 } from "@/src/appSession";
+import { logout } from "@/src/authService";
 import { auth } from "@/src/firebase";
 import {
   getCurrentUserProfile,
@@ -86,6 +88,15 @@ export default function UserHeaderRight() {
   const loginId = profile.loginId || profile.email || profile.uid || "";
   const initial = nickname.trim().charAt(0).toUpperCase() || "U";
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.replace("/");
+    } catch (error: any) {
+      Alert.alert("로그아웃 실패", error.message);
+    }
+  };
+
   return (
     <View style={styles.container}>
       {profile.photoURL ? (
@@ -104,6 +115,10 @@ export default function UserHeaderRight() {
           {loginId}
         </Text>
       </View>
+
+      <Pressable style={styles.logoutButton} onPress={handleLogout}>
+        <Text style={styles.logoutButtonText}>로그아웃</Text>
+      </Pressable>
     </View>
   );
 }
@@ -113,7 +128,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
-    maxWidth: 220,
+    maxWidth: 300,
     paddingRight: 12,
   },
   avatar: {
@@ -132,7 +147,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   textBox: {
-    maxWidth: 160,
+    maxWidth: 130,
   },
   nickname: {
     color: "#111827",
@@ -143,5 +158,17 @@ const styles = StyleSheet.create({
     color: "#6b7280",
     fontSize: 11,
     marginTop: 1,
+  },
+  logoutButton: {
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  logoutButtonText: {
+    color: "#374151",
+    fontSize: 12,
+    fontWeight: "700",
   },
 });
