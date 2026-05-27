@@ -131,6 +131,15 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="quiz"
+        options={{
+          title: "Quiz",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="help-circle-outline" size={size ?? 28} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

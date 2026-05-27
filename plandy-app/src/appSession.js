@@ -118,7 +118,16 @@ export const subscribeAppLogoutChange = (listener) => {
 
 export const getCurrentAppUserIdOrNull = () => {
   if (isAppLogoutInProgress()) return null;
-  return auth.currentUser?.uid || getAppUser()?.uid || null;
+
+  const appUser = getAppUser();
+  const userId =
+    auth.currentUser?.uid ||
+    appUser?.uid ||
+    appUser?.id ||
+    appUser?.user_id ||
+    appUser?.userId;
+
+  return userId ? String(userId) : null;
 };
 
 export const getCurrentAppUserId = () => {
