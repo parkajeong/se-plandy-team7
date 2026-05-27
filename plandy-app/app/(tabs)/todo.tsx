@@ -1,12 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   SafeAreaView,
-  StatusBar,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -17,141 +22,343 @@ import {
   completeTodo,
   createTodo,
   deleteTodo,
+  fetchSubjects,
   fetchTodos,
-  getCurrentTodoUserIdOrNull,
   reopenTodo,
   updateTodo,
 } from '../../src/todoService';
 
-type TodoStatus = 'pending' | 'completed';
-type TodoType = 'assignment' | 'exam' | 'review' | 'etc';
+type TodoCategory = '시험' | '과제' | '복습' | '기타';
+
+type Subject = {
+  id: string;
+  user_id: string;
+  title: string;
+  goal: string;
+  created_at: string;
+};
 
 type Todo = {
   id: string;
+  user_id: string;
+  subject_id: string;
   title: string;
-  description?: string;
-  courseName?: string;
-  type: TodoType;
-  dueDate?: string;
-  status: TodoStatus;
+  is_completed: boolean;
+  deadline: string;
+  priority: number;
+  created_at: string;
+  description: string;
+  category: TodoCategory;
 };
+
+type TodoForm = {
+  title: string;
+  subject_id: string;
+  category: TodoCategory;
+  deadline: Date | null;
+  priority: string;
+  description: string;
+};
+
+const TODO_CATEGORIES: TodoCategory[] = ['시험', '과제', '복습', '기타'];
+
+const initialForm: TodoForm = {
+  title: '',
+  subject_id: '',
+  category: '과제',
+  deadline: null,
+  priority: '3',
+  description: '',
+};
+
+function formatDateForStorage(date: Date | null) {
+  if (!date) {
+    return '';
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateFromString(dateString: string) {
+  if (!dateString) {
+    return null;
+  }
+
+  const [year, month, day] = dateString.split('-').map(Number);
+
+  if (!year || !month || !day) {
+    return null;
+  }
+
+  return new Date(year, month - 1, day);
+}
+
+function getCalendarDays(currentMonth: Date) {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+
+  const firstDayOfWeek = firstDay.getDay();
+  const totalDays = lastDay.getDate();
+
+  const days: (number | null)[] = [];
+
+  for (let i = 0; i < firstDayOfWeek; i += 1) {
+    days.push(null);
+  }
+
+  for (let day = 1; day <= totalDays; day += 1) {
+    days.push(day);
+  }
+
+  while (days.length % 7 !== 0) {
+    days.push(null);
+  }
+
+  return days;
+}
+
+function getCalendarWeeks(currentMonth: Date) {
+  const days = getCalendarDays(currentMonth);
+  const weeks: (number | null)[][] = [];
+
+  for (let i = 0; i < days.length; i += 7) {
+    weeks.push(days.slice(i, i + 7));
+  }
+
+  return weeks;
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return '알 수 없는 오류가 발생했습니다.';
+}
+
+function confirmOnWeb(message: string) {
+  if (Platform.OS !== 'web') {
+    return false;
+  }
+
+  return window.confirm(message);
+}
 
 export default function TodoScreen() {
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [form, setForm] = useState<TodoForm>(initialForm);
+  const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
 
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
+  const [isTodoModalVisible, setIsTodoModalVisible] = useState(false);
+  const [isCalendarVisible, setIsCalendarVisible] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  const [title, setTitle] = useState('');
-  const [courseName, setCourseName] = useState('');
-  const [description, setDescription] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [type, setType] = useState<TodoType>('assignment');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const loadTodos = useCallback(async () => {
-    if (!getCurrentTodoUserIdOrNull()) {
-      setTodos([]);
-      setLoading(false);
-      return;
-    }
+  const subjectTitleMap = useMemo(() => {
+    return subjects.reduce<Record<string, string>>((acc, subject) => {
+      acc[subject.id] = subject.title;
+      return acc;
+    }, {});
+  }, [subjects]);
 
+  const calendarWeeks = useMemo(() => {
+    return getCalendarWeeks(currentMonth);
+  }, [currentMonth]);
+
+  const loadData = useCallback(async () => {
     try {
-      setLoading(true);
-      const result = await fetchTodos();
-      setTodos(result);
+      const [subjectList, todoList] = await Promise.all([
+        fetchSubjects(),
+        fetchTodos(),
+      ]);
+
+      setSubjects(subjectList);
+      setTodos(todoList);
     } catch (error) {
-      console.error(error);
-      Alert.alert('오류', '할 일 목록을 불러오지 못했습니다.');
-    } finally {
-      setLoading(false);
+      console.error('[TodoScreen] Failed to load todos or subjects:', error);
+      Alert.alert('조회 실패', getErrorMessage(error));
     }
   }, []);
 
-  useEffect(() => {
-    loadTodos();
-  }, [loadTodos]);
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
 
-  const resetForm = () => {
-    setEditingTodo(null);
-    setTitle('');
-    setCourseName('');
-    setDescription('');
-    setDueDate('');
-    setType('assignment');
+      async function init() {
+        setIsLoading(true);
+        await loadData();
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+
+      init();
+
+      return () => {
+        isActive = false;
+      };
+    }, [loadData])
+  );
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadData();
+    setIsRefreshing(false);
   };
 
   const openCreateModal = () => {
-    if (!getCurrentTodoUserIdOrNull()) {
-      Alert.alert('로그인 필요', '로그인 후 이용해주세요.');
-      return;
-    }
-
-    resetForm();
-    setModalVisible(true);
+    setEditingTodoId(null);
+    setForm({
+      ...initialForm,
+      subject_id: subjects[0]?.id || '',
+    });
+    setCurrentMonth(new Date());
+    setIsTodoModalVisible(true);
   };
 
   const openEditModal = (todo: Todo) => {
-    setEditingTodo(todo);
-    setTitle(todo.title);
-    setCourseName(todo.courseName || '');
-    setDescription(todo.description || '');
-    setDueDate(todo.dueDate || '');
-    setType(todo.type || 'assignment');
-    setModalVisible(true);
+    const parsedDeadline = parseDateFromString(todo.deadline);
+
+    setEditingTodoId(todo.id);
+    setForm({
+      title: todo.title,
+      subject_id: todo.subject_id,
+      category: todo.category || '기타',
+      deadline: parsedDeadline,
+      priority: String(todo.priority),
+      description: todo.description || '',
+    });
+    setCurrentMonth(parsedDeadline || new Date());
+    setIsTodoModalVisible(true);
   };
 
-  const handleSave = async () => {
-    if (!title.trim()) {
-      Alert.alert('확인', '할 일 제목을 입력해주세요.');
+  const closeTodoModal = () => {
+    if (isSaving) {
       return;
     }
 
+    setIsTodoModalVisible(false);
+    setIsCalendarVisible(false);
+    setEditingTodoId(null);
+    setForm(initialForm);
+  };
+
+  const handlePrevMonth = () => {
+    setCurrentMonth((prev) => {
+      return new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
+    });
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth((prev) => {
+      return new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
+    });
+  };
+
+  const handleSelectDate = (day: number) => {
+    const selectedDate = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth(),
+      day
+    );
+
+    setForm((prev) => ({
+      ...prev,
+      deadline: selectedDate,
+    }));
+    setIsCalendarVisible(false);
+  };
+
+  const handleSaveTodo = async () => {
     try {
-      if (editingTodo) {
-        await updateTodo(editingTodo.id, {
-          title: title.trim(),
-          courseName: courseName.trim(),
-          description: description.trim(),
-          dueDate: dueDate.trim(),
-          type,
-        });
+      setIsSaving(true);
+
+      const payload = {
+        title: form.title,
+        subject_id: form.subject_id,
+        category: form.category,
+        deadline: formatDateForStorage(form.deadline),
+        priority: form.priority,
+        description: form.description,
+      };
+
+      if (editingTodoId) {
+        await updateTodo(editingTodoId, payload);
       } else {
-        await createTodo({
-          title: title.trim(),
-          courseName: courseName.trim(),
-          description: description.trim(),
-          dueDate: dueDate.trim(),
-          type,
-        });
+        await createTodo(payload);
       }
 
-      setModalVisible(false);
-      resetForm();
-      await loadTodos();
+      await loadData();
+      closeTodoModal();
     } catch (error) {
-      console.error(error);
-      Alert.alert('오류', '할 일 저장 중 문제가 발생했습니다.');
+      console.error('[TodoScreen] Failed to save todo:', error);
+      Alert.alert('저장 실패', getErrorMessage(error));
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleToggleComplete = async (todo: Todo) => {
     try {
-      if (todo.status === 'completed') {
+      if (todo.is_completed) {
         await reopenTodo(todo.id);
       } else {
         await completeTodo(todo.id);
       }
 
-      await loadTodos();
+      await loadData();
     } catch (error) {
-      console.error(error);
-      Alert.alert('오류', '완료 상태 변경 중 문제가 발생했습니다.');
+      console.error('[TodoScreen] Failed to toggle todo completion:', error);
+      Alert.alert('상태 변경 실패', getErrorMessage(error));
     }
   };
 
-  const handleDelete = (todo: Todo) => {
-    Alert.alert('삭제 확인', '이 할 일을 삭제하시겠습니까?', [
+  const performDeleteTodo = async (todoId: string) => {
+    if (!todoId) {
+      const error = new Error('Todo id is missing. Cannot delete todo.');
+      console.error('[TodoScreen] Failed to delete todo:', error);
+      Alert.alert('삭제 실패', getErrorMessage(error));
+      return;
+    }
+
+    const previousTodos = todos;
+
+    try {
+      setTodos((currentTodos) =>
+        currentTodos.filter((item) => item.id !== todoId)
+      );
+
+      await deleteTodo(todoId);
+      await loadData();
+    } catch (error) {
+      setTodos(previousTodos);
+      console.error(`[TodoScreen] Failed to delete todo ${todoId}:`, error);
+      Alert.alert('삭제 실패', getErrorMessage(error));
+    }
+  };
+
+  const handleDeleteTodo = (todo: Todo) => {
+    const todoId = todo.id;
+
+    if (Platform.OS === 'web') {
+      if (confirmOnWeb('이 할 일을 삭제할까요?')) {
+        void performDeleteTodo(todoId);
+      }
+      return;
+    }
+
+    Alert.alert('할 일 삭제', '이 할 일을 삭제할까요?', [
       {
         text: '취소',
         style: 'cancel',
@@ -160,59 +367,69 @@ export default function TodoScreen() {
         text: '삭제',
         style: 'destructive',
         onPress: async () => {
-          try {
-            await deleteTodo(todo.id);
-            await loadTodos();
-          } catch (error) {
-            console.error(error);
-            Alert.alert('오류', '할 일 삭제 중 문제가 발생했습니다.');
-          }
+          await performDeleteTodo(todoId);
         },
       },
     ]);
   };
 
+  const handleGoToSubjects = () => {
+    closeTodoModal();
+    router.push('/subjects');
+  };
+
   const renderTodoItem = ({ item }: { item: Todo }) => {
-    const isCompleted = item.status === 'completed';
+    const subjectTitle = subjectTitleMap[item.subject_id] || '과목 정보 없음';
 
     return (
       <View style={styles.todoCard}>
         <View style={styles.todoHeader}>
-          <Text style={[styles.todoTitle, isCompleted && styles.completedText]}>
-            {item.title}
-          </Text>
+          <Pressable
+            style={[
+              styles.checkBox,
+              item.is_completed && styles.checkBoxCompleted,
+            ]}
+            onPress={() => handleToggleComplete(item)}
+          >
+            <Text style={styles.checkBoxText}>
+              {item.is_completed ? '✓' : ''}
+            </Text>
+          </Pressable>
 
-          <Text style={styles.statusBadge}>
-            {isCompleted ? '완료' : '진행중'}
-          </Text>
+          <View style={styles.todoTitleArea}>
+            <Text
+              style={[
+                styles.todoTitle,
+                item.is_completed && styles.completedText,
+              ]}
+            >
+              {item.title}
+            </Text>
+
+            <Text style={styles.todoMeta}>
+              {subjectTitle} · {item.category} · 우선순위 {item.priority}
+            </Text>
+          </View>
         </View>
-
-        <Text style={styles.todoMeta}>분류: {getTypeLabel(item.type)}</Text>
-
-        {!!item.courseName && (
-          <Text style={styles.todoMeta}>과목: {item.courseName}</Text>
-        )}
-
-        {!!item.dueDate && (
-          <Text style={styles.todoMeta}>마감일: {item.dueDate}</Text>
-        )}
 
         {!!item.description && (
           <Text style={styles.todoDescription}>{item.description}</Text>
         )}
 
+        <View style={styles.todoInfoRow}>
+          <View style={styles.deadlineBadge}>
+            <Text style={styles.deadlineText}>
+              마감일: {item.deadline || '미설정'}
+            </Text>
+          </View>
+          <Text style={styles.todoStatus}>
+            {item.is_completed ? '완료' : '진행 중'}
+          </Text>
+        </View>
+
         <View style={styles.actionRow}>
           <Pressable
-            style={styles.actionButton}
-            onPress={() => handleToggleComplete(item)}
-          >
-            <Text style={styles.actionButtonText}>
-              {isCompleted ? '미완료' : '완료'}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.actionButton}
+            style={[styles.actionButton, styles.editButton]}
             onPress={() => openEditModal(item)}
           >
             <Text style={styles.actionButtonText}>수정</Text>
@@ -220,7 +437,7 @@ export default function TodoScreen() {
 
           <Pressable
             style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => handleDelete(item)}
+            onPress={() => handleDeleteTodo(item)}
           >
             <Text style={styles.actionButtonText}>삭제</Text>
           </Pressable>
@@ -229,13 +446,27 @@ export default function TodoScreen() {
     );
   };
 
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.centerContainer}>
+        <ActivityIndicator size="large" />
+        <Text style={styles.loadingText}>할 일을 불러오는 중입니다.</Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.screenTitle}>TodoList</Text>
+        <View>
+          <Text style={styles.screenTitle}>TodoList</Text>
+          <Text style={styles.screenSubtitle}>
+            과목별 학습 할 일을 관리하세요
+          </Text>
+        </View>
 
         <Pressable style={styles.addButton} onPress={openCreateModal}>
-          <Text style={styles.addButtonText}>+ 할 일 등록</Text>
+          <Text style={styles.addButtonText}>+ 등록</Text>
         </Pressable>
       </View>
 
@@ -243,256 +474,704 @@ export default function TodoScreen() {
         data={todos}
         keyExtractor={(item) => item.id}
         renderItem={renderTodoItem}
-        refreshing={loading}
-        onRefresh={loadTodos}
+        contentContainerStyle={[
+          styles.listContent,
+          todos.length === 0 && styles.emptyListContent,
+        ]}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
+        }
         ListEmptyComponent={
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>등록된 할 일이 없습니다.</Text>
+            <Text style={styles.emptyTitle}>등록된 할 일이 없습니다.</Text>
+            <Text style={styles.emptyDescription}>
+              과제, 시험 준비, 복습 일정을 등록해보세요.
+            </Text>
           </View>
         }
       />
 
-      <Modal visible={modalVisible} animationType="slide">
-        <SafeAreaView style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>
-            {editingTodo ? '할 일 수정' : '할 일 등록'}
-          </Text>
+      <Modal
+        visible={isTodoModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (isCalendarVisible) {
+            setIsCalendarVisible(false);
+            return;
+          }
 
-          <TextInput
-            style={styles.input}
-            placeholder="할 일 제목"
-            value={title}
-            onChangeText={setTitle}
-          />
+          closeTodoModal();
+        }}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.todoModalContent}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              contentContainerStyle={styles.todoModalScrollContent}
+            >
+              <Text style={styles.modalTitle}>
+                {editingTodoId ? '할 일 수정' : '할 일 등록'}
+              </Text>
 
-          <TextInput
-            style={styles.input}
-            placeholder="과목명"
-            value={courseName}
-            onChangeText={setCourseName}
-          />
+              <Text style={styles.inputLabel}>할 일 제목</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="예: 소프트웨어공학 과제 제출"
+                value={form.title}
+                onChangeText={(text) =>
+                  setForm((prev) => ({ ...prev, title: text }))
+                }
+              />
 
-          <TextInput
-            style={styles.input}
-            placeholder="마감일 예: 2026-05-20"
-            value={dueDate}
-            onChangeText={setDueDate}
-          />
+              <Text style={styles.inputLabel}>과목명</Text>
+              {subjects.length > 0 ? (
+                <View style={styles.chipWrap}>
+                  {subjects.map((subject) => {
+                    const selected = form.subject_id === subject.id;
 
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="상세 내용"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-          />
+                    return (
+                      <Pressable
+                        key={subject.id}
+                        style={[
+                          styles.chipButton,
+                          selected && styles.chipButtonSelected,
+                        ]}
+                        onPress={() =>
+                          setForm((prev) => ({
+                            ...prev,
+                            subject_id: subject.id,
+                          }))
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.chipButtonText,
+                            selected && styles.chipButtonTextSelected,
+                          ]}
+                        >
+                          {subject.title}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View style={styles.warningBox}>
+                  <Text style={styles.warningText}>
+                    등록된 과목이 없습니다. Todo를 만들려면 먼저 과목을 등록해주세요.
+                  </Text>
+                  <Pressable
+                    style={styles.warningButton}
+                    onPress={handleGoToSubjects}
+                  >
+                    <Text style={styles.warningButtonText}>
+                      과목 등록하러 가기
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
 
-          <View style={styles.typeRow}>
-            {(['assignment', 'exam', 'review', 'etc'] as TodoType[]).map(
-              (todoType) => (
-                <Pressable
-                  key={todoType}
+              <Text style={styles.inputLabel}>유형</Text>
+              <View style={styles.chipWrap}>
+                {TODO_CATEGORIES.map((category) => {
+                  const selected = form.category === category;
+
+                  return (
+                    <Pressable
+                      key={category}
+                      style={[
+                        styles.chipButton,
+                        selected && styles.chipButtonSelected,
+                      ]}
+                      onPress={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          category,
+                        }))
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.chipButtonText,
+                          selected && styles.chipButtonTextSelected,
+                        ]}
+                      >
+                        {category}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.inputLabel}>마감일</Text>
+              <Pressable
+                style={styles.dateSelectButton}
+                onPress={() => setIsCalendarVisible(true)}
+              >
+                <Text
                   style={[
-                    styles.typeButton,
-                    type === todoType && styles.typeButtonSelected,
+                    styles.dateSelectText,
+                    !form.deadline && styles.placeholderText,
                   ]}
-                  onPress={() => setType(todoType)}
                 >
-                  <Text style={styles.typeButtonText}>
-                    {getTypeLabel(todoType)}
+                  {form.deadline
+                    ? formatDateForStorage(form.deadline)
+                    : '달력에서 날짜 선택'}
+                </Text>
+              </Pressable>
+
+              <Text style={styles.inputLabel}>우선순위</Text>
+              <Text style={styles.helperText}>
+                1이 가장 중요하고, 5가 가장 낮은 중요도입니다.
+              </Text>
+              <View style={styles.chipWrap}>
+                {['1', '2', '3', '4', '5'].map((priority) => {
+                  const selected = form.priority === priority;
+
+                  return (
+                    <Pressable
+                      key={priority}
+                      style={[
+                        styles.priorityButton,
+                        selected && styles.chipButtonSelected,
+                      ]}
+                      onPress={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          priority,
+                        }))
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.chipButtonText,
+                          selected && styles.chipButtonTextSelected,
+                        ]}
+                      >
+                        {priority}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.inputLabel}>할 일 내용</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="예: 5장까지 읽고 연습문제 정리"
+                value={form.description}
+                onChangeText={(text) =>
+                  setForm((prev) => ({ ...prev, description: text }))
+                }
+                multiline
+                textAlignVertical="top"
+              />
+
+              <View style={styles.modalActionRow}>
+                <Pressable
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={closeTodoModal}
+                  disabled={isSaving}
+                >
+                  <Text style={styles.cancelButtonText}>취소</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[
+                    styles.modalButton,
+                    styles.saveButton,
+                    subjects.length === 0 && styles.disabledButton,
+                  ]}
+                  onPress={handleSaveTodo}
+                  disabled={isSaving || subjects.length === 0}
+                >
+                  <Text style={styles.saveButtonText}>
+                    {isSaving ? '저장 중...' : '저장'}
                   </Text>
                 </Pressable>
-              ),
-            )}
+              </View>
+            </ScrollView>
           </View>
 
-          <View style={styles.modalActionRow}>
-            <Pressable
-              style={[styles.modalButton, styles.cancelButton]}
-              onPress={() => {
-                setModalVisible(false);
-                resetForm();
-              }}
-            >
-              <Text style={styles.modalButtonText}>취소</Text>
-            </Pressable>
+          {isCalendarVisible && (
+            <View style={styles.calendarModalBackground}>
+              <View style={styles.calendarContainer}>
+                <View style={styles.calendarHeader}>
+                  <Pressable onPress={handlePrevMonth}>
+                    <Text style={styles.monthButton}>‹</Text>
+                  </Pressable>
 
-            <Pressable style={styles.modalButton} onPress={handleSave}>
-              <Text style={styles.modalButtonText}>저장</Text>
-            </Pressable>
-          </View>
-        </SafeAreaView>
+                  <Text style={styles.monthTitle}>
+                    {currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월
+                  </Text>
+
+                  <Pressable onPress={handleNextMonth}>
+                    <Text style={styles.monthButton}>›</Text>
+                  </Pressable>
+                </View>
+
+                <View style={styles.weekRow}>
+                  {['일', '월', '화', '수', '목', '금', '토'].map((weekDay) => (
+                    <Text key={weekDay} style={styles.weekText}>
+                      {weekDay}
+                    </Text>
+                  ))}
+                </View>
+
+                <View style={styles.daysContainer}>
+                  {calendarWeeks.map((week, weekIndex) => (
+                    <View key={weekIndex} style={styles.dayRow}>
+                      {week.map((day, dayIndex) => {
+                        const isSelected =
+                          !!day &&
+                          !!form.deadline &&
+                          form.deadline.getFullYear() ===
+                            currentMonth.getFullYear() &&
+                          form.deadline.getMonth() === currentMonth.getMonth() &&
+                          form.deadline.getDate() === day;
+
+                        return (
+                          <Pressable
+                            key={`${weekIndex}-${dayIndex}`}
+                            style={[
+                              styles.dayBox,
+                              isSelected && styles.selectedDayBox,
+                            ]}
+                            disabled={day === null}
+                            onPress={() => day && handleSelectDate(day)}
+                          >
+                            <Text
+                              style={[
+                                styles.dayText,
+                                isSelected && styles.selectedDayText,
+                              ]}
+                            >
+                              {day || ''}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ))}
+                </View>
+
+                <Pressable
+                  style={styles.closeCalendarButton}
+                  onPress={() => setIsCalendarVisible(false)}
+                >
+                  <Text style={styles.closeCalendarButtonText}>닫기</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
 }
 
-function getTypeLabel(type: TodoType) {
-  switch (type) {
-    case 'assignment':
-      return '과제';
-    case 'exam':
-      return '시험';
-    case 'review':
-      return '복습';
-    case 'etc':
-      return '기타';
-    default:
-      return '기타';
-  }
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop:
-      Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) + 28 : 28,
+    backgroundColor: '#f6f7fb',
+  },
+  centerContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f6f7fb',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#666',
   },
   header: {
-    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
   },
   screenTitle: {
-    color: '#111827',
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
+    color: '#111827',
+  },
+  screenSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: '#6b7280',
   },
   addButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#2563eb',
   },
   addButtonText: {
     color: '#ffffff',
     fontWeight: '700',
   },
-  todoCard: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    marginBottom: 12,
-    padding: 16,
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 32,
   },
-  todoHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'space-between',
-  },
-  todoTitle: {
-    color: '#111827',
-    flex: 1,
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  completedText: {
-    color: '#6b7280',
-    textDecorationLine: 'line-through',
-  },
-  statusBadge: {
-    color: '#2563eb',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  todoMeta: {
-    color: '#4b5563',
-    marginTop: 6,
-  },
-  todoDescription: {
-    color: '#111827',
-    marginTop: 8,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
-  },
-  actionButton: {
-    backgroundColor: '#374151',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  deleteButton: {
-    backgroundColor: '#dc2626',
-  },
-  actionButtonText: {
-    color: '#ffffff',
-    fontWeight: '600',
+  emptyListContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   emptyBox: {
     alignItems: 'center',
-    padding: 40,
+    padding: 24,
   },
-  emptyText: {
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  emptyDescription: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  todoCard: {
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  todoHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  checkBox: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  checkBoxCompleted: {
+    backgroundColor: '#2563eb',
+  },
+  checkBoxText: {
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  todoTitleArea: {
+    flex: 1,
+  },
+  todoTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  completedText: {
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
+  },
+  todoMeta: {
+    marginTop: 4,
+    fontSize: 13,
     color: '#6b7280',
   },
-  modalContainer: {
+  todoDescription: {
+    marginTop: 12,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#374151',
+  },
+  todoInfoRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  deadlineBadge: {
+    flexShrink: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#eef2ff',
+  },
+  deadlineText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#3730a3',
+  },
+  todoStatus: {
+    flexShrink: 0,
+    fontSize: 13,
+    color: '#374151',
+  },
+  actionRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  actionButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  editButton: {
+    backgroundColor: '#e0f2fe',
+  },
+  deleteButton: {
+    backgroundColor: '#fee2e2',
+  },
+  actionButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  modalOverlay: {
     flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+  },
+  todoModalContent: {
+    maxHeight: '82%',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop:
-      Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) + 28 : 28,
+  },
+  todoModalScrollContent: {
+    paddingBottom: 48,
   },
   modalTitle: {
+    marginBottom: 18,
+    fontSize: 22,
+    fontWeight: '800',
     color: '#111827',
-    fontSize: 24,
+  },
+  inputLabel: {
+    marginBottom: 6,
+    fontSize: 14,
     fontWeight: '700',
-    marginBottom: 20,
+    color: '#374151',
+  },
+  helperText: {
+    marginTop: -2,
+    marginBottom: 8,
+    fontSize: 12,
+    color: '#6b7280',
   },
   input: {
-    borderColor: '#d1d5db',
-    borderRadius: 10,
+    marginBottom: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderWidth: 1,
-    marginBottom: 12,
-    padding: 12,
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    fontSize: 15,
+    backgroundColor: '#ffffff',
   },
   textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
+    minHeight: 90,
   },
-  typeRow: {
+  chipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 20,
+    marginBottom: 14,
   },
-  typeButton: {
-    borderColor: '#d1d5db',
-    borderRadius: 8,
+  chipButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
     borderWidth: 1,
+    borderColor: '#d1d5db',
+    backgroundColor: '#ffffff',
+  },
+  priorityButton: {
+    width: 44,
+    height: 40,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+  },
+  chipButtonSelected: {
+    borderColor: '#2563eb',
+    backgroundColor: '#2563eb',
+  },
+  chipButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  chipButtonTextSelected: {
+    color: '#ffffff',
+  },
+  warningBox: {
+    marginBottom: 14,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#fff7ed',
+  },
+  warningText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#9a3412',
+  },
+  warningButton: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#ea580c',
   },
-  typeButtonSelected: {
-    backgroundColor: '#dbeafe',
-    borderColor: '#2563eb',
+  warningButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ffffff',
   },
-  typeButtonText: {
+  dateSelectButton: {
+    marginBottom: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+  },
+  dateSelectText: {
+    fontSize: 15,
     color: '#111827',
   },
+  placeholderText: {
+    color: '#9ca3af',
+  },
   modalActionRow: {
+    marginTop: 8,
+    marginBottom: 28,
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   modalButton: {
-    alignItems: 'center',
-    backgroundColor: '#2563eb',
-    borderRadius: 10,
     flex: 1,
-    padding: 14,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#6b7280',
+    backgroundColor: '#f3f4f6',
   },
-  modalButtonText: {
+  saveButton: {
+    backgroundColor: '#2563eb',
+  },
+  disabledButton: {
+    backgroundColor: '#9ca3af',
+  },
+  cancelButtonText: {
+    fontWeight: '800',
+    color: '#374151',
+  },
+  saveButtonText: {
+    fontWeight: '800',
     color: '#ffffff',
-    fontWeight: '700',
+  },
+  calendarModalBackground: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  calendarContainer: {
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    padding: 20,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  monthButton: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    paddingHorizontal: 15,
+  },
+  monthTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  weekRow: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  weekText: {
+    flex: 1,
+    textAlign: 'center',
+    fontWeight: 'bold',
+    color: '#555555',
+  },
+  daysContainer: {
+    width: '100%',
+  },
+  dayRow: {
+    flexDirection: 'row',
+  },
+  dayBox: {
+    flex: 1,
+    height: 42,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 999,
+  },
+  selectedDayBox: {
+    backgroundColor: '#2563eb',
+  },
+  dayText: {
+    fontSize: 16,
+    color: '#111827',
+  },
+  selectedDayText: {
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  closeCalendarButton: {
+    marginTop: 20,
+    backgroundColor: '#4A90E2',
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  closeCalendarButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
