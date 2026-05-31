@@ -34,7 +34,7 @@ type StudyGroup = {
   schedules: any[];
   available_times: Record<string, any>;
   invite_code: string;
-  created_at: Date;
+  created_at: any;
 };
 
 export default function StudyGroupScreen() {
@@ -44,6 +44,7 @@ export default function StudyGroupScreen() {
   const [inviteCode, setInviteCode] = useState("");
 
   const [groups, setGroups] = useState<StudyGroup[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<StudyGroup | null>(null);
 
   const getAppUserIdOrNull = useCallback(() => {
     const appUser = getAppUser();
@@ -84,6 +85,7 @@ export default function StudyGroupScreen() {
 
     setUserId(null);
     setGroups([]);
+    setSelectedGroup(null);
   }, [getAppUserIdOrNull]);
 
   useEffect(() => {
@@ -102,6 +104,61 @@ export default function StudyGroupScreen() {
       unsubscribeAppUser();
     };
   }, [syncUserId]);
+
+  const fetchGroups = useCallback(async () => {
+    if (!userId) {
+      setGroups([]);
+      setSelectedGroup(null);
+      return;
+    }
+
+    try {
+      const q = query(
+        collection(db, "study_groups"),
+        where("members", "array-contains", userId)
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      const data: StudyGroup[] = [];
+
+      querySnapshot.forEach((docItem) => {
+        const groupData = docItem.data();
+
+        data.push({
+          id: docItem.id,
+          name: groupData.name,
+          host_id: groupData.host_id,
+          members: groupData.members || [],
+          schedules: groupData.schedules || [],
+          available_times: groupData.available_times || {},
+          invite_code: groupData.invite_code,
+          created_at: groupData.created_at,
+        });
+      });
+
+      setGroups(data);
+
+      setSelectedGroup((prevSelectedGroup) => {
+        if (!prevSelectedGroup) {
+          return null;
+        }
+
+        const updatedSelectedGroup = data.find(
+          (group) => group.id === prevSelectedGroup.id
+        );
+
+        return updatedSelectedGroup || null;
+      });
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "스터디 그룹 목록 조회 실패");
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    fetchGroups();
+  }, [fetchGroups]);
 
   const generateInviteCode = () => {
     const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -141,20 +198,16 @@ export default function StudyGroupScreen() {
         created_at: new Date(),
       };
 
-      const docRef = await addDoc(collection(db, "study_groups"), groupData);
+      await addDoc(collection(db, "study_groups"), groupData);
 
-      const createdGroup: StudyGroup = {
-        id: docRef.id,
-        ...groupData,
-      };
-
-      setGroups((prevGroups) => [createdGroup, ...prevGroups]);
       setGroupName("");
 
       Alert.alert(
         "성공",
         `스터디 그룹이 생성되었습니다.\n초대코드: ${newInviteCode}`
       );
+
+      await fetchGroups();
     } catch (error) {
       console.log(error);
       Alert.alert("오류", "스터디 그룹 생성 실패");
@@ -197,6 +250,7 @@ export default function StudyGroupScreen() {
       if (members.includes(userId)) {
         Alert.alert("안내", "이미 참여 중인 스터디 그룹입니다.");
         setInviteCode("");
+        await fetchGroups();
         return;
       }
 
@@ -206,36 +260,19 @@ export default function StudyGroupScreen() {
         members: arrayUnion(userId),
       });
 
-      const joinedGroup: StudyGroup = {
-        id: targetDoc.id,
-        name: targetGroupData.name,
-        host_id: targetGroupData.host_id,
-        members: [...members, userId],
-        schedules: targetGroupData.schedules || [],
-        available_times: targetGroupData.available_times || {},
-        invite_code: targetGroupData.invite_code,
-        created_at: targetGroupData.created_at,
-      };
-
-      setGroups((prevGroups) => {
-        const alreadyExists = prevGroups.some(
-          (group) => group.id === joinedGroup.id
-        );
-
-        if (alreadyExists) {
-          return prevGroups;
-        }
-
-        return [joinedGroup, ...prevGroups];
-      });
-
       setInviteCode("");
 
       Alert.alert("성공", "스터디 그룹에 참여했습니다.");
+
+      await fetchGroups();
     } catch (error) {
       console.log(error);
       Alert.alert("오류", "스터디 그룹 참여 실패");
     }
+  };
+
+  const handleSelectGroup = (group: StudyGroup) => {
+    setSelectedGroup(group);
   };
 
   return (
@@ -283,19 +320,32 @@ export default function StudyGroupScreen() {
         ListEmptyComponent={
           <Text style={styles.emptyText}>참여 중인 스터디 그룹이 없습니다.</Text>
         }
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Text style={styles.groupName}>{item.name}</Text>
-            <Text style={styles.groupInfo}>초대코드: {item.invite_code}</Text>
-            <Text style={styles.groupInfo}>
-              참여 인원: {item.members.length}명
-            </Text>
+        renderItem={({ item }) => {
+          const isSelected = selectedGroup?.id === item.id;
 
-            {item.host_id === userId && (
-              <Text style={styles.hostText}>내가 만든 그룹</Text>
-            )}
-          </View>
-        )}
+          return (
+            <TouchableOpacity
+              style={[styles.card, isSelected && styles.selectedCard]}
+              onPress={() => handleSelectGroup(item)}
+            >
+              <Text style={styles.groupName}>{item.name}</Text>
+
+              <Text style={styles.groupInfo}>초대코드: {item.invite_code}</Text>
+
+              <Text style={styles.groupInfo}>
+                참여 인원: {item.members.length}명
+              </Text>
+
+              {item.host_id === userId && (
+                <Text style={styles.hostText}>내가 만든 그룹</Text>
+              )}
+
+              {isSelected && (
+                <Text style={styles.selectedText}>선택된 그룹</Text>
+              )}
+            </TouchableOpacity>
+          );
+        }}
       />
     </View>
   );
@@ -376,6 +426,13 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#F2F2F2",
+  },
+
+  selectedCard: {
+    borderColor: "#4A90E2",
+    backgroundColor: "#EEF5FF",
   },
 
   groupName: {
@@ -393,6 +450,12 @@ const styles = StyleSheet.create({
   hostText: {
     marginTop: 8,
     color: "#4A90E2",
+    fontWeight: "bold",
+  },
+
+  selectedText: {
+    marginTop: 8,
+    color: "#2F855A",
     fontWeight: "bold",
   },
 });
