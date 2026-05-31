@@ -30,8 +30,8 @@ const firebase = require("../../src/firebase");
 const db = firebase.db;
 const auth = firebase.auth;
 
-type Mode = "group" | "schedule" | "available";
-type DateTimeTarget = "start" | "end";
+type Mode = "group" | "available" | "recommend";
+type DateTimeTarget = "availableStart" | "availableEnd";
 
 type StudySchedule = {
   id: string;
@@ -41,6 +41,18 @@ type StudySchedule = {
   created_by?: string;
   created_by_name?: string;
   created_at?: any;
+  participant_count?: number;
+  participants?: string[];
+  source?: string;
+};
+
+type AvailableTime = {
+  id: string;
+  user_id: string;
+  user_name: string;
+  start_time: any;
+  end_time: any;
+  created_at: any;
 };
 
 type StudyGroup = {
@@ -52,6 +64,14 @@ type StudyGroup = {
   available_times: Record<string, any>;
   invite_code: string;
   created_at: any;
+};
+
+type Recommendation = {
+  id: string;
+  start_time: Date;
+  end_time: Date;
+  participant_count: number;
+  participants: string[];
 };
 
 export default function StudyGroupScreen() {
@@ -66,13 +86,17 @@ export default function StudyGroupScreen() {
   const [groups, setGroups] = useState<StudyGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<StudyGroup | null>(null);
 
+  const [availableStartDate, setAvailableStartDate] = useState<Date | null>(
+    null
+  );
+  const [availableEndDate, setAvailableEndDate] = useState<Date | null>(null);
+
   const [scheduleTitle, setScheduleTitle] = useState("");
-  const [scheduleStartDate, setScheduleStartDate] = useState<Date | null>(null);
-  const [scheduleEndDate, setScheduleEndDate] = useState<Date | null>(null);
 
   const [isDateTimeModalVisible, setIsDateTimeModalVisible] = useState(false);
   const [dateTimeTarget, setDateTimeTarget] =
-    useState<DateTimeTarget>("start");
+    useState<DateTimeTarget>("availableStart");
+
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [tempSelectedDate, setTempSelectedDate] = useState<Date | null>(null);
   const [tempSelectedHour, setTempSelectedHour] = useState(9);
@@ -81,21 +105,10 @@ export default function StudyGroupScreen() {
   const getAppUserIdOrNull = useCallback(() => {
     const appUser = getAppUser();
 
-    if (appUser?.uid) {
-      return String(appUser.uid);
-    }
-
-    if (appUser?.id) {
-      return String(appUser.id);
-    }
-
-    if (appUser?.user_id) {
-      return String(appUser.user_id);
-    }
-
-    if (appUser?.userId) {
-      return String(appUser.userId);
-    }
+    if (appUser?.uid) return String(appUser.uid);
+    if (appUser?.id) return String(appUser.id);
+    if (appUser?.user_id) return String(appUser.user_id);
+    if (appUser?.userId) return String(appUser.userId);
 
     return null;
   }, []);
@@ -103,31 +116,15 @@ export default function StudyGroupScreen() {
   const getAppUserNameOrDefault = useCallback(() => {
     const firebaseUser = auth.currentUser;
 
-    if (firebaseUser?.displayName) {
-      return firebaseUser.displayName;
-    }
-
-    if (firebaseUser?.email) {
-      return firebaseUser.email;
-    }
+    if (firebaseUser?.displayName) return firebaseUser.displayName;
+    if (firebaseUser?.email) return firebaseUser.email;
 
     const appUser = getAppUser();
 
-    if (appUser?.displayName) {
-      return String(appUser.displayName);
-    }
-
-    if (appUser?.name) {
-      return String(appUser.name);
-    }
-
-    if (appUser?.nickname) {
-      return String(appUser.nickname);
-    }
-
-    if (appUser?.email) {
-      return String(appUser.email);
-    }
+    if (appUser?.displayName) return String(appUser.displayName);
+    if (appUser?.name) return String(appUser.name);
+    if (appUser?.nickname) return String(appUser.nickname);
+    if (appUser?.email) return String(appUser.email);
 
     return "사용자";
   }, []);
@@ -191,9 +188,7 @@ export default function StudyGroupScreen() {
     setGroups(data);
 
     setSelectedGroup((prevSelectedGroup) => {
-      if (!prevSelectedGroup) {
-        return null;
-      }
+      if (!prevSelectedGroup) return null;
 
       const updatedSelectedGroup = data.find(
         (group) => group.id === prevSelectedGroup.id
@@ -217,7 +212,6 @@ export default function StudyGroupScreen() {
       );
 
       const querySnapshot = await getDocs(q);
-
       const data: StudyGroup[] = [];
 
       querySnapshot.forEach((docItem) => {
@@ -276,23 +270,15 @@ export default function StudyGroupScreen() {
   };
 
   const toDateObject = (value: any) => {
-    if (!value) {
-      return null;
-    }
+    if (!value) return null;
 
-    if (value?.toDate) {
-      return value.toDate();
-    }
+    if (value?.toDate) return value.toDate();
 
-    if (value instanceof Date) {
-      return value;
-    }
+    if (value instanceof Date) return value;
 
     const convertedDate = new Date(value);
 
-    if (Number.isNaN(convertedDate.getTime())) {
-      return null;
-    }
+    if (Number.isNaN(convertedDate.getTime())) return null;
 
     return convertedDate;
   };
@@ -329,17 +315,13 @@ export default function StudyGroupScreen() {
   const formatDateTime = (value: any) => {
     const date = toDateObject(value);
 
-    if (!date) {
-      return "";
-    }
+    if (!date) return "";
 
     return `${formatDate(date)} ${formatTime(date.getHours(), date.getMinutes())}`;
   };
 
   const getSortedSchedules = () => {
-    if (!selectedGroup) {
-      return [];
-    }
+    if (!selectedGroup) return [];
 
     return [...selectedGroup.schedules].sort((a, b) => {
       const aDate = toDateObject(a.start_time);
@@ -347,6 +329,104 @@ export default function StudyGroupScreen() {
 
       return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
     });
+  };
+
+  const getAvailableTimeList = () => {
+    if (!selectedGroup) return [];
+
+    const availableTimes = selectedGroup.available_times || {};
+    const result: AvailableTime[] = [];
+
+    Object.values(availableTimes).forEach((value: any) => {
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          result.push(item as AvailableTime);
+        });
+      }
+    });
+
+    return result.sort((a, b) => {
+      const aDate = toDateObject(a.start_time);
+      const bDate = toDateObject(b.start_time);
+
+      return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
+    });
+  };
+
+  const getRecommendedTimes = () => {
+    const availableTimeList = getAvailableTimeList();
+
+    if (availableTimeList.length < 2) {
+      return [];
+    }
+
+    const validTimes = availableTimeList
+      .map((time) => {
+        const startDate = toDateObject(time.start_time);
+        const endDate = toDateObject(time.end_time);
+
+        if (!startDate || !endDate) return null;
+        if (endDate.getTime() <= startDate.getTime()) return null;
+
+        return {
+          ...time,
+          startDate,
+          endDate,
+        };
+      })
+      .filter(Boolean) as Array<
+      AvailableTime & { startDate: Date; endDate: Date }
+    >;
+
+    const boundaries = Array.from(
+      new Set(
+        validTimes
+          .flatMap((time) => [time.startDate.getTime(), time.endDate.getTime()])
+          .sort((a, b) => a - b)
+      )
+    );
+
+    const recommendations: Recommendation[] = [];
+
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      const start = boundaries[i];
+      const end = boundaries[i + 1];
+
+      if (end <= start) continue;
+
+      const coveringTimes = validTimes.filter(
+        (time) =>
+          time.startDate.getTime() <= start && time.endDate.getTime() >= end
+      );
+
+      const participantMap = new Map<string, string>();
+
+      coveringTimes.forEach((time) => {
+        participantMap.set(time.user_id, time.user_name);
+      });
+
+      const participants = Array.from(participantMap.values());
+
+      if (participants.length < 2) continue;
+
+      recommendations.push({
+        id: `${start}-${end}`,
+        start_time: new Date(start),
+        end_time: new Date(end),
+        participant_count: participants.length,
+        participants,
+      });
+    }
+
+    return recommendations
+      .sort((a, b) => {
+        if (b.participant_count !== a.participant_count) {
+          return b.participant_count - a.participant_count;
+        }
+
+        return a.start_time.getTime() - b.start_time.getTime();
+      })
+      .slice(0, 5);
   };
 
   const handleCreateGroup = async () => {
@@ -450,14 +530,21 @@ export default function StudyGroupScreen() {
 
   const handleSelectGroup = (group: StudyGroup) => {
     setSelectedGroup(group);
-    setMode("schedule");
+    setMode("available");
   };
 
   const openDateTimeModal = (target: DateTimeTarget) => {
     setDateTimeTarget(target);
 
-    const existingDate =
-      target === "start" ? scheduleStartDate : scheduleEndDate;
+    let existingDate: Date | null = null;
+
+    if (target === "availableStart") {
+      existingDate = availableStartDate;
+    }
+
+    if (target === "availableEnd") {
+      existingDate = availableEndDate;
+    }
 
     const baseDate = getRoundedTime(existingDate || new Date());
 
@@ -563,16 +650,74 @@ export default function StudyGroupScreen() {
       0
     );
 
-    if (dateTimeTarget === "start") {
-      setScheduleStartDate(confirmedDate);
-    } else {
-      setScheduleEndDate(confirmedDate);
+    if (dateTimeTarget === "availableStart") {
+      setAvailableStartDate(confirmedDate);
+    }
+
+    if (dateTimeTarget === "availableEnd") {
+      setAvailableEndDate(confirmedDate);
     }
 
     setIsDateTimeModalVisible(false);
   };
 
-  const handleAddStudySchedule = async () => {
+  const handleAddAvailableTime = async () => {
+    if (!userId) {
+      Alert.alert("오류", "로그인 후 가능 시간을 입력할 수 있습니다.");
+      return;
+    }
+
+    if (!selectedGroup) {
+      Alert.alert("오류", "스터디 그룹을 선택해주세요.");
+      return;
+    }
+
+    if (!selectedGroup.members.includes(userId)) {
+      Alert.alert("오류", "스터디 그룹 멤버만 가능 시간을 입력할 수 있습니다.");
+      return;
+    }
+
+    if (!availableStartDate || !availableEndDate) {
+      Alert.alert("오류", "가능한 시작 일시와 종료 일시를 모두 선택해주세요.");
+      return;
+    }
+
+    if (availableEndDate.getTime() <= availableStartDate.getTime()) {
+      Alert.alert("오류", "종료 일시는 시작 일시보다 늦어야 합니다.");
+      return;
+    }
+
+    try {
+      const newAvailableTime: AvailableTime = {
+        id: Date.now().toString(),
+        user_id: userId,
+        user_name: userName,
+        start_time: availableStartDate,
+        end_time: availableEndDate,
+        created_at: new Date(),
+      };
+
+      const groupRef = doc(db, "study_groups", selectedGroup.id);
+
+      await updateDoc(groupRef, {
+        [`available_times.${userId}`]: arrayUnion(newAvailableTime),
+      });
+
+      setAvailableStartDate(null);
+      setAvailableEndDate(null);
+
+      Alert.alert("성공", "가능 시간이 등록되었습니다.");
+
+      await fetchGroups();
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "가능 시간 등록 실패");
+    }
+  };
+
+  const handleRegisterRecommendedSchedule = async (
+    recommendation: Recommendation
+  ) => {
     if (!userId) {
       Alert.alert("오류", "로그인 후 스터디 일정을 등록할 수 있습니다.");
       return;
@@ -583,32 +728,25 @@ export default function StudyGroupScreen() {
       return;
     }
 
-    if (!selectedGroup.members.includes(userId)) {
-      Alert.alert("오류", "스터디 그룹 멤버만 일정을 등록할 수 있습니다.");
-      return;
-    }
-
     const trimmedTitle = scheduleTitle.trim();
 
-    if (!trimmedTitle || !scheduleStartDate || !scheduleEndDate) {
-      Alert.alert("오류", "일정명, 시작 일시, 종료 일시를 모두 입력해주세요.");
-      return;
-    }
-
-    if (scheduleEndDate.getTime() < scheduleStartDate.getTime()) {
-      Alert.alert("오류", "종료 일시는 시작 일시보다 빠를 수 없습니다.");
+    if (!trimmedTitle) {
+      Alert.alert("오류", "등록할 스터디 일정명을 입력해주세요.");
       return;
     }
 
     try {
-      const newSchedule = {
+      const newSchedule: StudySchedule = {
         id: Date.now().toString(),
         title: trimmedTitle,
-        start_time: scheduleStartDate,
-        end_time: scheduleEndDate,
+        start_time: recommendation.start_time,
+        end_time: recommendation.end_time,
         created_by: userId,
         created_by_name: userName,
         created_at: new Date(),
+        participant_count: recommendation.participant_count,
+        participants: recommendation.participants,
+        source: "recommended",
       };
 
       const groupRef = doc(db, "study_groups", selectedGroup.id);
@@ -617,17 +755,57 @@ export default function StudyGroupScreen() {
         schedules: arrayUnion(newSchedule),
       });
 
-      setScheduleTitle("");
-      setScheduleStartDate(null);
-      setScheduleEndDate(null);
+      await Promise.all(
+        selectedGroup.members.map((memberId) =>
+          addDoc(collection(db, "schedules"), {
+            user_id: memberId,
+            title: `[스터디] ${trimmedTitle}`,
+            start_time: recommendation.start_time,
+            end_time: recommendation.end_time,
+            description: `스터디: ${selectedGroup.name}`,
+            created_at: new Date(),
+            study_group_id: selectedGroup.id,
+            study_group_name: selectedGroup.name,
+            source: "study_group",
+            created_by: userId,
+            created_by_name: userName,
+            participant_count: recommendation.participant_count,
+            participants: recommendation.participants,
+          })
+        )
+      );
 
-      Alert.alert("성공", "스터디 공유 일정이 등록되었습니다.");
+      setScheduleTitle("");
+
+      Alert.alert("성공", "추천 시간으로 스터디 일정이 등록되었습니다.");
 
       await fetchGroups();
     } catch (error) {
       console.log(error);
-      Alert.alert("오류", "스터디 공유 일정 등록 실패");
+      Alert.alert("오류", "스터디 일정 등록 실패");
     }
+  };
+
+  const renderSelectedGroupSimpleCard = () => {
+    if (!selectedGroup) return null;
+
+    return (
+      <View style={styles.selectedGroupSimpleCard}>
+        <View style={styles.selectedGroupTextBox}>
+          <Text style={styles.selectedGroupSimpleLabel}>선택한 그룹</Text>
+          <Text style={styles.selectedGroupSimpleName}>
+            {selectedGroup.name}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.changeGroupButton}
+          onPress={() => setMode("group")}
+        >
+          <Text style={styles.changeGroupButtonText}>다시 선택</Text>
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   const renderGroupManagement = () => (
@@ -698,7 +876,7 @@ export default function StudyGroupScreen() {
     </View>
   );
 
-  const renderScheduleManagement = () => {
+  const renderAvailableTimeManagement = () => {
     if (!selectedGroup) {
       return (
         <View>
@@ -709,77 +887,145 @@ export default function StudyGroupScreen() {
       );
     }
 
+    const availableTimeList = getAvailableTimeList();
+
+    return (
+      <View>
+        {renderSelectedGroupSimpleCard()}
+
+        <Text style={styles.sectionTitle}>내 가능 시간 입력</Text>
+
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => openDateTimeModal("availableStart")}
+        >
+          <Text
+            style={
+              availableStartDate
+                ? styles.selectedInputText
+                : styles.placeholderText
+            }
+          >
+            {availableStartDate
+              ? `시작: ${formatDateTime(availableStartDate)}`
+              : "가능한 시작 일시 선택"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => openDateTimeModal("availableEnd")}
+        >
+          <Text
+            style={
+              availableEndDate
+                ? styles.selectedInputText
+                : styles.placeholderText
+            }
+          >
+            {availableEndDate
+              ? `종료: ${formatDateTime(availableEndDate)}`
+              : "가능한 종료 일시 선택"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.button} onPress={handleAddAvailableTime}>
+          <Text style={styles.buttonText}>가능 시간 등록하기</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.sectionTitle}>멤버 가능 시간 목록</Text>
+
+        {availableTimeList.length === 0 ? (
+          <Text style={styles.emptyText}>등록된 가능 시간이 없습니다.</Text>
+        ) : (
+          availableTimeList.map((time) => (
+            <View key={time.id} style={styles.scheduleCard}>
+              <Text style={styles.scheduleTitle}>{time.user_name}</Text>
+
+              <Text style={styles.groupInfo}>
+                시작: {formatDateTime(time.start_time)}
+              </Text>
+
+              <Text style={styles.groupInfo}>
+                종료: {formatDateTime(time.end_time)}
+              </Text>
+            </View>
+          ))
+        )}
+      </View>
+    );
+  };
+
+  const renderRecommendManagement = () => {
+    if (!selectedGroup) {
+      return (
+        <View>
+          <Text style={styles.emptyText}>
+            그룹 관리 탭에서 스터디 그룹을 먼저 선택해주세요.
+          </Text>
+        </View>
+      );
+    }
+
+    const recommendations = getRecommendedTimes();
     const sortedSchedules = getSortedSchedules();
 
     return (
       <View>
-        <View style={styles.selectedGroupSimpleCard}>
-          <View style={styles.selectedGroupTextBox}>
-            <Text style={styles.selectedGroupSimpleLabel}>선택한 그룹</Text>
-            <Text style={styles.selectedGroupSimpleName}>
-              {selectedGroup.name}
-            </Text>
-          </View>
+        {renderSelectedGroupSimpleCard()}
 
-          <TouchableOpacity
-            style={styles.changeGroupButton}
-            onPress={() => setMode("group")}
-          >
-            <Text style={styles.changeGroupButtonText}>다시 선택</Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.sectionTitle}>스터디 공유 일정 등록</Text>
+        <Text style={styles.sectionTitle}>스터디 일정명</Text>
 
         <TextInput
           style={styles.input}
-          placeholder="일정명"
+          placeholder="예: 알고리즘 스터디 1회차"
           value={scheduleTitle}
           onChangeText={setScheduleTitle}
         />
 
-        <TouchableOpacity
-          style={styles.input}
-          onPress={() => openDateTimeModal("start")}
-        >
-          <Text
-            style={
-              scheduleStartDate
-                ? styles.selectedInputText
-                : styles.placeholderText
-            }
-          >
-            {scheduleStartDate
-              ? `시작: ${formatDateTime(scheduleStartDate)}`
-              : "시작 일시 선택"}
+        <Text style={styles.sectionTitle}>추천 시간</Text>
+
+        {recommendations.length === 0 ? (
+          <Text style={styles.emptyText}>
+            아직 2명 이상 겹치는 가능 시간이 없습니다.
           </Text>
-        </TouchableOpacity>
+        ) : (
+          recommendations.map((recommendation, index) => (
+            <View key={recommendation.id} style={styles.recommendCard}>
+              <Text style={styles.recommendTitle}>추천 시간 {index + 1}</Text>
 
-        <TouchableOpacity
-          style={styles.input}
-          onPress={() => openDateTimeModal("end")}
-        >
-          <Text
-            style={
-              scheduleEndDate
-                ? styles.selectedInputText
-                : styles.placeholderText
-            }
-          >
-            {scheduleEndDate
-              ? `종료: ${formatDateTime(scheduleEndDate)}`
-              : "종료 일시 선택"}
-          </Text>
-        </TouchableOpacity>
+              <Text style={styles.groupInfo}>
+                시작: {formatDateTime(recommendation.start_time)}
+              </Text>
 
-        <TouchableOpacity style={styles.button} onPress={handleAddStudySchedule}>
-          <Text style={styles.buttonText}>공유 일정 등록하기</Text>
-        </TouchableOpacity>
+              <Text style={styles.groupInfo}>
+                종료: {formatDateTime(recommendation.end_time)}
+              </Text>
 
-        <Text style={styles.sectionTitle}>스터디 공유 일정 목록</Text>
+              <Text style={styles.groupInfo}>
+                가능 인원: {recommendation.participant_count}명
+              </Text>
+
+              <Text style={styles.groupInfo}>
+                가능 멤버: {recommendation.participants.join(", ")}
+              </Text>
+
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() =>
+                  handleRegisterRecommendedSchedule(recommendation)
+                }
+              >
+                <Text style={styles.buttonText}>이 시간으로 일정 등록</Text>
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+
+        <Text style={styles.sectionTitle}>등록된 스터디 일정</Text>
 
         {sortedSchedules.length === 0 ? (
-          <Text style={styles.emptyText}>등록된 공유 일정이 없습니다.</Text>
+          <Text style={styles.emptyText}>등록된 스터디 일정이 없습니다.</Text>
         ) : (
           sortedSchedules.map((schedule) => (
             <View key={schedule.id} style={styles.scheduleCard}>
@@ -796,6 +1042,12 @@ export default function StudyGroupScreen() {
               <Text style={styles.groupInfo}>
                 종료: {formatDateTime(schedule.end_time)}
               </Text>
+
+              {schedule.participant_count && (
+                <Text style={styles.groupInfo}>
+                  추천 가능 인원: {schedule.participant_count}명
+                </Text>
+              )}
             </View>
           ))
         )}
@@ -803,13 +1055,13 @@ export default function StudyGroupScreen() {
     );
   };
 
-  const renderAvailableTimeManagement = () => (
-    <View>
-      <Text style={styles.emptyText}>
-        가능 시간 입력 기능은 다음 단계에서 추가할 예정입니다.
-      </Text>
-    </View>
-  );
+  const getModalTitle = () => {
+    if (dateTimeTarget === "availableStart") {
+      return "가능 시간 시작 일시 선택";
+    }
+
+    return "가능 시간 종료 일시 선택";
+  };
 
   return (
     <View style={styles.root}>
@@ -840,23 +1092,6 @@ export default function StudyGroupScreen() {
           <TouchableOpacity
             style={[
               styles.tabButton,
-              mode === "schedule" && styles.activeTabButton,
-            ]}
-            onPress={() => setMode("schedule")}
-          >
-            <Text
-              style={[
-                styles.tabButtonText,
-                mode === "schedule" && styles.activeTabButtonText,
-              ]}
-            >
-              공유 일정
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
               mode === "available" && styles.activeTabButton,
             ]}
             onPress={() => setMode("available")}
@@ -870,11 +1105,28 @@ export default function StudyGroupScreen() {
               가능 시간
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              mode === "recommend" && styles.activeTabButton,
+            ]}
+            onPress={() => setMode("recommend")}
+          >
+            <Text
+              style={[
+                styles.tabButtonText,
+                mode === "recommend" && styles.activeTabButtonText,
+              ]}
+            >
+              일정 추천
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {mode === "group" && renderGroupManagement()}
-        {mode === "schedule" && renderScheduleManagement()}
         {mode === "available" && renderAvailableTimeManagement()}
+        {mode === "recommend" && renderRecommendManagement()}
       </ScrollView>
 
       <Modal
@@ -885,9 +1137,7 @@ export default function StudyGroupScreen() {
       >
         <View style={styles.modalBackground}>
           <View style={styles.calendarContainer}>
-            <Text style={styles.modalTitle}>
-              {dateTimeTarget === "start" ? "시작 일시 선택" : "종료 일시 선택"}
-            </Text>
+            <Text style={styles.modalTitle}>{getModalTitle()}</Text>
 
             <View style={styles.calendarHeader}>
               <TouchableOpacity onPress={handlePrevMonth}>
@@ -1107,6 +1357,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
+    marginTop: 12,
     marginBottom: 10,
   },
 
@@ -1231,6 +1482,22 @@ const styles = StyleSheet.create({
   scheduleTitle: {
     fontSize: 17,
     fontWeight: "bold",
+    marginBottom: 6,
+  },
+
+  recommendCard: {
+    backgroundColor: "#EEF5FF",
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#4A90E2",
+  },
+
+  recommendTitle: {
+    fontSize: 17,
+    fontWeight: "bold",
+    color: "#4A90E2",
     marginBottom: 6,
   },
 
