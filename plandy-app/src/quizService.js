@@ -1,4 +1,5 @@
 import {
+  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -113,6 +114,54 @@ export const fetchNotesBySubject = async (userId, subjectId) => {
   return notes;
 };
 
+export const submitQuizResult = async ({
+  userId,
+  quizId,
+  score,
+  total_count,
+  correct_count,
+  correct_rate,
+  incorrect_items,
+}) => {
+  debugQuiz("submitQuizResult", {
+    userId,
+    quizId,
+    score,
+    total_count,
+    correct_count,
+    correct_rate,
+    incorrect_items,
+  });
+
+  const ref = collection(db, "quiz_results");
+  const result = await addDoc(ref, {
+    user_id: userId,
+    quiz_id: quizId,
+    score,
+    total_count,
+    correct_count,
+    correct_rate,
+    incorrect_items,
+    solved_at: serverTimestamp(),
+  });
+
+  return result.id;
+};
+
+export const getQuizResultsByUser = async (userId) => {
+  debugQuiz("getQuizResultsByUser", { userId });
+
+  const q = query(
+    collection(db, "quiz_results"),
+    where("user_id", "==", userId)
+  );
+
+  const snapshot = await getDocs(q);
+  const results = snapshot.docs.map(mapDoc);
+  debugQuiz("getQuizResultsByUser result", { count: results.length });
+  return results;
+};
+
 export const createQuiz = async ({ userId, subjectId, title, questions }) => {
   const docRef = doc(collection(db, "quizzes"));
 
@@ -148,4 +197,112 @@ export const generateQuizFromNote = async ({
   const callable = httpsCallable(functions, "generateQuizFromNote");
   const result = await callable({ noteId, userId, subjectId, questionCount });
   return result.data;
+};
+
+export const getIncorrectNoteGroupsByUser = async (userId) => {
+  debugQuiz("getIncorrectNoteGroupsByUser", { userId });
+
+  const quizResultsQuery = query(
+    collection(db, "quiz_results"),
+    where("user_id", "==", userId)
+  );
+
+  const quizResultsSnapshot = await getDocs(quizResultsQuery);
+  const quizResultsData = quizResultsSnapshot.docs.map(mapDoc);
+
+  const quizIds = [
+    ...new Set(
+      quizResultsData.flatMap((result) =>
+        Array.isArray(result.incorrect_items) && result.incorrect_items.length
+          ? [result.quiz_id]
+          : []
+      )
+    ),
+  ].filter(Boolean);
+
+  const quizMap = {};
+  await Promise.all(
+    quizIds.map(async (quizId) => {
+      const quiz = await fetchQuizById(quizId);
+      if (quiz) {
+        quizMap[quizId] = quiz;
+      }
+    })
+  );
+
+  const groups = quizResultsData
+    .map((result) => {
+      const incorrectItems = Array.isArray(result.incorrect_items)
+        ? result.incorrect_items
+        : [];
+
+      if (!incorrectItems.length) return null;
+
+      const quiz = quizMap[result.quiz_id];
+      if (!quiz) return null;
+
+      const questions = Array.isArray(quiz.questions) ? quiz.questions : [];
+      const solvedAtText = result.solved_at?.toDate?.()?.toLocaleDateString?.("ko-KR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }) || "-";
+
+      const items = incorrectItems
+        .map((incorrectItem) => {
+          const questionIndex = Number(incorrectItem.question_index);
+          const userAnswerIndex = Number(incorrectItem.user_answer);
+          const question = questions[questionIndex] || null;
+
+          if (!question) return null;
+
+          const options = Array.isArray(question.options) ? question.options : [];
+          const correctAnswerIndex = Number.isFinite(Number(question.answer))
+            ? Number(question.answer)
+            : -1;
+          const correctAnswerText =
+            options[correctAnswerIndex] ?? "정답 정보 없음";
+          const userAnswerText =
+            options[userAnswerIndex] ?? "선택 정보 없음";
+
+          return {
+            question_index: questionIndex,
+            question: String(question.question || "문제 정보 없음"),
+            user_answer_index: Number.isFinite(userAnswerIndex)
+              ? userAnswerIndex
+              : -1,
+            user_answer_text: userAnswerText,
+            correct_answer_index: Number.isFinite(correctAnswerIndex)
+              ? correctAnswerIndex
+              : -1,
+            correct_answer_text: correctAnswerText,
+            explanation: String(question.explanation || ""),
+            is_review_needed: Boolean(incorrectItem.is_review_needed),
+          };
+        })
+        .filter(Boolean);
+
+      if (!items.length) return null;
+
+      return {
+        quiz_id: result.quiz_id,
+        quiz_title: quiz.title || "AI 노트 퀴즈",
+        solved_at: solvedAtText,
+        incorrect_count: items.length,
+        items,
+      };
+    })
+    .filter(Boolean);
+
+  const sortedGroups = groups.sort((a, b) => {
+    const dateA = new Date(a.solved_at).getTime() || 0;
+    const dateB = new Date(b.solved_at).getTime() || 0;
+    return dateB - dateA;
+  });
+
+  debugQuiz("getIncorrectNoteGroupsByUser result", {
+    count: sortedGroups.length,
+  });
+
+  return sortedGroups;
 };

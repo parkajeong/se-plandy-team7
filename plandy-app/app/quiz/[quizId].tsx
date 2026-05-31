@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   StyleSheet,
   Text,
@@ -11,7 +12,11 @@ import {
 } from "react-native";
 
 import { getCurrentAppUserIdOrNull } from "@/src/appSession";
-import { fetchQuizById, getQuizErrorMessage } from "@/src/quizService";
+import {
+  fetchQuizById,
+  getQuizErrorMessage,
+  submitQuizResult,
+} from "@/src/quizService";
 
 type Question = {
   question?: string;
@@ -30,12 +35,25 @@ type Quiz = {
 const getParam = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value;
 
+export const unstable_settings = {
+  title: "Quiz / Question",
+};
+
 export default function QuizDetailScreen() {
   const params = useLocalSearchParams();
   const quizId = getParam(params.quizId);
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resultSummary, setResultSummary] = useState<{
+    score: number;
+    totalCount: number;
+    correctRate: number;
+    incorrectItems: { question_index: number; user_answer: number }[];
+  }>({ score: 0, totalCount: 0, correctRate: 0, incorrectItems: [] });
 
   const loadQuiz = useCallback(async () => {
     const userId = getCurrentAppUserIdOrNull();
@@ -76,6 +94,95 @@ export default function QuizDetailScreen() {
     }
   }, [quizId]);
 
+  const handleSelectAnswer = (questionIndex: number, optionIndex: number) => {
+    if (submitted) return;
+    setSelectedAnswers((prev) => ({
+      ...prev,
+      [questionIndex]: optionIndex,
+    }));
+  };
+
+  const handleSubmitAnswers = async () => {
+    if (!quiz) return;
+
+    const questions = Array.isArray(quiz.questions) ? quiz.questions : [];
+
+    const missingIndex = questions.findIndex(
+      (_, index) => !Object.prototype.hasOwnProperty.call(selectedAnswers, index)
+    );
+
+    if (missingIndex !== -1) {
+      Alert.alert("제출 불가", "모든 문제를 선택한 후 제출해 주세요.");
+      return;
+    }
+
+    const incorrectItems: { question_index: number; user_answer: number }[] = [];
+    let correctCount = 0;
+
+    questions.forEach((item, index) => {
+      const userAnswer = selectedAnswers[index];
+      const answerIndex =
+        typeof item.answer === "number" ? item.answer : Number(item.answer);
+      const isCorrect = userAnswer === answerIndex;
+
+      if (!isCorrect) {
+        incorrectItems.push({
+          question_index: index,
+          user_answer: userAnswer,
+        });
+      } else {
+        correctCount += 1;
+      }
+    });
+
+    const totalCount = questions.length;
+    const correctRate = totalCount
+      ? Math.round((correctCount / totalCount) * 100)
+      : 0;
+
+    setIsSubmitting(true);
+
+    try {
+      const userId = getCurrentAppUserIdOrNull();
+
+      if (!userId) {
+        Alert.alert("로그인 필요", "로그인 후 퀴즈를 제출할 수 있습니다.");
+        return;
+      }
+
+      await submitQuizResult({
+        userId,
+        quizId: quiz.id,
+        score: correctCount,
+        total_count: totalCount,
+        correct_count: correctCount,
+        correct_rate: correctRate,
+        incorrect_items: incorrectItems.map((item) => ({
+          ...item,
+          is_review_needed: true,
+        })),
+      });
+
+      setResultSummary({
+        score: correctCount,
+        totalCount,
+        correctRate,
+        incorrectItems,
+      });
+      setSubmitted(true);
+
+      Alert.alert(
+        "제출 완료",
+        `총 ${totalCount}문제 중 ${correctCount}문제 정답입니다. 정답률 ${correctRate}%`
+      );
+    } catch (error: any) {
+      console.error("[quiz] submit failed", error);
+      Alert.alert("제출 실패", "결과 저장에 실패했습니다. 다시 시도해 주세요.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     loadQuiz();
   }, [loadQuiz]);
@@ -103,50 +210,123 @@ export default function QuizDetailScreen() {
   }
 
   const questions = Array.isArray(quiz.questions) ? quiz.questions : [];
+  const allAnswered = questions.every((_, index) =>
+    Object.prototype.hasOwnProperty.call(selectedAnswers, index)
+  );
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{quiz.title || "AI 노트 퀴즈"}</Text>
       <Text style={styles.summary}>문제 {questions.length}개</Text>
 
+      {submitted && (
+        <View style={styles.resultBanner}>
+          <Text style={styles.resultBannerText}>
+            {resultSummary.score}/{resultSummary.totalCount} 정답
+          </Text>
+          <Text style={styles.resultBannerSubText}>
+            정답률 {resultSummary.correctRate}%
+          </Text>
+        </View>
+      )}
+
       <FlatList
         data={questions}
         keyExtractor={(_, index) => `${quiz.id}-${index}`}
         contentContainerStyle={styles.listContent}
-        renderItem={({ item, index }) => (
-          <View style={styles.questionCard}>
-            <Text style={styles.questionLabel}>문제 {index + 1}</Text>
-            <Text style={styles.questionText}>{item.question}</Text>
+        renderItem={({ item, index }) => {
+          const selectedIndex = selectedAnswers[index];
+          const answerIndex =
+            typeof item.answer === "number" ? item.answer : Number(item.answer);
+          const isCorrect = submitted && selectedIndex === answerIndex;
+          const isWrong = submitted && selectedIndex !== answerIndex;
 
-            {(item.options || []).map((option, optionIndex) => {
-              const isAnswer = item.answer === optionIndex;
+          return (
+            <View
+              style={[
+                styles.questionCard,
+                submitted && isCorrect && styles.questionCardCorrect,
+                submitted && isWrong && styles.questionCardIncorrect,
+              ]}
+            >
+              <Text style={styles.questionLabel}>문제 {index + 1}</Text>
+              <Text style={styles.questionText}>{item.question}</Text>
 
-              return (
-                <View
-                  key={`${index}-${optionIndex}`}
-                  style={[styles.optionRow, isAnswer && styles.answerOption]}
-                >
-                  <Text
+              {(item.options || []).map((option, optionIndex) => {
+                const isSelected = selectedIndex === optionIndex;
+                const isAnswerOption = answerIndex === optionIndex;
+                const showCorrectState = submitted && isAnswerOption;
+                const showWrongState = submitted && isSelected && !isAnswerOption;
+
+                return (
+                  <TouchableOpacity
+                    key={`${index}-${optionIndex}`}
+                    activeOpacity={0.8}
+                    disabled={submitted}
+                    onPress={() => handleSelectAnswer(index, optionIndex)}
                     style={[
-                      styles.optionText,
-                      isAnswer && styles.answerOptionText,
+                      styles.optionRow,
+                      isSelected && styles.optionSelected,
+                      showCorrectState && styles.optionCorrect,
+                      showWrongState && styles.optionIncorrect,
                     ]}
                   >
-                    {optionIndex + 1}. {option}
+                    <Text
+                      style={[
+                        styles.optionText,
+                        isSelected && styles.optionTextSelected,
+                        showCorrectState && styles.optionTextCorrect,
+                        showWrongState && styles.optionTextIncorrect,
+                      ]}
+                    >
+                      {optionIndex + 1}. {option}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {submitted && (
+                <View style={styles.answerSection}>
+                  <Text style={styles.answerText}>
+                    내 답: {selectedIndex !== undefined ? selectedIndex + 1 : "-"}번
+                  </Text>
+                  <Text style={styles.answerText}>
+                    정답: {Number.isFinite(answerIndex) ? answerIndex + 1 : "-"}번
+                  </Text>
+                  <Text style={styles.explanationText}>
+                    해설: {item.explanation || "없음"}
                   </Text>
                 </View>
-              );
-            })}
-
-            <Text style={styles.answerText}>
-              정답: {typeof item.answer === "number" ? item.answer + 1 : "-"}번
-            </Text>
-            <Text style={styles.explanationText}>
-              해설: {item.explanation || "-"}
-            </Text>
-          </View>
-        )}
+              )}
+            </View>
+          );
+        }}
       />
+
+      {!submitted ? (
+        <TouchableOpacity
+          style={[styles.submitButton, !allAnswered && styles.disabledButton]}
+          onPress={handleSubmitAnswers}
+          disabled={!allAnswered || isSubmitting}
+        >
+          <Text style={styles.submitButtonText}>
+            {isSubmitting ? "제출 중..." : "제출하기"}
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.reviewSection}>
+          <Text style={styles.reviewTitle}>오답 노트</Text>
+          {resultSummary.incorrectItems.length === 0 ? (
+            <Text style={styles.emptyText}>모든 문제를 맞혔습니다!</Text>
+          ) : (
+            resultSummary.incorrectItems.map((item) => (
+              <Text key={item.question_index} style={styles.reviewItemText}>
+                {item.question_index + 1}번 문제 - 내 답 {item.user_answer + 1}번
+              </Text>
+            ))
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -156,6 +336,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8faff",
     padding: 24,
+    paddingBottom: 32,
   },
   centerContainer: {
     flex: 1,
@@ -219,15 +400,100 @@ const styles = StyleSheet.create({
     color: "#166534",
     fontWeight: "700",
   },
+  optionTextSelected: {
+    color: "#1f2937",
+    fontWeight: "700",
+  },
+  optionTextCorrect: {
+    color: "#166534",
+    fontWeight: "700",
+  },
+  optionTextIncorrect: {
+    color: "#b91c1c",
+    fontWeight: "700",
+  },
+  optionSelected: {
+    backgroundColor: "#e0f2fe",
+  },
+  optionCorrect: {
+    backgroundColor: "#dcfce7",
+  },
+  optionIncorrect: {
+    backgroundColor: "#fee2e2",
+  },
+  questionCardCorrect: {
+    borderColor: "#4ade80",
+  },
+  questionCardIncorrect: {
+    borderColor: "#fca5a5",
+  },
   answerText: {
     color: "#166534",
     fontWeight: "800",
     marginTop: 6,
   },
+  answerSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#e2e8f0",
+  },
   explanationText: {
     color: "#64748b",
     lineHeight: 21,
     marginTop: 6,
+  },
+  resultBanner: {
+    backgroundColor: "#eff6ff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#60a5fa",
+    marginBottom: 16,
+    padding: 14,
+  },
+  resultBannerText: {
+    color: "#1d4ed8",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  resultBannerSubText: {
+    color: "#4f46e5",
+    marginTop: 4,
+  },
+  submitButton: {
+    backgroundColor: "#2563eb",
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 12,
+    marginBottom: 14,
+  },
+  submitButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  reviewSection: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 16,
+    marginTop: 12,
+  },
+  reviewTitle: {
+    color: "#1e3a5f",
+    fontSize: 15,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  reviewItemText: {
+    color: "#334155",
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  disabledButton: {
+    backgroundColor: "#94a3b8",
   },
   errorTitle: {
     color: "#1E3A5F",
