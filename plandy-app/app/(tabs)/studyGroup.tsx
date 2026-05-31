@@ -9,6 +9,7 @@ import {
   Alert,
   ScrollView,
   Modal,
+  Platform,
 } from "react-native";
 
 import { onAuthStateChanged } from "firebase/auth";
@@ -22,6 +23,7 @@ import {
   updateDoc,
   arrayUnion,
   onSnapshot,
+  deleteDoc,
 } from "firebase/firestore";
 
 import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
@@ -41,6 +43,7 @@ type StudySchedule = {
   created_by?: string;
   created_by_name?: string;
   created_at?: any;
+  updated_at?: any;
   participant_count?: number;
   participants?: string[];
   source?: string;
@@ -53,6 +56,7 @@ type AvailableTime = {
   start_time: any;
   end_time: any;
   created_at: any;
+  updated_at?: any;
 };
 
 type StudyGroup = {
@@ -90,8 +94,15 @@ export default function StudyGroupScreen() {
     null
   );
   const [availableEndDate, setAvailableEndDate] = useState<Date | null>(null);
+  const [editingAvailableTimeId, setEditingAvailableTimeId] = useState<
+    string | null
+  >(null);
 
   const [scheduleTitle, setScheduleTitle] = useState("");
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(
+    null
+  );
+  const [editingScheduleTitle, setEditingScheduleTitle] = useState("");
 
   const [isDateTimeModalVisible, setIsDateTimeModalVisible] = useState(false);
   const [dateTimeTarget, setDateTimeTarget] =
@@ -271,9 +282,7 @@ export default function StudyGroupScreen() {
 
   const toDateObject = (value: any) => {
     if (!value) return null;
-
     if (value?.toDate) return value.toDate();
-
     if (value instanceof Date) return value;
 
     const convertedDate = new Date(value);
@@ -661,7 +670,7 @@ export default function StudyGroupScreen() {
     setIsDateTimeModalVisible(false);
   };
 
-  const handleAddAvailableTime = async () => {
+  const handleSaveAvailableTime = async () => {
     if (!userId) {
       Alert.alert("오류", "로그인 후 가능 시간을 입력할 수 있습니다.");
       return;
@@ -688,31 +697,151 @@ export default function StudyGroupScreen() {
     }
 
     try {
-      const newAvailableTime: AvailableTime = {
-        id: Date.now().toString(),
-        user_id: userId,
-        user_name: userName,
-        start_time: availableStartDate,
-        end_time: availableEndDate,
-        created_at: new Date(),
-      };
-
       const groupRef = doc(db, "study_groups", selectedGroup.id);
+      const currentUserTimes = Array.isArray(
+        selectedGroup.available_times?.[userId]
+      )
+        ? selectedGroup.available_times[userId]
+        : [];
 
-      await updateDoc(groupRef, {
-        [`available_times.${userId}`]: arrayUnion(newAvailableTime),
-      });
+      if (editingAvailableTimeId) {
+        const updatedTimes = currentUserTimes.map((time: AvailableTime) => {
+          if (time.id !== editingAvailableTimeId) {
+            return time;
+          }
+
+          return {
+            ...time,
+            start_time: availableStartDate,
+            end_time: availableEndDate,
+            updated_at: new Date(),
+          };
+        });
+
+        await updateDoc(groupRef, {
+          [`available_times.${userId}`]: updatedTimes,
+        });
+
+        Alert.alert("성공", "가능 시간이 수정되었습니다.");
+      } else {
+        const newAvailableTime: AvailableTime = {
+          id: Date.now().toString(),
+          user_id: userId,
+          user_name: userName,
+          start_time: availableStartDate,
+          end_time: availableEndDate,
+          created_at: new Date(),
+        };
+
+        await updateDoc(groupRef, {
+          [`available_times.${userId}`]: arrayUnion(newAvailableTime),
+        });
+
+        Alert.alert("성공", "가능 시간이 등록되었습니다.");
+      }
 
       setAvailableStartDate(null);
       setAvailableEndDate(null);
-
-      Alert.alert("성공", "가능 시간이 등록되었습니다.");
+      setEditingAvailableTimeId(null);
 
       await fetchGroups();
     } catch (error) {
       console.log(error);
-      Alert.alert("오류", "가능 시간 등록 실패");
+      Alert.alert("오류", "가능 시간 저장 실패");
     }
+  };
+
+  const handleStartEditAvailableTime = (time: AvailableTime) => {
+    if (time.user_id !== userId) {
+      Alert.alert("안내", "본인이 등록한 가능 시간만 수정할 수 있습니다.");
+      return;
+    }
+
+    const startDate = toDateObject(time.start_time);
+    const endDate = toDateObject(time.end_time);
+
+    if (!startDate || !endDate) {
+      Alert.alert("오류", "시간 정보를 불러올 수 없습니다.");
+      return;
+    }
+
+    setEditingAvailableTimeId(time.id);
+    setAvailableStartDate(startDate);
+    setAvailableEndDate(endDate);
+  };
+
+  const handleCancelEditAvailableTime = () => {
+    setEditingAvailableTimeId(null);
+    setAvailableStartDate(null);
+    setAvailableEndDate(null);
+  };
+
+  const deleteAvailableTime = async (time: AvailableTime) => {
+    if (!userId || !selectedGroup) {
+      return;
+    }
+
+    try {
+      const groupRef = doc(db, "study_groups", selectedGroup.id);
+
+      const currentUserTimes = Array.isArray(
+        selectedGroup.available_times?.[userId]
+      )
+        ? selectedGroup.available_times[userId]
+        : [];
+
+      const updatedTimes = currentUserTimes.filter(
+        (item: AvailableTime) => item.id !== time.id
+      );
+
+      await updateDoc(groupRef, {
+        [`available_times.${userId}`]: updatedTimes,
+      });
+
+      if (editingAvailableTimeId === time.id) {
+        handleCancelEditAvailableTime();
+      }
+
+      Alert.alert("성공", "가능 시간이 삭제되었습니다.");
+
+      await fetchGroups();
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "가능 시간 삭제 실패");
+    }
+  };
+
+  const handleDeleteAvailableTime = (time: AvailableTime) => {
+    if (!userId || !selectedGroup) {
+      return;
+    }
+
+    if (time.user_id !== userId) {
+      Alert.alert("안내", "본인이 등록한 가능 시간만 삭제할 수 있습니다.");
+      return;
+    }
+
+    if (Platform.OS === "web") {
+      const confirmed =
+        typeof window !== "undefined"
+          ? window.confirm("이 가능 시간을 삭제할까요?")
+          : false;
+
+      if (confirmed) {
+        deleteAvailableTime(time);
+      }
+
+      return;
+    }
+
+    Alert.alert("삭제 확인", "이 가능 시간을 삭제할까요?", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: () => deleteAvailableTime(time),
+      },
+    ]);
   };
 
   const handleRegisterRecommendedSchedule = async (
@@ -736,8 +865,10 @@ export default function StudyGroupScreen() {
     }
 
     try {
+      const scheduleId = Date.now().toString();
+
       const newSchedule: StudySchedule = {
-        id: Date.now().toString(),
+        id: scheduleId,
         title: trimmedTitle,
         start_time: recommendation.start_time,
         end_time: recommendation.end_time,
@@ -766,6 +897,7 @@ export default function StudyGroupScreen() {
             created_at: new Date(),
             study_group_id: selectedGroup.id,
             study_group_name: selectedGroup.name,
+            study_schedule_id: scheduleId,
             source: "study_group",
             created_by: userId,
             created_by_name: userName,
@@ -784,6 +916,157 @@ export default function StudyGroupScreen() {
       console.log(error);
       Alert.alert("오류", "스터디 일정 등록 실패");
     }
+  };
+
+  const handleStartEditSchedule = (schedule: StudySchedule) => {
+    if (schedule.created_by !== userId) {
+      Alert.alert("안내", "일정을 등록한 사용자만 수정할 수 있습니다.");
+      return;
+    }
+
+    setEditingScheduleId(schedule.id);
+    setEditingScheduleTitle(schedule.title);
+  };
+
+  const handleCancelEditSchedule = () => {
+    setEditingScheduleId(null);
+    setEditingScheduleTitle("");
+  };
+
+  const handleUpdateScheduleTitle = async (schedule: StudySchedule) => {
+    if (!selectedGroup) {
+      return;
+    }
+
+    const trimmedTitle = editingScheduleTitle.trim();
+
+    if (!trimmedTitle) {
+      Alert.alert("오류", "일정명을 입력해주세요.");
+      return;
+    }
+
+    try {
+      const groupRef = doc(db, "study_groups", selectedGroup.id);
+
+      const updatedSchedules = selectedGroup.schedules.map((item) => {
+        if (item.id !== schedule.id) {
+          return item;
+        }
+
+        return {
+          ...item,
+          title: trimmedTitle,
+          updated_at: new Date(),
+        };
+      });
+
+      await updateDoc(groupRef, {
+        schedules: updatedSchedules,
+      });
+
+      const scheduleQuery = query(
+        collection(db, "schedules"),
+        where("study_group_id", "==", selectedGroup.id),
+        where("study_schedule_id", "==", schedule.id)
+      );
+
+      const scheduleSnapshot = await getDocs(scheduleQuery);
+
+      await Promise.all(
+        scheduleSnapshot.docs.map((scheduleDoc) =>
+          updateDoc(doc(db, "schedules", scheduleDoc.id), {
+            title: `[스터디] ${trimmedTitle}`,
+            updated_at: new Date(),
+          })
+        )
+      );
+
+      setEditingScheduleId(null);
+      setEditingScheduleTitle("");
+
+      Alert.alert("성공", "스터디 일정이 수정되었습니다.");
+
+      await fetchGroups();
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "스터디 일정 수정 실패");
+    }
+  };
+
+  const deleteSchedule = async (schedule: StudySchedule) => {
+    if (!selectedGroup) {
+      return;
+    }
+
+    try {
+      const groupRef = doc(db, "study_groups", selectedGroup.id);
+
+      const updatedSchedules = selectedGroup.schedules.filter(
+        (item) => item.id !== schedule.id
+      );
+
+      await updateDoc(groupRef, {
+        schedules: updatedSchedules,
+      });
+
+      const scheduleQuery = query(
+        collection(db, "schedules"),
+        where("study_group_id", "==", selectedGroup.id),
+        where("study_schedule_id", "==", schedule.id)
+      );
+
+      const scheduleSnapshot = await getDocs(scheduleQuery);
+
+      await Promise.all(
+        scheduleSnapshot.docs.map((scheduleDoc) =>
+          deleteDoc(doc(db, "schedules", scheduleDoc.id))
+        )
+      );
+
+      if (editingScheduleId === schedule.id) {
+        handleCancelEditSchedule();
+      }
+
+      Alert.alert("성공", "스터디 일정이 삭제되었습니다.");
+
+      await fetchGroups();
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "스터디 일정 삭제 실패");
+    }
+  };
+
+  const handleDeleteSchedule = (schedule: StudySchedule) => {
+    if (!selectedGroup) {
+      return;
+    }
+
+    if (schedule.created_by !== userId) {
+      Alert.alert("안내", "일정을 등록한 사용자만 삭제할 수 있습니다.");
+      return;
+    }
+
+    if (Platform.OS === "web") {
+      const confirmed =
+        typeof window !== "undefined"
+          ? window.confirm("이 스터디 일정을 삭제할까요?")
+          : false;
+
+      if (confirmed) {
+        deleteSchedule(schedule);
+      }
+
+      return;
+    }
+
+    Alert.alert("삭제 확인", "이 스터디 일정을 삭제할까요?", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: () => deleteSchedule(schedule),
+      },
+    ]);
   };
 
   const renderSelectedGroupSimpleCard = () => {
@@ -893,7 +1176,9 @@ export default function StudyGroupScreen() {
       <View>
         {renderSelectedGroupSimpleCard()}
 
-        <Text style={styles.sectionTitle}>내 가능 시간 입력</Text>
+        <Text style={styles.sectionTitle}>
+          {editingAvailableTimeId ? "가능 시간 수정" : "내 가능 시간 입력"}
+        </Text>
 
         <TouchableOpacity
           style={styles.input}
@@ -929,9 +1214,20 @@ export default function StudyGroupScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.button} onPress={handleAddAvailableTime}>
-          <Text style={styles.buttonText}>가능 시간 등록하기</Text>
+        <TouchableOpacity style={styles.button} onPress={handleSaveAvailableTime}>
+          <Text style={styles.buttonText}>
+            {editingAvailableTimeId ? "가능 시간 수정하기" : "가능 시간 등록하기"}
+          </Text>
         </TouchableOpacity>
+
+        {editingAvailableTimeId && (
+          <TouchableOpacity
+            style={styles.grayButton}
+            onPress={handleCancelEditAvailableTime}
+          >
+            <Text style={styles.grayButtonText}>수정 취소</Text>
+          </TouchableOpacity>
+        )}
 
         <Text style={styles.sectionTitle}>멤버 가능 시간 목록</Text>
 
@@ -949,6 +1245,24 @@ export default function StudyGroupScreen() {
               <Text style={styles.groupInfo}>
                 종료: {formatDateTime(time.end_time)}
               </Text>
+
+              {time.user_id === userId && (
+                <View style={styles.actionRow}>
+                  <TouchableOpacity
+                    style={styles.smallOutlineButton}
+                    onPress={() => handleStartEditAvailableTime(time)}
+                  >
+                    <Text style={styles.smallOutlineButtonText}>수정</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.smallDangerButton}
+                    onPress={() => handleDeleteAvailableTime(time)}
+                  >
+                    <Text style={styles.smallDangerButtonText}>삭제</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           ))
         )}
@@ -1029,24 +1343,71 @@ export default function StudyGroupScreen() {
         ) : (
           sortedSchedules.map((schedule) => (
             <View key={schedule.id} style={styles.scheduleCard}>
-              <Text style={styles.scheduleTitle}>{schedule.title}</Text>
+              {editingScheduleId === schedule.id ? (
+                <>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="스터디 일정명"
+                    value={editingScheduleTitle}
+                    onChangeText={setEditingScheduleTitle}
+                  />
 
-              <Text style={styles.groupInfo}>
-                등록자: {schedule.created_by_name || "알 수 없음"}
-              </Text>
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      style={styles.smallOutlineButton}
+                      onPress={() => handleUpdateScheduleTitle(schedule)}
+                    >
+                      <Text style={styles.smallOutlineButtonText}>저장</Text>
+                    </TouchableOpacity>
 
-              <Text style={styles.groupInfo}>
-                시작: {formatDateTime(schedule.start_time)}
-              </Text>
+                    <TouchableOpacity
+                      style={styles.smallDangerButton}
+                      onPress={handleCancelEditSchedule}
+                    >
+                      <Text style={styles.smallDangerButtonText}>취소</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.scheduleTitle}>{schedule.title}</Text>
 
-              <Text style={styles.groupInfo}>
-                종료: {formatDateTime(schedule.end_time)}
-              </Text>
+                  <Text style={styles.groupInfo}>
+                    등록자: {schedule.created_by_name || "알 수 없음"}
+                  </Text>
 
-              {schedule.participant_count && (
-                <Text style={styles.groupInfo}>
-                  추천 가능 인원: {schedule.participant_count}명
-                </Text>
+                  <Text style={styles.groupInfo}>
+                    시작: {formatDateTime(schedule.start_time)}
+                  </Text>
+
+                  <Text style={styles.groupInfo}>
+                    종료: {formatDateTime(schedule.end_time)}
+                  </Text>
+
+                  {schedule.participant_count && (
+                    <Text style={styles.groupInfo}>
+                      추천 가능 인원: {schedule.participant_count}명
+                    </Text>
+                  )}
+
+                  {schedule.created_by === userId && (
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity
+                        style={styles.smallOutlineButton}
+                        onPress={() => handleStartEditSchedule(schedule)}
+                      >
+                        <Text style={styles.smallOutlineButtonText}>수정</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.smallDangerButton}
+                        onPress={() => handleDeleteSchedule(schedule)}
+                      >
+                        <Text style={styles.smallDangerButtonText}>삭제</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </>
               )}
             </View>
           ))
@@ -1382,6 +1743,20 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
+  grayButton: {
+    backgroundColor: "#F2F2F2",
+    padding: 15,
+    borderRadius: 10,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  grayButtonText: {
+    color: "#555",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
   emptyText: {
     color: "#777",
     marginTop: 10,
@@ -1499,6 +1874,42 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#4A90E2",
     marginBottom: 6,
+  },
+
+  actionRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+
+  smallOutlineButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#4A90E2",
+    borderRadius: 8,
+    padding: 10,
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+
+  smallOutlineButtonText: {
+    color: "#4A90E2",
+    fontWeight: "bold",
+  },
+
+  smallDangerButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#E53E3E",
+    borderRadius: 8,
+    padding: 10,
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+
+  smallDangerButtonText: {
+    color: "#E53E3E",
+    fontWeight: "bold",
   },
 
   modalBackground: {
