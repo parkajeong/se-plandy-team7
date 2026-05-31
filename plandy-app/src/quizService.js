@@ -133,19 +133,32 @@ export const submitQuizResult = async ({
     incorrect_items,
   });
 
-  const ref = collection(db, "quiz_results");
-  const result = await addDoc(ref, {
+  if (!userId || !quizId) {
+    throw new Error("submitQuizResult: userId and quizId are required");
+  }
+
+  const makeQuizResultId = (uId, qId) => {
+    const safe = (s) => String(s).replaceAll("/", "_");
+    return `${safe(uId)}_${safe(qId)}`;
+  };
+
+  const resultId = makeQuizResultId(userId, quizId);
+
+  const payload = {
     user_id: userId,
     quiz_id: quizId,
     score,
     total_count,
     correct_count,
     correct_rate,
-    incorrect_items,
+    incorrect_items: Array.isArray(incorrect_items) ? incorrect_items : [],
     solved_at: serverTimestamp(),
-  });
+    updated_at: serverTimestamp(),
+  };
 
-  return result.id;
+  await setDoc(doc(db, "quiz_results", resultId), payload);
+
+  return resultId;
 };
 
 export const getQuizResultsByUser = async (userId) => {
@@ -210,9 +223,26 @@ export const getIncorrectNoteGroupsByUser = async (userId) => {
   const quizResultsSnapshot = await getDocs(quizResultsQuery);
   const quizResultsData = quizResultsSnapshot.docs.map(mapDoc);
 
+  // sort by updated_at (preferred) or solved_at desc
+  const sortedResults = [...quizResultsData].sort((a, b) => {
+    const aTime = getDateMillis(a.updated_at || a.solved_at);
+    const bTime = getDateMillis(b.updated_at || b.solved_at);
+    return bTime - aTime;
+  });
+
+  // dedupe by quiz_id keeping the latest result only
+  const latestResultsByQuizId = new Map();
+  sortedResults.forEach((r) => {
+    if (!latestResultsByQuizId.has(r.quiz_id)) {
+      latestResultsByQuizId.set(r.quiz_id, r);
+    }
+  });
+
+  const dedupedQuizResults = Array.from(latestResultsByQuizId.values());
+
   const quizIds = [
     ...new Set(
-      quizResultsData.flatMap((result) =>
+      dedupedQuizResults.flatMap((result) =>
         Array.isArray(result.incorrect_items) && result.incorrect_items.length
           ? [result.quiz_id]
           : []
@@ -230,7 +260,7 @@ export const getIncorrectNoteGroupsByUser = async (userId) => {
     })
   );
 
-  const groups = quizResultsData
+  const groups = dedupedQuizResults
     .map((result) => {
       const incorrectItems = Array.isArray(result.incorrect_items)
         ? result.incorrect_items
@@ -242,7 +272,7 @@ export const getIncorrectNoteGroupsByUser = async (userId) => {
       if (!quiz) return null;
 
       const questions = Array.isArray(quiz.questions) ? quiz.questions : [];
-      const solvedAtText = result.solved_at?.toDate?.()?.toLocaleDateString?.("ko-KR", {
+      const solvedAtText = (result.updated_at || result.solved_at)?.toDate?.()?.toLocaleDateString?.("ko-KR", {
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
@@ -285,6 +315,7 @@ export const getIncorrectNoteGroupsByUser = async (userId) => {
       if (!items.length) return null;
 
       return {
+        result_id: result.id,
         quiz_id: result.quiz_id,
         quiz_title: quiz.title || "AI 노트 퀴즈",
         solved_at: solvedAtText,

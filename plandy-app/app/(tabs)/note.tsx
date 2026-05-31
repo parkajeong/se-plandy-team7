@@ -590,7 +590,7 @@ export default function NoteScreen() {
 
               <FlatList
                 data={incorrectNoteGroups}
-                keyExtractor={(item) => item.quiz_id}
+                keyExtractor={(item) => `${item.quiz_id}-${item.result_id || item.solved_at}`}
                 ListEmptyComponent={
                   <Text style={styles.emptyText}>
                     {isLoadingIncorrectNotes
@@ -608,8 +608,8 @@ export default function NoteScreen() {
                       오답 {item.incorrect_count}개
                     </Text>
 
-                    {item.items.map((incorrect) => (
-                      <View key={incorrect.question_index} style={styles.incorrectCard}>
+                    {item.items.map((incorrect, idx) => (
+                      <View key={`${item.quiz_id}-${incorrect.question_index}-${idx}`} style={styles.incorrectCard}>
                         <Text style={styles.questionNumber}>
                           문제 {incorrect.question_index + 1}
                         </Text>
