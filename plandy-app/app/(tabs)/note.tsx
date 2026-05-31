@@ -26,6 +26,7 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { getSubjects } from "@/src/subjectService";
 import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
+import { getIncorrectNoteGroupsByUser } from "@/src/quizService";
 import SubjectDropdown from "../../components/SubjectDropdown";
 
 const firebase = require("../../src/firebase");
@@ -39,10 +40,30 @@ type Subject = {
   progress?: number;
 };
 
+type IncorrectNoteItem = {
+  question_index: number;
+  question: string;
+  user_answer_index: number;
+  user_answer_text: string;
+  correct_answer_index: number;
+  correct_answer_text: string;
+  explanation: string;
+  is_review_needed: boolean;
+};
+
+type IncorrectNoteGroup = {
+  quiz_id: string;
+  quiz_title: string;
+  solved_at: string;
+  incorrect_count: number;
+  items: IncorrectNoteItem[];
+};
+
 export default function NoteScreen() {
   const [userId, setUserId] = useState<string | null>(null);
 
   const [mode, setMode] = useState<"write" | "search">("write");
+  const [searchTab, setSearchTab] = useState<"note" | "incorrect">("note");
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
 
@@ -53,6 +74,8 @@ export default function NoteScreen() {
   const [content, setContent] = useState("");
 
   const [notes, setNotes] = useState<any[]>([]);
+  const [incorrectNoteGroups, setIncorrectNoteGroups] = useState<IncorrectNoteGroup[]>([]);
+  const [isLoadingIncorrectNotes, setIsLoadingIncorrectNotes] = useState(false);
 
   const [isEditNoteModalVisible, setIsEditNoteModalVisible] = useState(false);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -192,6 +215,25 @@ export default function NoteScreen() {
       fetchSubjects();
     }, [syncUserId, userId])
   );
+
+  const fetchIncorrectNoteGroups = async () => {
+    if (!userId) {
+      Alert.alert("오류", "로그인 후 오답노트를 조회할 수 있습니다.");
+      return;
+    }
+
+    try {
+      setIsLoadingIncorrectNotes(true);
+      const groups = (await getIncorrectNoteGroupsByUser(userId)) as IncorrectNoteGroup[];
+      setIncorrectNoteGroups(groups);
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "오답노트 조회 실패");
+      setIncorrectNoteGroups([]);
+    } finally {
+      setIsLoadingIncorrectNotes(false);
+    }
+  };
 
   const handleAddNote = async () => {
     if (!userId) {
@@ -427,69 +469,177 @@ export default function NoteScreen() {
         <View style={styles.searchContainer}>
           <Text style={styles.sectionTitle}>과목별 노트 조회</Text>
 
-          <SubjectDropdown
-            subjects={subjects}
-            selectedSubjectId={searchSubject?.id}
-            placeholder="조회할 과목 선택"
-            disabled={!userId || subjects.length === 0}
-            onOpen={fetchSubjects}
-            onSelect={(subject) => {
-              setSearchSubject(subject as Subject);
-              setNotes([]);
-            }}
-          />
+          <View style={styles.searchTabContainer}>
+            <TouchableOpacity
+              style={[
+                styles.searchTabButton,
+                searchTab === "note" && styles.activeSearchTabButton,
+              ]}
+              onPress={() => setSearchTab("note")}
+            >
+              <Text
+                style={[
+                  styles.searchTabText,
+                  searchTab === "note" && styles.activeSearchTabText,
+                ]}
+              >
+                학습 노트
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.searchTabButton,
+                searchTab === "incorrect" && styles.activeSearchTabButton,
+              ]}
+              onPress={() => {
+                setSearchTab("incorrect");
+                fetchIncorrectNoteGroups();
+              }}
+            >
+              <Text
+                style={[
+                  styles.searchTabText,
+                  searchTab === "incorrect" && styles.activeSearchTabText,
+                ]}
+              >
+                오답노트
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-          {userId && subjects.length === 0 && (
-            <Text style={styles.subjectNotice}>
-              먼저 과목을 등록해주세요.
-            </Text>
-          )}
+          {searchTab === "note" ? (
+            <>
+              <SubjectDropdown
+                subjects={subjects}
+                selectedSubjectId={searchSubject?.id}
+                placeholder="조회할 과목 선택"
+                disabled={!userId || subjects.length === 0}
+                onOpen={fetchSubjects}
+                onSelect={(subject) => {
+                  setSearchSubject(subject as Subject);
+                  setNotes([]);
+                }}
+              />
 
-          <TouchableOpacity
-            style={[
-              styles.searchButton,
-              (!userId || subjects.length === 0) && styles.disabledButton,
-            ]}
-            onPress={handleSearchNotes}
-            disabled={!userId || subjects.length === 0}
-          >
-            <Text style={styles.buttonText}>조회하기</Text>
-          </TouchableOpacity>
-
-          <FlatList
-            data={notes}
-            keyExtractor={(item) => item.id}
-            ListEmptyComponent={
-              <Text style={styles.emptyText}>조회된 노트가 없습니다.</Text>
-            }
-            renderItem={({ item }) => (
-              <View style={styles.card}>
-                <Text style={styles.subject}>
-                  {getSubjectTitle(item.subject_id)}
+              {userId && subjects.length === 0 && (
+                <Text style={styles.subjectNotice}>
+                  먼저 과목을 등록해주세요.
                 </Text>
+              )}
 
-                <Text style={styles.noteTitle}>{item.title}</Text>
+              <TouchableOpacity
+                style={[
+                  styles.searchButton,
+                  (!userId || subjects.length === 0) && styles.disabledButton,
+                ]}
+                onPress={handleSearchNotes}
+                disabled={!userId || subjects.length === 0}
+              >
+                <Text style={styles.buttonText}>조회하기</Text>
+              </TouchableOpacity>
 
-                <Text style={styles.noteText}>{item.content}</Text>
+              <FlatList
+                data={notes}
+                keyExtractor={(item) => item.id}
+                ListEmptyComponent={
+                  <Text style={styles.emptyText}>조회된 노트가 없습니다.</Text>
+                }
+                renderItem={({ item }) => (
+                  <View style={styles.card}>
+                    <Text style={styles.subject}>
+                      {getSubjectTitle(item.subject_id)}
+                    </Text>
 
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={() => handleOpenEditNoteModal(item)}
-                  >
-                    <Text style={styles.editButtonText}>수정</Text>
-                  </TouchableOpacity>
+                    <Text style={styles.noteTitle}>{item.title}</Text>
 
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => handleDeleteNote(item.id)}
-                  >
-                    <Text style={styles.deleteButtonText}>삭제</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          />
+                    <Text style={styles.noteText}>{item.content}</Text>
+
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity
+                        style={styles.editButton}
+                        onPress={() => handleOpenEditNoteModal(item)}
+                      >
+                        <Text style={styles.editButtonText}>수정</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={() => handleDeleteNote(item.id)}
+                      >
+                        <Text style={styles.deleteButtonText}>삭제</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              />
+            </>
+          ) : (
+            <View style={styles.incorrectNotesContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.searchButton,
+                  !userId && styles.disabledButton,
+                ]}
+                onPress={fetchIncorrectNoteGroups}
+                disabled={!userId}
+              >
+                <Text style={styles.buttonText}>
+                  {isLoadingIncorrectNotes ? "로딩 중..." : "새로고침"}
+                </Text>
+              </TouchableOpacity>
+
+              <FlatList
+                data={incorrectNoteGroups}
+                keyExtractor={(item) => item.quiz_id}
+                ListEmptyComponent={
+                  <Text style={styles.emptyText}>
+                    {isLoadingIncorrectNotes
+                      ? "오답노트를 불러오는 중..."
+                      : "저장된 오답노트가 없습니다."}
+                  </Text>
+                }
+                renderItem={({ item }) => (
+                  <View style={styles.incorrectGroupCard}>
+                    <View style={styles.incorrectGroupHeader}>
+                      <Text style={styles.quizTitleText}>{item.quiz_title}</Text>
+                      <Text style={styles.dateText}>{item.solved_at}</Text>
+                    </View>
+                    <Text style={styles.incorrectSummaryText}>
+                      오답 {item.incorrect_count}개
+                    </Text>
+
+                    {item.items.map((incorrect) => (
+                      <View key={incorrect.question_index} style={styles.incorrectCard}>
+                        <Text style={styles.questionNumber}>
+                          문제 {incorrect.question_index + 1}
+                        </Text>
+                        <Text style={styles.questionContentText}>
+                          {incorrect.question}
+                        </Text>
+                        <Text style={styles.answerInfoText}>
+                          내 답: {incorrect.user_answer_text}
+                        </Text>
+                        <Text style={styles.answerInfoText}>
+                          정답: {incorrect.correct_answer_text}
+                        </Text>
+                        {incorrect.explanation ? (
+                          <View style={styles.explanationSection}>
+                            <Text style={styles.explanationTitle}>해설</Text>
+                            <Text style={styles.explanationText}>
+                              {incorrect.explanation}
+                            </Text>
+                          </View>
+                        ) : null}
+                        <Text style={styles.reviewNeededTextBlock}>
+                          {incorrect.is_review_needed ? "복습 필요" : "복습 불필요"}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              />
+            </View>
+          )}
         </View>
       )}
 
@@ -710,6 +860,81 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  searchTabContainer: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+  },
+
+  searchTabButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+
+  searchTabText: {
+    color: "#475569",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+
+  activeSearchTabButton: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+  },
+
+  activeSearchTabText: {
+    color: "#fff",
+  },
+
+  incorrectNotesContainer: {
+    flex: 1,
+  },
+
+  incorrectGroupCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 16,
+    marginBottom: 16,
+  },
+
+  incorrectGroupHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+
+  incorrectSummaryText: {
+    color: "#64748b",
+    fontSize: 14,
+    marginBottom: 12,
+  },
+
+  incorrectCard: {
+    backgroundColor: "#f8fafc",
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+  },
+
+  answerInfoText: {
+    color: "#475569",
+    fontSize: 14,
+    marginTop: 4,
+  },
+
+  reviewNeededTextBlock: {
+    marginTop: 10,
+    color: "#92400e",
+    fontWeight: "700",
+  },
+
   card: {
     backgroundColor: "#F2F2F2",
     padding: 15,
@@ -887,5 +1112,139 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+
+  incorrectItemsContainer: {
+    flex: 1,
+    marginTop: 12,
+  },
+
+  incorrectItemCard: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#e53e3e",
+  },
+
+  incorrectItemHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+
+  quizTitleText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1E3A5F",
+    flex: 1,
+  },
+
+  dateText: {
+    fontSize: 12,
+    color: "#64748b",
+  },
+
+  questionNumber: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#2563EB",
+    marginBottom: 6,
+  },
+
+  questionContentText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1E3A5F",
+    lineHeight: 21,
+    marginBottom: 10,
+  },
+
+  optionsContainer: {
+    marginBottom: 10,
+  },
+
+  incorrectItemOption: {
+    backgroundColor: "#f8fafc",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+
+  correctAnswerOption: {
+    backgroundColor: "#dcfce7",
+    borderColor: "#4ade80",
+  },
+
+  wrongAnswerOption: {
+    backgroundColor: "#fee2e2",
+    borderColor: "#fca5a5",
+  },
+
+  optionNumberText: {
+    fontSize: 13,
+    color: "#334155",
+    lineHeight: 19,
+  },
+
+  correctAnswerText: {
+    color: "#166534",
+    fontWeight: "700",
+  },
+
+  wrongAnswerText: {
+    color: "#b91c1c",
+    fontWeight: "700",
+  },
+
+  correctLabel: {
+    color: "#166534",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+
+  wrongLabel: {
+    color: "#b91c1c",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+
+  explanationSection: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#e2e8f0",
+  },
+
+  explanationTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1E3A5F",
+    marginBottom: 4,
+  },
+
+  explanationText: {
+    fontSize: 13,
+    color: "#475569",
+    lineHeight: 20,
+  },
+
+  reviewNeededBadge: {
+    backgroundColor: "#fef3c7",
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginTop: 10,
+    alignSelf: "flex-start",
+  },
+
+  reviewNeededText: {
+    fontSize: 12,
+    color: "#92400e",
+    fontWeight: "600",
   },
 });
