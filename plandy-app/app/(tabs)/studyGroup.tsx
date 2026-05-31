@@ -10,7 +10,16 @@ import {
 } from "react-native";
 
 import { onAuthStateChanged } from "firebase/auth";
-import { addDoc, collection } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  getDocs,
+  query,
+  where,
+  doc,
+  updateDoc,
+  arrayUnion,
+} from "firebase/firestore";
 import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
 
 const firebase = require("../../src/firebase");
@@ -152,6 +161,83 @@ export default function StudyGroupScreen() {
     }
   };
 
+  const handleJoinGroup = async () => {
+    if (!userId) {
+      Alert.alert("오류", "로그인 후 스터디 그룹에 참여할 수 있습니다.");
+      return;
+    }
+
+    const trimmedInviteCode = inviteCode.trim().toUpperCase();
+
+    if (!trimmedInviteCode) {
+      Alert.alert("오류", "초대코드를 입력해주세요.");
+      return;
+    }
+
+    try {
+      const q = query(
+        collection(db, "study_groups"),
+        where("invite_code", "==", trimmedInviteCode)
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        Alert.alert("오류", "해당 초대코드의 스터디 그룹을 찾을 수 없습니다.");
+        return;
+      }
+
+      const targetDoc = querySnapshot.docs[0];
+      const targetGroupData = targetDoc.data();
+
+      const members = Array.isArray(targetGroupData.members)
+        ? targetGroupData.members
+        : [];
+
+      if (members.includes(userId)) {
+        Alert.alert("안내", "이미 참여 중인 스터디 그룹입니다.");
+        setInviteCode("");
+        return;
+      }
+
+      const groupRef = doc(db, "study_groups", targetDoc.id);
+
+      await updateDoc(groupRef, {
+        members: arrayUnion(userId),
+      });
+
+      const joinedGroup: StudyGroup = {
+        id: targetDoc.id,
+        name: targetGroupData.name,
+        host_id: targetGroupData.host_id,
+        members: [...members, userId],
+        schedules: targetGroupData.schedules || [],
+        available_times: targetGroupData.available_times || {},
+        invite_code: targetGroupData.invite_code,
+        created_at: targetGroupData.created_at,
+      };
+
+      setGroups((prevGroups) => {
+        const alreadyExists = prevGroups.some(
+          (group) => group.id === joinedGroup.id
+        );
+
+        if (alreadyExists) {
+          return prevGroups;
+        }
+
+        return [joinedGroup, ...prevGroups];
+      });
+
+      setInviteCode("");
+
+      Alert.alert("성공", "스터디 그룹에 참여했습니다.");
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "스터디 그룹 참여 실패");
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>스터디 그룹</Text>
@@ -181,11 +267,11 @@ export default function StudyGroupScreen() {
         style={styles.input}
         placeholder="초대코드 입력"
         value={inviteCode}
-        onChangeText={setInviteCode}
+        onChangeText={(text) => setInviteCode(text.toUpperCase())}
         autoCapitalize="characters"
       />
 
-      <TouchableOpacity style={styles.outlineButton}>
+      <TouchableOpacity style={styles.outlineButton} onPress={handleJoinGroup}>
         <Text style={styles.outlineButtonText}>그룹 참여하기</Text>
       </TouchableOpacity>
 
