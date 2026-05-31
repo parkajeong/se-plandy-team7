@@ -27,6 +27,7 @@ import {
   reopenTodo,
   updateTodo,
 } from '../../src/todoService';
+import SubjectDropdown from '../../components/SubjectDropdown';
 
 type TodoCategory = '시험' | '과제' | '복습' | '기타';
 
@@ -281,6 +282,16 @@ export default function TodoScreen() {
   };
 
   const handleSaveTodo = async () => {
+    if (subjects.length === 0) {
+      Alert.alert('과목 필요', '먼저 과목을 등록해주세요.');
+      return;
+    }
+
+    if (!form.subject_id) {
+      Alert.alert('과목 선택', '저장할 과목을 선택해주세요.');
+      return;
+    }
+
     try {
       setIsSaving(true);
 
@@ -531,40 +542,21 @@ export default function TodoScreen() {
 
               <Text style={styles.inputLabel}>과목명</Text>
               {subjects.length > 0 ? (
-                <View style={styles.chipWrap}>
-                  {subjects.map((subject) => {
-                    const selected = form.subject_id === subject.id;
-
-                    return (
-                      <Pressable
-                        key={subject.id}
-                        style={[
-                          styles.chipButton,
-                          selected && styles.chipButtonSelected,
-                        ]}
-                        onPress={() =>
-                          setForm((prev) => ({
-                            ...prev,
-                            subject_id: subject.id,
-                          }))
-                        }
-                      >
-                        <Text
-                          style={[
-                            styles.chipButtonText,
-                            selected && styles.chipButtonTextSelected,
-                          ]}
-                        >
-                          {subject.title}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                <SubjectDropdown
+                  subjects={subjects}
+                  selectedSubjectId={form.subject_id}
+                  placeholder="과목 선택"
+                  onSelect={(subject) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      subject_id: subject.id,
+                    }))
+                  }
+                />
               ) : (
                 <View style={styles.warningBox}>
                   <Text style={styles.warningText}>
-                    등록된 과목이 없습니다. Todo를 만들려면 먼저 과목을 등록해주세요.
+                    먼저 과목을 등록해주세요. Todo를 만들려면 과목이 필요합니다.
                   </Text>
                   <Pressable
                     style={styles.warningButton}
@@ -686,10 +678,11 @@ export default function TodoScreen() {
                   style={[
                     styles.modalButton,
                     styles.saveButton,
-                    subjects.length === 0 && styles.disabledButton,
+                    (subjects.length === 0 || !form.subject_id) &&
+                      styles.disabledButton,
                   ]}
                   onPress={handleSaveTodo}
-                  disabled={isSaving || subjects.length === 0}
+                  disabled={isSaving || subjects.length === 0 || !form.subject_id}
                 >
                   <Text style={styles.saveButtonText}>
                     {isSaving ? '저장 중...' : '저장'}
