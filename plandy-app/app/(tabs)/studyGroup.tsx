@@ -90,6 +90,9 @@ export default function StudyGroupScreen() {
   const [groups, setGroups] = useState<StudyGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<StudyGroup | null>(null);
 
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editingGroupName, setEditingGroupName] = useState("");
+
   const [availableStartDate, setAvailableStartDate] = useState<Date | null>(
     null
   );
@@ -112,6 +115,32 @@ export default function StudyGroupScreen() {
   const [tempSelectedDate, setTempSelectedDate] = useState<Date | null>(null);
   const [tempSelectedHour, setTempSelectedHour] = useState(9);
   const [tempSelectedMinute, setTempSelectedMinute] = useState(0);
+
+  const confirmAction = (
+    title: string,
+    message: string,
+    onConfirm: () => void
+  ) => {
+    if (Platform.OS === "web") {
+      const confirmed =
+        typeof window !== "undefined" ? window.confirm(message) : false;
+
+      if (confirmed) {
+        onConfirm();
+      }
+
+      return;
+    }
+
+    Alert.alert(title, message, [
+      { text: "취소", style: "cancel" },
+      {
+        text: "확인",
+        style: "destructive",
+        onPress: onConfirm,
+      },
+    ]);
+  };
 
   const getAppUserIdOrNull = useCallback(() => {
     const appUser = getAppUser();
@@ -542,6 +571,175 @@ export default function StudyGroupScreen() {
     setMode("available");
   };
 
+  const handleStartEditGroup = (group: StudyGroup) => {
+    if (group.host_id !== userId) {
+      Alert.alert("안내", "그룹장만 그룹명을 수정할 수 있습니다.");
+      return;
+    }
+
+    setEditingGroupId(group.id);
+    setEditingGroupName(group.name);
+  };
+
+  const handleCancelEditGroup = () => {
+    setEditingGroupId(null);
+    setEditingGroupName("");
+  };
+
+  const handleUpdateGroupName = async (group: StudyGroup) => {
+    const trimmedName = editingGroupName.trim();
+
+    if (!trimmedName) {
+      Alert.alert("오류", "그룹 이름을 입력해주세요.");
+      return;
+    }
+
+    try {
+      const groupRef = doc(db, "study_groups", group.id);
+
+      await updateDoc(groupRef, {
+        name: trimmedName,
+        updated_at: new Date(),
+      });
+
+      const scheduleQuery = query(
+        collection(db, "schedules"),
+        where("study_group_id", "==", group.id)
+      );
+
+      const scheduleSnapshot = await getDocs(scheduleQuery);
+
+      await Promise.all(
+        scheduleSnapshot.docs.map((scheduleDoc) =>
+          updateDoc(doc(db, "schedules", scheduleDoc.id), {
+            study_group_name: trimmedName,
+            description: `스터디: ${trimmedName}`,
+            updated_at: new Date(),
+          })
+        )
+      );
+
+      setEditingGroupId(null);
+      setEditingGroupName("");
+
+      Alert.alert("성공", "스터디 그룹명이 수정되었습니다.");
+
+      await fetchGroups();
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "스터디 그룹명 수정 실패");
+    }
+  };
+
+  const deleteGroup = async (group: StudyGroup) => {
+    try {
+      const scheduleQuery = query(
+        collection(db, "schedules"),
+        where("study_group_id", "==", group.id)
+      );
+
+      const scheduleSnapshot = await getDocs(scheduleQuery);
+
+      await Promise.all(
+        scheduleSnapshot.docs.map((scheduleDoc) =>
+          deleteDoc(doc(db, "schedules", scheduleDoc.id))
+        )
+      );
+
+      await deleteDoc(doc(db, "study_groups", group.id));
+
+      if (selectedGroup?.id === group.id) {
+        setSelectedGroup(null);
+        setMode("group");
+      }
+
+      if (editingGroupId === group.id) {
+        handleCancelEditGroup();
+      }
+
+      Alert.alert("성공", "스터디 그룹이 삭제되었습니다.");
+
+      await fetchGroups();
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "스터디 그룹 삭제 실패");
+    }
+  };
+
+  const handleDeleteGroup = (group: StudyGroup) => {
+    if (group.host_id !== userId) {
+      Alert.alert("안내", "그룹장만 그룹을 삭제할 수 있습니다.");
+      return;
+    }
+
+    confirmAction(
+      "삭제 확인",
+      "스터디 그룹을 삭제하면 그룹의 가능 시간, 추천 일정, 일정 탭의 스터디 일정이 함께 삭제됩니다. 삭제할까요?",
+      () => deleteGroup(group)
+    );
+  };
+
+  const leaveGroup = async (group: StudyGroup) => {
+    if (!userId) return;
+
+    try {
+      const groupRef = doc(db, "study_groups", group.id);
+
+      const updatedMembers = group.members.filter((memberId) => memberId !== userId);
+
+      const updatedAvailableTimes = {
+        ...(group.available_times || {}),
+      };
+
+      delete updatedAvailableTimes[userId];
+
+      await updateDoc(groupRef, {
+        members: updatedMembers,
+        available_times: updatedAvailableTimes,
+        updated_at: new Date(),
+      });
+
+      const scheduleQuery = query(
+        collection(db, "schedules"),
+        where("study_group_id", "==", group.id),
+        where("user_id", "==", userId)
+      );
+
+      const scheduleSnapshot = await getDocs(scheduleQuery);
+
+      await Promise.all(
+        scheduleSnapshot.docs.map((scheduleDoc) =>
+          deleteDoc(doc(db, "schedules", scheduleDoc.id))
+        )
+      );
+
+      if (selectedGroup?.id === group.id) {
+        setSelectedGroup(null);
+        setMode("group");
+      }
+
+      Alert.alert("성공", "스터디 그룹에서 탈퇴했습니다.");
+
+      await fetchGroups();
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "스터디 그룹 탈퇴 실패");
+    }
+  };
+
+  const handleLeaveGroup = (group: StudyGroup) => {
+    if (group.host_id === userId) {
+      Alert.alert("안내", "그룹장은 탈퇴 대신 그룹 삭제를 사용할 수 있습니다.");
+      return;
+    }
+
+    confirmAction(
+      "탈퇴 확인",
+      "스터디 그룹에서 탈퇴하면 내 가능 시간과 내 일정 탭의 해당 그룹 일정이 삭제됩니다. 탈퇴할까요?",
+      () => leaveGroup(group)
+    );
+  };
+
   const openDateTimeModal = (target: DateTimeTarget) => {
     setDateTimeTarget(target);
 
@@ -821,27 +1019,9 @@ export default function StudyGroupScreen() {
       return;
     }
 
-    if (Platform.OS === "web") {
-      const confirmed =
-        typeof window !== "undefined"
-          ? window.confirm("이 가능 시간을 삭제할까요?")
-          : false;
-
-      if (confirmed) {
-        deleteAvailableTime(time);
-      }
-
-      return;
-    }
-
-    Alert.alert("삭제 확인", "이 가능 시간을 삭제할까요?", [
-      { text: "취소", style: "cancel" },
-      {
-        text: "삭제",
-        style: "destructive",
-        onPress: () => deleteAvailableTime(time),
-      },
-    ]);
+    confirmAction("삭제 확인", "이 가능 시간을 삭제할까요?", () =>
+      deleteAvailableTime(time)
+    );
   };
 
   const handleRegisterRecommendedSchedule = async (
@@ -1046,27 +1226,9 @@ export default function StudyGroupScreen() {
       return;
     }
 
-    if (Platform.OS === "web") {
-      const confirmed =
-        typeof window !== "undefined"
-          ? window.confirm("이 스터디 일정을 삭제할까요?")
-          : false;
-
-      if (confirmed) {
-        deleteSchedule(schedule);
-      }
-
-      return;
-    }
-
-    Alert.alert("삭제 확인", "이 스터디 일정을 삭제할까요?", [
-      { text: "취소", style: "cancel" },
-      {
-        text: "삭제",
-        style: "destructive",
-        onPress: () => deleteSchedule(schedule),
-      },
-    ]);
+    confirmAction("삭제 확인", "이 스터디 일정을 삭제할까요?", () =>
+      deleteSchedule(schedule)
+    );
   };
 
   const renderSelectedGroupSimpleCard = () => {
@@ -1131,28 +1293,85 @@ export default function StudyGroupScreen() {
         }
         renderItem={({ item }) => {
           const isSelected = selectedGroup?.id === item.id;
+          const isHost = item.host_id === userId;
+          const isEditingGroup = editingGroupId === item.id;
 
           return (
-            <TouchableOpacity
-              style={[styles.card, isSelected && styles.selectedCard]}
-              onPress={() => handleSelectGroup(item)}
-            >
-              <Text style={styles.groupName}>{item.name}</Text>
+            <View style={[styles.card, isSelected && styles.selectedCard]}>
+              {isEditingGroup ? (
+                <>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="스터디 그룹 이름"
+                    value={editingGroupName}
+                    onChangeText={setEditingGroupName}
+                  />
 
-              <Text style={styles.groupInfo}>초대코드: {item.invite_code}</Text>
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      style={styles.smallOutlineButton}
+                      onPress={() => handleUpdateGroupName(item)}
+                    >
+                      <Text style={styles.smallOutlineButtonText}>저장</Text>
+                    </TouchableOpacity>
 
-              <Text style={styles.groupInfo}>
-                참여 인원: {item.members.length}명
-              </Text>
+                    <TouchableOpacity
+                      style={styles.smallDangerButton}
+                      onPress={handleCancelEditGroup}
+                    >
+                      <Text style={styles.smallDangerButtonText}>취소</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity onPress={() => handleSelectGroup(item)}>
+                    <Text style={styles.groupName}>{item.name}</Text>
 
-              {item.host_id === userId && (
-                <Text style={styles.hostText}>내가 만든 그룹</Text>
+                    <Text style={styles.groupInfo}>
+                      초대코드: {item.invite_code}
+                    </Text>
+
+                    <Text style={styles.groupInfo}>
+                      참여 인원: {item.members.length}명
+                    </Text>
+
+                    {isHost && <Text style={styles.hostText}>내가 만든 그룹</Text>}
+
+                    {isSelected && (
+                      <Text style={styles.selectedText}>선택된 그룹</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <View style={styles.actionRow}>
+                    {isHost ? (
+                      <>
+                        <TouchableOpacity
+                          style={styles.smallOutlineButton}
+                          onPress={() => handleStartEditGroup(item)}
+                        >
+                          <Text style={styles.smallOutlineButtonText}>수정</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.smallDangerButton}
+                          onPress={() => handleDeleteGroup(item)}
+                        >
+                          <Text style={styles.smallDangerButtonText}>삭제</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.smallDangerButton}
+                        onPress={() => handleLeaveGroup(item)}
+                      >
+                        <Text style={styles.smallDangerButtonText}>탈퇴</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </>
               )}
-
-              {isSelected && (
-                <Text style={styles.selectedText}>선택된 그룹</Text>
-              )}
-            </TouchableOpacity>
+            </View>
           );
         }}
       />
