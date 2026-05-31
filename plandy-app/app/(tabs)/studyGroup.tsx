@@ -7,6 +7,8 @@ import {
   StyleSheet,
   FlatList,
   Alert,
+  ScrollView,
+  Modal,
 } from "react-native";
 
 import { onAuthStateChanged } from "firebase/auth";
@@ -19,19 +21,34 @@ import {
   doc,
   updateDoc,
   arrayUnion,
+  onSnapshot,
 } from "firebase/firestore";
+
 import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
 
 const firebase = require("../../src/firebase");
 const db = firebase.db;
 const auth = firebase.auth;
 
+type Mode = "group" | "schedule" | "available";
+type DateTimeTarget = "start" | "end";
+
+type StudySchedule = {
+  id: string;
+  title: string;
+  start_time: any;
+  end_time: any;
+  created_by?: string;
+  created_by_name?: string;
+  created_at?: any;
+};
+
 type StudyGroup = {
   id: string;
   name: string;
   host_id: string;
   members: string[];
-  schedules: any[];
+  schedules: StudySchedule[];
   available_times: Record<string, any>;
   invite_code: string;
   created_at: any;
@@ -39,12 +56,27 @@ type StudyGroup = {
 
 export default function StudyGroupScreen() {
   const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState("사용자");
+
+  const [mode, setMode] = useState<Mode>("group");
 
   const [groupName, setGroupName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
 
   const [groups, setGroups] = useState<StudyGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<StudyGroup | null>(null);
+
+  const [scheduleTitle, setScheduleTitle] = useState("");
+  const [scheduleStartDate, setScheduleStartDate] = useState<Date | null>(null);
+  const [scheduleEndDate, setScheduleEndDate] = useState<Date | null>(null);
+
+  const [isDateTimeModalVisible, setIsDateTimeModalVisible] = useState(false);
+  const [dateTimeTarget, setDateTimeTarget] =
+    useState<DateTimeTarget>("start");
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [tempSelectedDate, setTempSelectedDate] = useState<Date | null>(null);
+  const [tempSelectedHour, setTempSelectedHour] = useState(9);
+  const [tempSelectedMinute, setTempSelectedMinute] = useState(0);
 
   const getAppUserIdOrNull = useCallback(() => {
     const appUser = getAppUser();
@@ -68,11 +100,44 @@ export default function StudyGroupScreen() {
     return null;
   }, []);
 
+  const getAppUserNameOrDefault = useCallback(() => {
+    const firebaseUser = auth.currentUser;
+
+    if (firebaseUser?.displayName) {
+      return firebaseUser.displayName;
+    }
+
+    if (firebaseUser?.email) {
+      return firebaseUser.email;
+    }
+
+    const appUser = getAppUser();
+
+    if (appUser?.displayName) {
+      return String(appUser.displayName);
+    }
+
+    if (appUser?.name) {
+      return String(appUser.name);
+    }
+
+    if (appUser?.nickname) {
+      return String(appUser.nickname);
+    }
+
+    if (appUser?.email) {
+      return String(appUser.email);
+    }
+
+    return "사용자";
+  }, []);
+
   const syncUserId = useCallback(() => {
     const firebaseUser = auth.currentUser;
 
     if (firebaseUser) {
       setUserId(firebaseUser.uid);
+      setUserName(getAppUserNameOrDefault());
       return;
     }
 
@@ -80,13 +145,15 @@ export default function StudyGroupScreen() {
 
     if (appUserId) {
       setUserId(appUserId);
+      setUserName(getAppUserNameOrDefault());
       return;
     }
 
     setUserId(null);
+    setUserName("사용자");
     setGroups([]);
     setSelectedGroup(null);
-  }, [getAppUserIdOrNull]);
+  }, [getAppUserIdOrNull, getAppUserNameOrDefault]);
 
   useEffect(() => {
     const unsubscribeFirebase = onAuthStateChanged(auth, () => {
@@ -104,6 +171,37 @@ export default function StudyGroupScreen() {
       unsubscribeAppUser();
     };
   }, [syncUserId]);
+
+  const convertDocToStudyGroup = (docItem: any): StudyGroup => {
+    const groupData = docItem.data();
+
+    return {
+      id: docItem.id,
+      name: groupData.name,
+      host_id: groupData.host_id,
+      members: groupData.members || [],
+      schedules: groupData.schedules || [],
+      available_times: groupData.available_times || {},
+      invite_code: groupData.invite_code,
+      created_at: groupData.created_at,
+    };
+  };
+
+  const applyGroupsToState = useCallback((data: StudyGroup[]) => {
+    setGroups(data);
+
+    setSelectedGroup((prevSelectedGroup) => {
+      if (!prevSelectedGroup) {
+        return null;
+      }
+
+      const updatedSelectedGroup = data.find(
+        (group) => group.id === prevSelectedGroup.id
+      );
+
+      return updatedSelectedGroup || null;
+    });
+  }, []);
 
   const fetchGroups = useCallback(async () => {
     if (!userId) {
@@ -123,42 +221,47 @@ export default function StudyGroupScreen() {
       const data: StudyGroup[] = [];
 
       querySnapshot.forEach((docItem) => {
-        const groupData = docItem.data();
-
-        data.push({
-          id: docItem.id,
-          name: groupData.name,
-          host_id: groupData.host_id,
-          members: groupData.members || [],
-          schedules: groupData.schedules || [],
-          available_times: groupData.available_times || {},
-          invite_code: groupData.invite_code,
-          created_at: groupData.created_at,
-        });
+        data.push(convertDocToStudyGroup(docItem));
       });
 
-      setGroups(data);
-
-      setSelectedGroup((prevSelectedGroup) => {
-        if (!prevSelectedGroup) {
-          return null;
-        }
-
-        const updatedSelectedGroup = data.find(
-          (group) => group.id === prevSelectedGroup.id
-        );
-
-        return updatedSelectedGroup || null;
-      });
+      applyGroupsToState(data);
     } catch (error) {
       console.log(error);
       Alert.alert("오류", "스터디 그룹 목록 조회 실패");
     }
-  }, [userId]);
+  }, [userId, applyGroupsToState]);
 
   useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
+    if (!userId) {
+      setGroups([]);
+      setSelectedGroup(null);
+      return;
+    }
+
+    const q = query(
+      collection(db, "study_groups"),
+      where("members", "array-contains", userId)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (querySnapshot) => {
+        const data: StudyGroup[] = [];
+
+        querySnapshot.forEach((docItem) => {
+          data.push(convertDocToStudyGroup(docItem));
+        });
+
+        applyGroupsToState(data);
+      },
+      (error) => {
+        console.log(error);
+        Alert.alert("오류", "스터디 그룹 실시간 조회 실패");
+      }
+    );
+
+    return unsubscribe;
+  }, [userId, applyGroupsToState]);
 
   const generateInviteCode = () => {
     const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -170,6 +273,80 @@ export default function StudyGroupScreen() {
     }
 
     return code;
+  };
+
+  const toDateObject = (value: any) => {
+    if (!value) {
+      return null;
+    }
+
+    if (value?.toDate) {
+      return value.toDate();
+    }
+
+    if (value instanceof Date) {
+      return value;
+    }
+
+    const convertedDate = new Date(value);
+
+    if (Number.isNaN(convertedDate.getTime())) {
+      return null;
+    }
+
+    return convertedDate;
+  };
+
+  const getRoundedTime = (date: Date) => {
+    const roundedMinute = Math.round(date.getMinutes() / 5) * 5;
+    const result = new Date(date);
+
+    if (roundedMinute === 60) {
+      result.setHours(result.getHours() + 1);
+      result.setMinutes(0);
+    } else {
+      result.setMinutes(roundedMinute);
+    }
+
+    result.setSeconds(0);
+    result.setMilliseconds(0);
+
+    return result;
+  };
+
+  const formatDate = (targetDate: Date) => {
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, "0");
+    const day = String(targetDate.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
+
+  const formatTime = (hour: number, minute: number) => {
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  };
+
+  const formatDateTime = (value: any) => {
+    const date = toDateObject(value);
+
+    if (!date) {
+      return "";
+    }
+
+    return `${formatDate(date)} ${formatTime(date.getHours(), date.getMinutes())}`;
+  };
+
+  const getSortedSchedules = () => {
+    if (!selectedGroup) {
+      return [];
+    }
+
+    return [...selectedGroup.schedules].sort((a, b) => {
+      const aDate = toDateObject(a.start_time);
+      const bDate = toDateObject(b.start_time);
+
+      return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
+    });
   };
 
   const handleCreateGroup = async () => {
@@ -273,18 +450,188 @@ export default function StudyGroupScreen() {
 
   const handleSelectGroup = (group: StudyGroup) => {
     setSelectedGroup(group);
+    setMode("schedule");
   };
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>스터디 그룹</Text>
+  const openDateTimeModal = (target: DateTimeTarget) => {
+    setDateTimeTarget(target);
 
-      {!userId && (
-        <Text style={styles.loginNotice}>
-          로그인 후 스터디 그룹을 생성하고 참여할 수 있습니다.
-        </Text>
-      )}
+    const existingDate =
+      target === "start" ? scheduleStartDate : scheduleEndDate;
 
+    const baseDate = getRoundedTime(existingDate || new Date());
+
+    setCurrentMonth(new Date(baseDate.getFullYear(), baseDate.getMonth(), 1));
+    setTempSelectedDate(baseDate);
+    setTempSelectedHour(baseDate.getHours());
+    setTempSelectedMinute(baseDate.getMinutes());
+
+    setIsDateTimeModalVisible(true);
+  };
+
+  const getCalendarDays = () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    const firstDayOfWeek = firstDay.getDay();
+    const totalDays = lastDay.getDate();
+
+    const days: (number | null)[] = [];
+
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      days.push(null);
+    }
+
+    for (let day = 1; day <= totalDays; day++) {
+      days.push(day);
+    }
+
+    while (days.length % 7 !== 0) {
+      days.push(null);
+    }
+
+    return days;
+  };
+
+  const getCalendarWeeks = () => {
+    const days = getCalendarDays();
+    const weeks: (number | null)[][] = [];
+
+    for (let i = 0; i < days.length; i += 7) {
+      weeks.push(days.slice(i, i + 7));
+    }
+
+    return weeks;
+  };
+
+  const handlePrevMonth = () => {
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1)
+    );
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1)
+    );
+  };
+
+  const handleSelectCalendarDay = (day: number) => {
+    const selectedDate = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth(),
+      day,
+      tempSelectedHour,
+      tempSelectedMinute,
+      0
+    );
+
+    setTempSelectedDate(selectedDate);
+  };
+
+  const increaseHour = () => {
+    setTempSelectedHour((prev) => (prev + 1) % 24);
+  };
+
+  const decreaseHour = () => {
+    setTempSelectedHour((prev) => (prev - 1 + 24) % 24);
+  };
+
+  const increaseMinute = () => {
+    setTempSelectedMinute((prev) => (prev + 5) % 60);
+  };
+
+  const decreaseMinute = () => {
+    setTempSelectedMinute((prev) => (prev - 5 + 60) % 60);
+  };
+
+  const handleConfirmDateTime = () => {
+    if (!tempSelectedDate) {
+      Alert.alert("오류", "날짜를 선택해주세요.");
+      return;
+    }
+
+    const confirmedDate = new Date(
+      tempSelectedDate.getFullYear(),
+      tempSelectedDate.getMonth(),
+      tempSelectedDate.getDate(),
+      tempSelectedHour,
+      tempSelectedMinute,
+      0
+    );
+
+    if (dateTimeTarget === "start") {
+      setScheduleStartDate(confirmedDate);
+    } else {
+      setScheduleEndDate(confirmedDate);
+    }
+
+    setIsDateTimeModalVisible(false);
+  };
+
+  const handleAddStudySchedule = async () => {
+    if (!userId) {
+      Alert.alert("오류", "로그인 후 스터디 일정을 등록할 수 있습니다.");
+      return;
+    }
+
+    if (!selectedGroup) {
+      Alert.alert("오류", "스터디 그룹을 선택해주세요.");
+      return;
+    }
+
+    if (!selectedGroup.members.includes(userId)) {
+      Alert.alert("오류", "스터디 그룹 멤버만 일정을 등록할 수 있습니다.");
+      return;
+    }
+
+    const trimmedTitle = scheduleTitle.trim();
+
+    if (!trimmedTitle || !scheduleStartDate || !scheduleEndDate) {
+      Alert.alert("오류", "일정명, 시작 일시, 종료 일시를 모두 입력해주세요.");
+      return;
+    }
+
+    if (scheduleEndDate.getTime() < scheduleStartDate.getTime()) {
+      Alert.alert("오류", "종료 일시는 시작 일시보다 빠를 수 없습니다.");
+      return;
+    }
+
+    try {
+      const newSchedule = {
+        id: Date.now().toString(),
+        title: trimmedTitle,
+        start_time: scheduleStartDate,
+        end_time: scheduleEndDate,
+        created_by: userId,
+        created_by_name: userName,
+        created_at: new Date(),
+      };
+
+      const groupRef = doc(db, "study_groups", selectedGroup.id);
+
+      await updateDoc(groupRef, {
+        schedules: arrayUnion(newSchedule),
+      });
+
+      setScheduleTitle("");
+      setScheduleStartDate(null);
+      setScheduleEndDate(null);
+
+      Alert.alert("성공", "스터디 공유 일정이 등록되었습니다.");
+
+      await fetchGroups();
+    } catch (error) {
+      console.log(error);
+      Alert.alert("오류", "스터디 공유 일정 등록 실패");
+    }
+  };
+
+  const renderGroupManagement = () => (
+    <View>
       <Text style={styles.sectionTitle}>스터디 그룹 생성</Text>
 
       <TextInput
@@ -316,6 +663,7 @@ export default function StudyGroupScreen() {
 
       <FlatList
         data={groups}
+        scrollEnabled={false}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
           <Text style={styles.emptyText}>참여 중인 스터디 그룹이 없습니다.</Text>
@@ -349,13 +697,341 @@ export default function StudyGroupScreen() {
       />
     </View>
   );
+
+  const renderScheduleManagement = () => {
+    if (!selectedGroup) {
+      return (
+        <View>
+          <Text style={styles.emptyText}>
+            그룹 관리 탭에서 스터디 그룹을 먼저 선택해주세요.
+          </Text>
+        </View>
+      );
+    }
+
+    const sortedSchedules = getSortedSchedules();
+
+    return (
+      <View>
+        <View style={styles.selectedGroupSimpleCard}>
+          <View style={styles.selectedGroupTextBox}>
+            <Text style={styles.selectedGroupSimpleLabel}>선택한 그룹</Text>
+            <Text style={styles.selectedGroupSimpleName}>
+              {selectedGroup.name}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.changeGroupButton}
+            onPress={() => setMode("group")}
+          >
+            <Text style={styles.changeGroupButtonText}>다시 선택</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.sectionTitle}>스터디 공유 일정 등록</Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="일정명"
+          value={scheduleTitle}
+          onChangeText={setScheduleTitle}
+        />
+
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => openDateTimeModal("start")}
+        >
+          <Text
+            style={
+              scheduleStartDate
+                ? styles.selectedInputText
+                : styles.placeholderText
+            }
+          >
+            {scheduleStartDate
+              ? `시작: ${formatDateTime(scheduleStartDate)}`
+              : "시작 일시 선택"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => openDateTimeModal("end")}
+        >
+          <Text
+            style={
+              scheduleEndDate
+                ? styles.selectedInputText
+                : styles.placeholderText
+            }
+          >
+            {scheduleEndDate
+              ? `종료: ${formatDateTime(scheduleEndDate)}`
+              : "종료 일시 선택"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.button} onPress={handleAddStudySchedule}>
+          <Text style={styles.buttonText}>공유 일정 등록하기</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.sectionTitle}>스터디 공유 일정 목록</Text>
+
+        {sortedSchedules.length === 0 ? (
+          <Text style={styles.emptyText}>등록된 공유 일정이 없습니다.</Text>
+        ) : (
+          sortedSchedules.map((schedule) => (
+            <View key={schedule.id} style={styles.scheduleCard}>
+              <Text style={styles.scheduleTitle}>{schedule.title}</Text>
+
+              <Text style={styles.groupInfo}>
+                등록자: {schedule.created_by_name || "알 수 없음"}
+              </Text>
+
+              <Text style={styles.groupInfo}>
+                시작: {formatDateTime(schedule.start_time)}
+              </Text>
+
+              <Text style={styles.groupInfo}>
+                종료: {formatDateTime(schedule.end_time)}
+              </Text>
+            </View>
+          ))
+        )}
+      </View>
+    );
+  };
+
+  const renderAvailableTimeManagement = () => (
+    <View>
+      <Text style={styles.emptyText}>
+        가능 시간 입력 기능은 다음 단계에서 추가할 예정입니다.
+      </Text>
+    </View>
+  );
+
+  return (
+    <View style={styles.root}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Text style={styles.title}>스터디 그룹</Text>
+
+        {!userId && (
+          <Text style={styles.loginNotice}>
+            로그인 후 스터디 그룹을 생성하고 참여할 수 있습니다.
+          </Text>
+        )}
+
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tabButton, mode === "group" && styles.activeTabButton]}
+            onPress={() => setMode("group")}
+          >
+            <Text
+              style={[
+                styles.tabButtonText,
+                mode === "group" && styles.activeTabButtonText,
+              ]}
+            >
+              그룹 관리
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              mode === "schedule" && styles.activeTabButton,
+            ]}
+            onPress={() => setMode("schedule")}
+          >
+            <Text
+              style={[
+                styles.tabButtonText,
+                mode === "schedule" && styles.activeTabButtonText,
+              ]}
+            >
+              공유 일정
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              mode === "available" && styles.activeTabButton,
+            ]}
+            onPress={() => setMode("available")}
+          >
+            <Text
+              style={[
+                styles.tabButtonText,
+                mode === "available" && styles.activeTabButtonText,
+              ]}
+            >
+              가능 시간
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {mode === "group" && renderGroupManagement()}
+        {mode === "schedule" && renderScheduleManagement()}
+        {mode === "available" && renderAvailableTimeManagement()}
+      </ScrollView>
+
+      <Modal
+        visible={isDateTimeModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsDateTimeModalVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.calendarContainer}>
+            <Text style={styles.modalTitle}>
+              {dateTimeTarget === "start" ? "시작 일시 선택" : "종료 일시 선택"}
+            </Text>
+
+            <View style={styles.calendarHeader}>
+              <TouchableOpacity onPress={handlePrevMonth}>
+                <Text style={styles.monthButton}>‹</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.monthTitle}>
+                {currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월
+              </Text>
+
+              <TouchableOpacity onPress={handleNextMonth}>
+                <Text style={styles.monthButton}>›</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.weekRow}>
+              {["일", "월", "화", "수", "목", "금", "토"].map((weekDay) => (
+                <Text key={weekDay} style={styles.weekText}>
+                  {weekDay}
+                </Text>
+              ))}
+            </View>
+
+            <View>
+              {getCalendarWeeks().map((week, weekIndex) => (
+                <View key={weekIndex} style={styles.dayRow}>
+                  {week.map((day, dayIndex) => {
+                    const isSelected =
+                      tempSelectedDate &&
+                      day !== null &&
+                      tempSelectedDate.getFullYear() ===
+                        currentMonth.getFullYear() &&
+                      tempSelectedDate.getMonth() === currentMonth.getMonth() &&
+                      tempSelectedDate.getDate() === day;
+
+                    return (
+                      <TouchableOpacity
+                        key={dayIndex}
+                        style={[
+                          styles.dayBox,
+                          isSelected && styles.selectedDayBox,
+                        ]}
+                        disabled={day === null}
+                        onPress={() => {
+                          if (day !== null) {
+                            handleSelectCalendarDay(day);
+                          }
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.dayText,
+                            isSelected && styles.selectedDayText,
+                          ]}
+                        >
+                          {day || ""}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.timeSelector}>
+              <Text style={styles.timeSelectorTitle}>시간 선택</Text>
+
+              <View style={styles.timeRow}>
+                <View style={styles.timeControl}>
+                  <TouchableOpacity
+                    style={styles.timeButton}
+                    onPress={increaseHour}
+                  >
+                    <Text style={styles.timeButtonText}>＋</Text>
+                  </TouchableOpacity>
+
+                  <Text style={styles.timeValue}>
+                    {String(tempSelectedHour).padStart(2, "0")}시
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.timeButton}
+                    onPress={decreaseHour}
+                  >
+                    <Text style={styles.timeButtonText}>－</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.timeControl}>
+                  <TouchableOpacity
+                    style={styles.timeButton}
+                    onPress={increaseMinute}
+                  >
+                    <Text style={styles.timeButtonText}>＋</Text>
+                  </TouchableOpacity>
+
+                  <Text style={styles.timeValue}>
+                    {String(tempSelectedMinute).padStart(2, "0")}분
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.timeButton}
+                    onPress={decreaseMinute}
+                  >
+                    <Text style={styles.timeButtonText}>－</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={handleConfirmDateTime}
+            >
+              <Text style={styles.closeButtonText}>확인</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setIsDateTimeModalVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: "#fff",
+  },
+
+  content: {
+    padding: 20,
+    paddingBottom: 120,
   },
 
   title: {
@@ -368,6 +1044,35 @@ const styles = StyleSheet.create({
     color: "#e53e3e",
     marginBottom: 15,
     fontSize: 15,
+  },
+
+  tabContainer: {
+    flexDirection: "row",
+    marginBottom: 20,
+    backgroundColor: "#F2F2F2",
+    borderRadius: 10,
+    padding: 4,
+  },
+
+  tabButton: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+
+  activeTabButton: {
+    backgroundColor: "#4A90E2",
+  },
+
+  tabButtonText: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#777",
+  },
+
+  activeTabButtonText: {
+    color: "#fff",
   },
 
   sectionTitle: {
@@ -384,6 +1089,17 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 12,
     fontSize: 16,
+    justifyContent: "center",
+  },
+
+  selectedInputText: {
+    fontSize: 16,
+    color: "#000",
+  },
+
+  placeholderText: {
+    fontSize: 16,
+    color: "#999",
   },
 
   button: {
@@ -456,6 +1172,215 @@ const styles = StyleSheet.create({
   selectedText: {
     marginTop: 8,
     color: "#2F855A",
+    fontWeight: "bold",
+  },
+
+  selectedGroupSimpleCard: {
+    backgroundColor: "#EEF5FF",
+    borderWidth: 1,
+    borderColor: "#4A90E2",
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  selectedGroupTextBox: {
+    flex: 1,
+  },
+
+  selectedGroupSimpleLabel: {
+    fontSize: 13,
+    color: "#4A90E2",
+    fontWeight: "bold",
+    marginBottom: 4,
+  },
+
+  selectedGroupSimpleName: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#222",
+  },
+
+  changeGroupButton: {
+    borderWidth: 1,
+    borderColor: "#4A90E2",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#fff",
+  },
+
+  changeGroupButtonText: {
+    color: "#4A90E2",
+    fontWeight: "bold",
+  },
+
+  scheduleCard: {
+    backgroundColor: "#F8F8F8",
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+
+  scheduleTitle: {
+    fontSize: 17,
+    fontWeight: "bold",
+    marginBottom: 6,
+  },
+
+  modalBackground: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+
+  calendarContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    padding: 20,
+  },
+
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 15,
+  },
+
+  calendarHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+
+  monthButton: {
+    fontSize: 32,
+    fontWeight: "bold",
+    paddingHorizontal: 15,
+  },
+
+  monthTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+
+  weekRow: {
+    flexDirection: "row",
+    marginBottom: 10,
+  },
+
+  weekText: {
+    flex: 1,
+    textAlign: "center",
+    fontWeight: "bold",
+    color: "#555",
+  },
+
+  dayRow: {
+    flexDirection: "row",
+  },
+
+  dayBox: {
+    flex: 1,
+    height: 38,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 20,
+  },
+
+  selectedDayBox: {
+    backgroundColor: "#4A90E2",
+  },
+
+  dayText: {
+    fontSize: 16,
+  },
+
+  selectedDayText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+
+  timeSelector: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: "#F2F2F2",
+    borderRadius: 10,
+  },
+
+  timeSelectorTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+
+  timeRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+
+  timeControl: {
+    flex: 1,
+    alignItems: "center",
+  },
+
+  timeButton: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#4A90E2",
+    borderRadius: 8,
+    padding: 8,
+    alignItems: "center",
+  },
+
+  timeButtonText: {
+    color: "#4A90E2",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+
+  timeValue: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginVertical: 8,
+  },
+
+  closeButton: {
+    marginTop: 20,
+    backgroundColor: "#4A90E2",
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  closeButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  cancelButton: {
+    marginTop: 10,
+    backgroundColor: "#F2F2F2",
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  cancelButtonText: {
+    color: "#555",
+    fontSize: 16,
     fontWeight: "bold",
   },
 });
