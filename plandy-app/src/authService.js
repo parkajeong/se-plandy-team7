@@ -436,8 +436,13 @@ const openKakaoAuthPopup = (authUrl) => {
   });
 };
 
-export const loginWithKakao = async () => {
-  cancelAppLogout();
+export const signInWithKakaoOnly = async ({
+  cancelLogout = true,
+  persistAppUser = true,
+} = {}) => {
+  if (cancelLogout) {
+    cancelAppLogout();
+  }
 
   const restApiKey = KAKAO_REST_API_KEY;
 
@@ -498,13 +503,20 @@ export const loginWithKakao = async () => {
   const kakaoUser = await fetchKakaoUser(accessToken);
 
   await createKakaoUserDocumentIfNeeded(kakaoUser);
-  await setAppUser(kakaoUser);
+
+  if (persistAppUser) {
+    await setAppUser(kakaoUser);
+  }
 
   return kakaoUser;
 };
 
-export const loginWithGoogle = async () => {
-  cancelAppLogout();
+export const loginWithKakao = async () => signInWithKakaoOnly();
+
+export const signInWithGoogleOnly = async ({ cancelLogout = true } = {}) => {
+  if (cancelLogout) {
+    cancelAppLogout();
+  }
 
   if (isWeb) {
     const provider = new GoogleAuthProvider();
@@ -551,6 +563,8 @@ export const loginWithGoogle = async () => {
     throw error;
   }
 };
+
+export const loginWithGoogle = async () => signInWithGoogleOnly();
 
 export const loginWithGoogleIdToken = async (idToken) => {
   if (!idToken) {
