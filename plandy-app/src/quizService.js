@@ -175,6 +175,15 @@ export const getQuizResultsByUser = async (userId) => {
   return results;
 };
 
+export const fetchQuizResultsBySubject = async (userId, subjectId) => {
+  const quizzes = await fetchQuizzesBySubject(userId, subjectId);
+  if (!quizzes.length) return [];
+
+  const quizIdSet = new Set(quizzes.map((q) => q.id));
+  const allResults = await getQuizResultsByUser(userId);
+  return allResults.filter((r) => quizIdSet.has(r.quiz_id));
+};
+
 export const createQuiz = async ({ userId, subjectId, title, questions }) => {
   const docRef = doc(collection(db, "quizzes"));
 

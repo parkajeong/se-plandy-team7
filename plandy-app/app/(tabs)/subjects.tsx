@@ -16,6 +16,8 @@ import {
   updateSubjectGoal,
   deleteSubject,
 } from "@/src/subjectService";
+import { fetchTodosBySubject } from "@/src/todoService";
+import { fetchQuizResultsBySubject } from "@/src/quizService";
 
 type Subject = {
   id: string;
@@ -40,10 +42,55 @@ export default function SubjectsScreen() {
 
   const userId = getCurrentAppUserIdOrNull();
 
+  const calculateProgress = async (subjectId: string): Promise<number> => {
+    if (!userId) return 0;
+    const [todos, quizResults] = await Promise.all([
+      fetchTodosBySubject(userId, subjectId),
+      fetchQuizResultsBySubject(userId, subjectId),
+    ]);
+
+    const todoRate =
+      todos.length > 0
+        ? (todos.filter((t: any) => t.is_completed).length / todos.length) * 100
+        : 0;
+
+    let quizRate = 0;
+    if (quizResults.length > 0) {
+      const latestByQuiz = new Map<string, any>();
+      quizResults.forEach((r: any) => {
+        const existing = latestByQuiz.get(r.quiz_id);
+        const rTime = r.solved_at?.toDate?.()?.getTime?.() ?? 0;
+        const existingTime = existing?.solved_at?.toDate?.()?.getTime?.() ?? 0;
+        if (!existing || rTime > existingTime) {
+          latestByQuiz.set(r.quiz_id, r);
+        }
+      });
+      const latestResults = Array.from(latestByQuiz.values());
+      const sum = latestResults.reduce((acc: number, r: any) => {
+        const rate =
+          typeof r.correct_rate === "number"
+            ? r.correct_rate
+            : r.total_count > 0
+            ? Math.round((r.score / r.total_count) * 100)
+            : 0;
+        return acc + rate;
+      }, 0);
+      quizRate = sum / latestResults.length;
+    }
+
+    return Math.round(todoRate * 0.6 + quizRate * 0.4);
+  };
+
   const loadSubjects = async () => {
     if (!userId) return;
     const data = await getSubjects(userId);
-    setSubjects(data as Subject[]);
+    const subjectsWithProgress = await Promise.all(
+      (data as Subject[]).map(async (subject) => ({
+        ...subject,
+        progress: await calculateProgress(subject.id),
+      }))
+    );
+    setSubjects(subjectsWithProgress);
   };
 
   useEffect(() => {
