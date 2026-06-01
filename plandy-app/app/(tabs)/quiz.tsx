@@ -25,6 +25,7 @@ import {
   fetchNotesBySubject,
   fetchQuizzesBySubject,
   getQuizErrorMessage,
+  getQuizResultsByUser,
 } from "@/src/quizService";
 import { getSubjects } from "@/src/subjectService";
 
@@ -74,6 +75,7 @@ export default function QuizScreen() {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [quizResults, setQuizResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [isNoteModalVisible, setIsNoteModalVisible] = useState(false);
@@ -158,6 +160,26 @@ export default function QuizScreen() {
     [selectedSubject, userId]
   );
 
+  const loadQuizResults = useCallback(async () => {
+    if (!userId) {
+      setQuizResults([]);
+      return;
+    }
+
+    try {
+      const results = await getQuizResultsByUser(userId);
+      const sortedResults = [...results].sort((a, b) => {
+        const aTime = a.solved_at?.toDate?.()?.getTime?.() || 0;
+        const bTime = b.solved_at?.toDate?.()?.getTime?.() || 0;
+        return bTime - aTime;
+      });
+      setQuizResults(sortedResults);
+    } catch (error: any) {
+      console.error("[quiz] quiz results load failed", error);
+      setQuizResults([]);
+    }
+  }, [userId]);
+
   useEffect(() => {
     const unsubscribeFirebase = onAuthStateChanged(auth, syncUserId);
     const unsubscribeAppUser = subscribeAppUserChange(syncUserId);
@@ -172,7 +194,8 @@ export default function QuizScreen() {
 
   useEffect(() => {
     loadSubjects();
-  }, [loadSubjects]);
+    loadQuizResults();
+  }, [loadSubjects, loadQuizResults]);
 
   useFocusEffect(
     useCallback(() => {
@@ -180,7 +203,8 @@ export default function QuizScreen() {
       syncUserId();
       loadSubjects();
       loadSubjectData();
-    }, [loadSubjectData, loadSubjects, syncUserId])
+      loadQuizResults();
+    }, [loadSubjectData, loadSubjects, loadQuizResults, syncUserId])
   );
 
   const handleSelectSubject = async (subject: Subject) => {
@@ -248,6 +272,49 @@ export default function QuizScreen() {
     }
   };
 
+  const quizResultStats = React.useMemo(() => {
+    if (!quizResults.length) {
+      return null;
+    }
+
+    const rates = quizResults.map((item) => {
+      if (typeof item.correct_rate === "number") return item.correct_rate;
+      if (
+        typeof item.score === "number" &&
+        typeof item.total_count === "number" &&
+        item.total_count > 0
+      ) {
+        return Math.round((item.score / item.total_count) * 100);
+      }
+      return 0;
+    });
+
+    const averageRate = Math.round(
+      rates.reduce((sum, rate) => sum + rate, 0) / rates.length
+    );
+
+    return {
+      totalCount: quizResults.length,
+      averageRate,
+      recentRate: rates[0] ?? 0,
+      recentResults: quizResults.slice(0, 3).map((item) => ({
+        id: item.id,
+        correct_rate:
+          typeof item.correct_rate === "number"
+            ? item.correct_rate
+            : Math.round(
+                (item.score / Math.max(1, item.total_count)) * 100
+              ),
+        solvedAt:
+          item.solved_at?.toDate?.()?.toLocaleDateString?.("ko-KR", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }) || "-",
+      })),
+    };
+  }, [quizResults]);
+
   return (
     <View style={styles.container}>
       <View style={styles.titleRow}>
@@ -267,6 +334,40 @@ export default function QuizScreen() {
         onOpen={loadSubjects}
         onSelect={(subject) => handleSelectSubject(subject as Subject)}
       />
+
+      {userId && (
+        <View style={styles.statsCard}>
+          <Text style={styles.statsTitle}>내 퀴즈 풀이 통계</Text>
+          {quizResultStats ? (
+            <>
+              <View style={styles.statsRow}>
+                <Text style={styles.statsLabel}>총 풀이 횟수</Text>
+                <Text style={styles.statsValue}>{quizResultStats.totalCount}회</Text>
+              </View>
+              <View style={styles.statsRow}>
+                <Text style={styles.statsLabel}>평균 정답률</Text>
+                <Text style={styles.statsValue}>{quizResultStats.averageRate}%</Text>
+              </View>
+              <View style={styles.statsRow}>
+                <Text style={styles.statsLabel}>최근 정답률</Text>
+                <Text style={styles.statsValue}>{quizResultStats.recentRate}%</Text>
+              </View>
+              {quizResultStats.recentResults.length > 0 && (
+                <View style={styles.recentList}>
+                  {quizResultStats.recentResults.map((item) => (
+                    <View key={item.id} style={styles.recentItem}>
+                      <Text style={styles.recentText}>{item.solvedAt}</Text>
+                      <Text style={styles.recentRateText}>{item.correct_rate}%</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </>
+          ) : (
+            <Text style={styles.emptyText}>아직 풀이 기록이 없습니다.</Text>
+          )}
+        </View>
+      )}
 
       {userId && subjects.length === 0 && (
         <Text style={styles.notice}>먼저 과목을 등록하세요.</Text>
@@ -426,6 +527,54 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: "800",
     color: "#1E3A5F",
+  },
+  statsCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 16,
+    marginBottom: 16,
+  },
+  statsTitle: {
+    color: "#1E3A5F",
+    fontSize: 15,
+    fontWeight: "800",
+    marginBottom: 10,
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  statsLabel: {
+    color: "#475569",
+    fontSize: 13,
+  },
+  statsValue: {
+    color: "#1E3A5F",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  recentList: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#e2e8f0",
+    paddingTop: 10,
+  },
+  recentItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  recentText: {
+    color: "#475569",
+    fontSize: 13,
+  },
+  recentRateText: {
+    color: "#2563EB",
+    fontSize: 13,
+    fontWeight: "700",
   },
   notice: {
     color: "#9a3412",
