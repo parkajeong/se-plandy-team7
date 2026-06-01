@@ -107,6 +107,8 @@ export default function StudyGroupScreen() {
   );
   const [editingScheduleTitle, setEditingScheduleTitle] = useState("");
 
+  const [isGroupModalVisible, setIsGroupModalVisible] = useState(false);
+
   const [isDateTimeModalVisible, setIsDateTimeModalVisible] = useState(false);
   const [dateTimeTarget, setDateTimeTarget] =
     useState<DateTimeTarget>("availableStart");
@@ -355,7 +357,10 @@ export default function StudyGroupScreen() {
 
     if (!date) return "";
 
-    return `${formatDate(date)} ${formatTime(date.getHours(), date.getMinutes())}`;
+    return `${formatDate(date)} ${formatTime(
+      date.getHours(),
+      date.getMinutes()
+    )}`;
   };
 
   const getSortedSchedules = () => {
@@ -568,7 +573,6 @@ export default function StudyGroupScreen() {
 
   const handleSelectGroup = (group: StudyGroup) => {
     setSelectedGroup(group);
-    setMode("available");
   };
 
   const handleStartEditGroup = (group: StudyGroup) => {
@@ -685,7 +689,9 @@ export default function StudyGroupScreen() {
     try {
       const groupRef = doc(db, "study_groups", group.id);
 
-      const updatedMembers = group.members.filter((memberId) => memberId !== userId);
+      const updatedMembers = group.members.filter(
+        (memberId) => memberId !== userId
+      );
 
       const updatedAvailableTimes = {
         ...(group.available_times || {}),
@@ -1231,23 +1237,26 @@ export default function StudyGroupScreen() {
     );
   };
 
-  const renderSelectedGroupSimpleCard = () => {
-    if (!selectedGroup) return null;
-
+  const renderGroupSelector = () => {
     return (
-      <View style={styles.selectedGroupSimpleCard}>
-        <View style={styles.selectedGroupTextBox}>
-          <Text style={styles.selectedGroupSimpleLabel}>선택한 그룹</Text>
-          <Text style={styles.selectedGroupSimpleName}>
-            {selectedGroup.name}
-          </Text>
-        </View>
+      <View style={styles.groupSelectorBox}>
+        <Text style={styles.groupSelectorLabel}>스터디 그룹 선택</Text>
 
         <TouchableOpacity
-          style={styles.changeGroupButton}
-          onPress={() => setMode("group")}
+          style={styles.groupSelectButton}
+          onPress={() => setIsGroupModalVisible(true)}
         >
-          <Text style={styles.changeGroupButtonText}>다시 선택</Text>
+          <Text
+            style={
+              selectedGroup
+                ? styles.groupSelectButtonText
+                : styles.groupSelectPlaceholder
+            }
+          >
+            {selectedGroup
+              ? `선택한 그룹 : ${selectedGroup.name}`
+              : "스터디 그룹을 선택해주세요"}
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -1339,7 +1348,7 @@ export default function StudyGroupScreen() {
                     {isHost && <Text style={styles.hostText}>내가 만든 그룹</Text>}
 
                     {isSelected && (
-                      <Text style={styles.selectedText}>선택된 그룹</Text>
+                      <Text style={styles.selectedText}>현재 선택된 그룹</Text>
                     )}
                   </TouchableOpacity>
 
@@ -1379,257 +1388,258 @@ export default function StudyGroupScreen() {
   );
 
   const renderAvailableTimeManagement = () => {
-    if (!selectedGroup) {
-      return (
-        <View>
-          <Text style={styles.emptyText}>
-            그룹 관리 탭에서 스터디 그룹을 먼저 선택해주세요.
-          </Text>
-        </View>
-      );
-    }
-
     const availableTimeList = getAvailableTimeList();
 
     return (
       <View>
-        {renderSelectedGroupSimpleCard()}
+        {renderGroupSelector()}
 
-        <Text style={styles.sectionTitle}>
-          {editingAvailableTimeId ? "가능 시간 수정" : "내 가능 시간 입력"}
-        </Text>
-
-        <TouchableOpacity
-          style={styles.input}
-          onPress={() => openDateTimeModal("availableStart")}
-        >
-          <Text
-            style={
-              availableStartDate
-                ? styles.selectedInputText
-                : styles.placeholderText
-            }
-          >
-            {availableStartDate
-              ? `시작: ${formatDateTime(availableStartDate)}`
-              : "가능한 시작 일시 선택"}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.input}
-          onPress={() => openDateTimeModal("availableEnd")}
-        >
-          <Text
-            style={
-              availableEndDate
-                ? styles.selectedInputText
-                : styles.placeholderText
-            }
-          >
-            {availableEndDate
-              ? `종료: ${formatDateTime(availableEndDate)}`
-              : "가능한 종료 일시 선택"}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.button} onPress={handleSaveAvailableTime}>
-          <Text style={styles.buttonText}>
-            {editingAvailableTimeId ? "가능 시간 수정하기" : "가능 시간 등록하기"}
-          </Text>
-        </TouchableOpacity>
-
-        {editingAvailableTimeId && (
-          <TouchableOpacity
-            style={styles.grayButton}
-            onPress={handleCancelEditAvailableTime}
-          >
-            <Text style={styles.grayButtonText}>수정 취소</Text>
-          </TouchableOpacity>
-        )}
-
-        <Text style={styles.sectionTitle}>멤버 가능 시간 목록</Text>
-
-        {availableTimeList.length === 0 ? (
-          <Text style={styles.emptyText}>등록된 가능 시간이 없습니다.</Text>
-        ) : (
-          availableTimeList.map((time) => (
-            <View key={time.id} style={styles.scheduleCard}>
-              <Text style={styles.scheduleTitle}>{time.user_name}</Text>
-
-              <Text style={styles.groupInfo}>
-                시작: {formatDateTime(time.start_time)}
-              </Text>
-
-              <Text style={styles.groupInfo}>
-                종료: {formatDateTime(time.end_time)}
-              </Text>
-
-              {time.user_id === userId && (
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={styles.smallOutlineButton}
-                    onPress={() => handleStartEditAvailableTime(time)}
-                  >
-                    <Text style={styles.smallOutlineButtonText}>수정</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.smallDangerButton}
-                    onPress={() => handleDeleteAvailableTime(time)}
-                  >
-                    <Text style={styles.smallDangerButtonText}>삭제</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          ))
-        )}
-      </View>
-    );
-  };
-
-  const renderRecommendManagement = () => {
-    if (!selectedGroup) {
-      return (
-        <View>
+        {!selectedGroup ? (
           <Text style={styles.emptyText}>
-            그룹 관리 탭에서 스터디 그룹을 먼저 선택해주세요.
-          </Text>
-        </View>
-      );
-    }
-
-    const recommendations = getRecommendedTimes();
-    const sortedSchedules = getSortedSchedules();
-
-    return (
-      <View>
-        {renderSelectedGroupSimpleCard()}
-
-        <Text style={styles.sectionTitle}>스터디 일정명</Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="예: 알고리즘 스터디 1회차"
-          value={scheduleTitle}
-          onChangeText={setScheduleTitle}
-        />
-
-        <Text style={styles.sectionTitle}>추천 시간</Text>
-
-        {recommendations.length === 0 ? (
-          <Text style={styles.emptyText}>
-            아직 2명 이상 겹치는 가능 시간이 없습니다.
+            가능 시간을 입력할 스터디 그룹을 선택해주세요.
           </Text>
         ) : (
-          recommendations.map((recommendation, index) => (
-            <View key={recommendation.id} style={styles.recommendCard}>
-              <Text style={styles.recommendTitle}>추천 시간 {index + 1}</Text>
+          <>
+            <Text style={styles.sectionTitle}>
+              {editingAvailableTimeId ? "가능 시간 수정" : "내 가능 시간 입력"}
+            </Text>
 
-              <Text style={styles.groupInfo}>
-                시작: {formatDateTime(recommendation.start_time)}
-              </Text>
-
-              <Text style={styles.groupInfo}>
-                종료: {formatDateTime(recommendation.end_time)}
-              </Text>
-
-              <Text style={styles.groupInfo}>
-                가능 인원: {recommendation.participant_count}명
-              </Text>
-
-              <Text style={styles.groupInfo}>
-                가능 멤버: {recommendation.participants.join(", ")}
-              </Text>
-
-              <TouchableOpacity
-                style={styles.button}
-                onPress={() =>
-                  handleRegisterRecommendedSchedule(recommendation)
+            <TouchableOpacity
+              style={styles.input}
+              onPress={() => openDateTimeModal("availableStart")}
+            >
+              <Text
+                style={
+                  availableStartDate
+                    ? styles.selectedInputText
+                    : styles.placeholderText
                 }
               >
-                <Text style={styles.buttonText}>이 시간으로 일정 등록</Text>
+                {availableStartDate
+                  ? `시작: ${formatDateTime(availableStartDate)}`
+                  : "가능한 시작 일시 선택"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.input}
+              onPress={() => openDateTimeModal("availableEnd")}
+            >
+              <Text
+                style={
+                  availableEndDate
+                    ? styles.selectedInputText
+                    : styles.placeholderText
+                }
+              >
+                {availableEndDate
+                  ? `종료: ${formatDateTime(availableEndDate)}`
+                  : "가능한 종료 일시 선택"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleSaveAvailableTime}
+            >
+              <Text style={styles.buttonText}>
+                {editingAvailableTimeId
+                  ? "가능 시간 수정하기"
+                  : "가능 시간 등록하기"}
+              </Text>
+            </TouchableOpacity>
+
+            {editingAvailableTimeId && (
+              <TouchableOpacity
+                style={styles.grayButton}
+                onPress={handleCancelEditAvailableTime}
+              >
+                <Text style={styles.grayButtonText}>수정 취소</Text>
               </TouchableOpacity>
-            </View>
-          ))
-        )}
+            )}
 
-        <Text style={styles.sectionTitle}>등록된 스터디 일정</Text>
+            <Text style={styles.sectionTitle}>멤버 가능 시간 목록</Text>
 
-        {sortedSchedules.length === 0 ? (
-          <Text style={styles.emptyText}>등록된 스터디 일정이 없습니다.</Text>
-        ) : (
-          sortedSchedules.map((schedule) => (
-            <View key={schedule.id} style={styles.scheduleCard}>
-              {editingScheduleId === schedule.id ? (
-                <>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="스터디 일정명"
-                    value={editingScheduleTitle}
-                    onChangeText={setEditingScheduleTitle}
-                  />
-
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity
-                      style={styles.smallOutlineButton}
-                      onPress={() => handleUpdateScheduleTitle(schedule)}
-                    >
-                      <Text style={styles.smallOutlineButtonText}>저장</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.smallDangerButton}
-                      onPress={handleCancelEditSchedule}
-                    >
-                      <Text style={styles.smallDangerButtonText}>취소</Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.scheduleTitle}>{schedule.title}</Text>
+            {availableTimeList.length === 0 ? (
+              <Text style={styles.emptyText}>등록된 가능 시간이 없습니다.</Text>
+            ) : (
+              availableTimeList.map((time) => (
+                <View key={time.id} style={styles.scheduleCard}>
+                  <Text style={styles.scheduleTitle}>{time.user_name}</Text>
 
                   <Text style={styles.groupInfo}>
-                    등록자: {schedule.created_by_name || "알 수 없음"}
+                    시작: {formatDateTime(time.start_time)}
                   </Text>
 
                   <Text style={styles.groupInfo}>
-                    시작: {formatDateTime(schedule.start_time)}
+                    종료: {formatDateTime(time.end_time)}
                   </Text>
 
-                  <Text style={styles.groupInfo}>
-                    종료: {formatDateTime(schedule.end_time)}
-                  </Text>
-
-                  {schedule.participant_count && (
-                    <Text style={styles.groupInfo}>
-                      추천 가능 인원: {schedule.participant_count}명
-                    </Text>
-                  )}
-
-                  {schedule.created_by === userId && (
+                  {time.user_id === userId && (
                     <View style={styles.actionRow}>
                       <TouchableOpacity
                         style={styles.smallOutlineButton}
-                        onPress={() => handleStartEditSchedule(schedule)}
+                        onPress={() => handleStartEditAvailableTime(time)}
                       >
                         <Text style={styles.smallOutlineButtonText}>수정</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
                         style={styles.smallDangerButton}
-                        onPress={() => handleDeleteSchedule(schedule)}
+                        onPress={() => handleDeleteAvailableTime(time)}
                       >
                         <Text style={styles.smallDangerButtonText}>삭제</Text>
                       </TouchableOpacity>
                     </View>
                   )}
-                </>
-              )}
-            </View>
-          ))
+                </View>
+              ))
+            )}
+          </>
+        )}
+      </View>
+    );
+  };
+
+  const renderRecommendManagement = () => {
+    const recommendations = getRecommendedTimes();
+    const sortedSchedules = getSortedSchedules();
+
+    return (
+      <View>
+        {renderGroupSelector()}
+
+        {!selectedGroup ? (
+          <Text style={styles.emptyText}>
+            일정을 추천받을 스터디 그룹을 선택해주세요.
+          </Text>
+        ) : (
+          <>
+            <Text style={styles.sectionTitle}>스터디 일정명</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="예: 알고리즘 스터디 1회차"
+              value={scheduleTitle}
+              onChangeText={setScheduleTitle}
+            />
+
+            <Text style={styles.sectionTitle}>추천 시간</Text>
+
+            {recommendations.length === 0 ? (
+              <Text style={styles.emptyText}>
+                아직 2명 이상 겹치는 가능 시간이 없습니다.
+              </Text>
+            ) : (
+              recommendations.map((recommendation, index) => (
+                <View key={recommendation.id} style={styles.recommendCard}>
+                  <Text style={styles.recommendTitle}>추천 시간 {index + 1}</Text>
+
+                  <Text style={styles.groupInfo}>
+                    시작: {formatDateTime(recommendation.start_time)}
+                  </Text>
+
+                  <Text style={styles.groupInfo}>
+                    종료: {formatDateTime(recommendation.end_time)}
+                  </Text>
+
+                  <Text style={styles.groupInfo}>
+                    가능 인원: {recommendation.participant_count}명
+                  </Text>
+
+                  <Text style={styles.groupInfo}>
+                    가능 멤버: {recommendation.participants.join(", ")}
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.button}
+                    onPress={() =>
+                      handleRegisterRecommendedSchedule(recommendation)
+                    }
+                  >
+                    <Text style={styles.buttonText}>이 시간으로 일정 등록</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+
+            <Text style={styles.sectionTitle}>등록된 스터디 일정</Text>
+
+            {sortedSchedules.length === 0 ? (
+              <Text style={styles.emptyText}>등록된 스터디 일정이 없습니다.</Text>
+            ) : (
+              sortedSchedules.map((schedule) => (
+                <View key={schedule.id} style={styles.scheduleCard}>
+                  {editingScheduleId === schedule.id ? (
+                    <>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="스터디 일정명"
+                        value={editingScheduleTitle}
+                        onChangeText={setEditingScheduleTitle}
+                      />
+
+                      <View style={styles.actionRow}>
+                        <TouchableOpacity
+                          style={styles.smallOutlineButton}
+                          onPress={() => handleUpdateScheduleTitle(schedule)}
+                        >
+                          <Text style={styles.smallOutlineButtonText}>저장</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.smallDangerButton}
+                          onPress={handleCancelEditSchedule}
+                        >
+                          <Text style={styles.smallDangerButtonText}>취소</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.scheduleTitle}>{schedule.title}</Text>
+
+                      <Text style={styles.groupInfo}>
+                        등록자: {schedule.created_by_name || "알 수 없음"}
+                      </Text>
+
+                      <Text style={styles.groupInfo}>
+                        시작: {formatDateTime(schedule.start_time)}
+                      </Text>
+
+                      <Text style={styles.groupInfo}>
+                        종료: {formatDateTime(schedule.end_time)}
+                      </Text>
+
+                      {schedule.participant_count && (
+                        <Text style={styles.groupInfo}>
+                          추천 가능 인원: {schedule.participant_count}명
+                        </Text>
+                      )}
+
+                      {schedule.created_by === userId && (
+                        <View style={styles.actionRow}>
+                          <TouchableOpacity
+                            style={styles.smallOutlineButton}
+                            onPress={() => handleStartEditSchedule(schedule)}
+                          >
+                            <Text style={styles.smallOutlineButtonText}>수정</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={styles.smallDangerButton}
+                            onPress={() => handleDeleteSchedule(schedule)}
+                          >
+                            <Text style={styles.smallDangerButtonText}>삭제</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </>
+                  )}
+                </View>
+              ))
+            )}
+          </>
         )}
       </View>
     );
@@ -1708,6 +1718,53 @@ export default function StudyGroupScreen() {
         {mode === "available" && renderAvailableTimeManagement()}
         {mode === "recommend" && renderRecommendManagement()}
       </ScrollView>
+
+      <Modal
+        visible={isGroupModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsGroupModalVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.groupModalContainer}>
+            <Text style={styles.modalTitle}>스터디 그룹 선택</Text>
+
+            {groups.length === 0 ? (
+              <Text style={styles.emptyText}>
+                참여 중인 스터디 그룹이 없습니다.
+              </Text>
+            ) : (
+              groups.map((group) => {
+                const isSelected = selectedGroup?.id === group.id;
+
+                return (
+                  <TouchableOpacity
+                    key={group.id}
+                    style={styles.groupModalItem}
+                    onPress={() => {
+                      setSelectedGroup(group);
+                      setIsGroupModalVisible(false);
+                    }}
+                  >
+                    <Text style={styles.groupModalItemText}>{group.name}</Text>
+
+                    {isSelected && (
+                      <Text style={styles.groupModalSelectedText}>선택됨</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })
+            )}
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setIsGroupModalVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={isDateTimeModalVisible}
@@ -2020,46 +2077,57 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
-  selectedGroupSimpleCard: {
-    backgroundColor: "#EEF5FF",
-    borderWidth: 1,
-    borderColor: "#4A90E2",
-    borderRadius: 12,
-    padding: 15,
+  groupSelectorBox: {
     marginBottom: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
   },
 
-  selectedGroupTextBox: {
-    flex: 1,
-  },
-
-  selectedGroupSimpleLabel: {
-    fontSize: 13,
-    color: "#4A90E2",
+  groupSelectorLabel: {
+    fontSize: 17,
     fontWeight: "bold",
-    marginBottom: 4,
+    marginBottom: 10,
   },
 
-  selectedGroupSimpleName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#222",
-  },
-
-  changeGroupButton: {
+  groupSelectButton: {
     borderWidth: 1,
-    borderColor: "#4A90E2",
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    borderColor: "#ccc",
+    borderRadius: 10,
+    padding: 15,
     backgroundColor: "#fff",
   },
 
-  changeGroupButtonText: {
+  groupSelectButtonText: {
+    fontSize: 16,
+    color: "#000",
+  },
+
+  groupSelectPlaceholder: {
+    fontSize: 16,
+    color: "#999",
+  },
+
+  groupModalContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    padding: 20,
+  },
+
+  groupModalItem: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  groupModalItemText: {
+    fontSize: 16,
+    color: "#222",
+  },
+
+  groupModalSelectedText: {
+    fontSize: 13,
     color: "#4A90E2",
     fontWeight: "bold",
   },
