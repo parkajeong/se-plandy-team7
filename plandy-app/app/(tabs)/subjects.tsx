@@ -44,6 +44,12 @@ type TrendPoint = {
   count: number;
 };
 
+type StudyAmountChartItem = {
+  subjectId: string;
+  subjectTitle: string;
+  value: number;
+};
+
 type ProgressSummary = {
   totalSubjectCount: number;
   totalTodoCount: number;
@@ -114,42 +120,101 @@ function SummaryCard({ summary }: { summary: ProgressSummary }) {
 function BarChart({
   title,
   data,
-  valueKey,
-  suffix = "",
 }: {
   title: string;
-  data: SubjectProgress[];
-  valueKey: "studyAmount" | "completionRate";
-  suffix?: string;
+  data: StudyAmountChartItem[];
 }) {
-  const chartData = data.filter((item) =>
-    valueKey === "completionRate" ? item.todoCount > 0 : item.studyAmount > 0
-  );
-  const maxValue = Math.max(...chartData.map((item) => item[valueKey]), 1);
-  const visibleData = chartData.slice(0, 8);
+  const { width } = useWindowDimensions();
+  const chartWidth = Math.max(width - 32, 280);
+  const chartHeight = 240;
+  const leftPadding = 34;
+  const rightPadding = 14;
+  const topPadding = 22;
+  const bottomPadding = 46;
+  const plotWidth = chartWidth - leftPadding - rightPadding;
+  const plotHeight = chartHeight - topPadding - bottomPadding;
+  const visibleData = data.slice(0, 8);
+  const maxValue = Math.max(...visibleData.map((item) => item.value), 1);
+  const slotWidth = visibleData.length > 0 ? plotWidth / visibleData.length : plotWidth;
+  const barWidth = Math.max(Math.min(slotWidth * 0.56, 44), 22);
 
   return (
     <View style={styles.chartBlock}>
       <Text style={styles.chartTitle}>{title}</Text>
       {visibleData.length === 0 ? (
-        <Text style={styles.chartEmptyText}>표시할 데이터가 없습니다.</Text>
+        <Text style={styles.chartEmptyText}>
+          과목, 할 일, 노트를 추가하면 학습량 그래프를 확인할 수 있습니다.
+        </Text>
       ) : (
-        <View style={styles.barChart}>
-          {visibleData.map((item) => {
-            const value = item[valueKey];
-            const heightPercent =
-              value === 0 ? 0 : Math.max((value / maxValue) * 100, 6);
-
+        <View style={[styles.barChart, { width: chartWidth, height: chartHeight }]}>
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+            const y = topPadding + plotHeight - plotHeight * ratio;
+            const label = Math.round(maxValue * ratio);
             return (
-              <View key={item.subjectId} style={styles.barItem}>
-                <Text style={styles.barValue}>
-                  {value}
-                  {suffix}
+              <View key={ratio} style={[styles.gridLine, { top: y }]}>
+                <Text style={styles.yAxisLabel}>{label}</Text>
+                <View style={styles.gridRule} />
+              </View>
+            );
+          })}
+
+          <View
+            style={[
+              styles.yAxisLine,
+              { left: leftPadding, top: topPadding, height: plotHeight },
+            ]}
+          />
+          <View
+            style={[
+              styles.xAxisLine,
+              {
+                left: leftPadding,
+                right: rightPadding,
+                top: topPadding + plotHeight,
+              },
+            ]}
+          />
+
+          {visibleData.map((item, index) => {
+            const barHeight =
+              item.value === 0 ? 0 : Math.max((item.value / maxValue) * plotHeight, 8);
+            const left = leftPadding + slotWidth * index + (slotWidth - barWidth) / 2;
+            return (
+              <View key={item.subjectId}>
+                <Text
+                  style={[
+                    styles.barValue,
+                    {
+                      left: left - 8,
+                      top: topPadding + plotHeight - barHeight - 20,
+                      width: barWidth + 16,
+                    },
+                  ]}
+                >
+                  {item.value}
                 </Text>
-                <View style={styles.barTrack}>
-                  <View style={[styles.barFill, { height: `${heightPercent}%` }]} />
-                </View>
-                <Text numberOfLines={1} style={styles.barLabel}>
+                <View
+                  style={[
+                    styles.barFill,
+                    {
+                      left,
+                      top: topPadding + plotHeight - barHeight,
+                      width: barWidth,
+                      height: barHeight,
+                    },
+                  ]}
+                />
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.barLabel,
+                    {
+                      left: left - 14,
+                      top: topPadding + plotHeight + 10,
+                      width: barWidth + 28,
+                    },
+                  ]}
+                >
                   {shortenLabel(item.subjectTitle)}
                 </Text>
               </View>
@@ -161,15 +226,65 @@ function BarChart({
   );
 }
 
+function SubjectCompletionBars({
+  title,
+  data,
+}: {
+  title: string;
+  data: SubjectProgress[];
+}) {
+  const hasTodos = data.some((item) => item.todoCount > 0);
+
+  return (
+    <View style={styles.chartBlock}>
+      <Text style={styles.chartTitle}>{title}</Text>
+      {!hasTodos ? (
+        <Text style={styles.chartEmptyText}>
+          아직 등록된 할 일이 없어 완료율을 표시할 수 없습니다.
+        </Text>
+      ) : (
+        <View style={styles.completionList}>
+          {data.map((item) => {
+            const completionRate = Math.min(
+              Math.max(Math.round(item.completionRate), 0),
+              100
+            );
+            return (
+              <View key={item.subjectId} style={styles.completionRow}>
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={styles.completionSubject}
+                >
+                  {item.subjectTitle}
+                </Text>
+                <View style={styles.completionBarOuter}>
+                  <View
+                    style={[
+                      styles.completionBarInner,
+                      { width: `${completionRate}%` as `${number}%` },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.completionPercent}>{completionRate}%</Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
 function LineChart({ title, data }: { title: string; data: TrendPoint[] }) {
   const { width } = useWindowDimensions();
-  const chartWidth = Math.max(Math.min(width - 96, 640), 220);
-  const chartHeight = 160;
+  const chartWidth = Math.max(width - 32, 280);
+  const chartHeight = 230;
   const maxValue = Math.max(...data.map((item) => item.count), 1);
-  const leftPadding = 18;
-  const rightPadding = 12;
-  const topPadding = 16;
-  const bottomPadding = 28;
+  const leftPadding = 34;
+  const rightPadding = 16;
+  const topPadding = 22;
+  const bottomPadding = 44;
   const plotWidth = chartWidth - leftPadding - rightPadding;
   const plotHeight = chartHeight - topPadding - bottomPadding;
 
@@ -184,12 +299,32 @@ function LineChart({ title, data }: { title: string; data: TrendPoint[] }) {
   return (
     <View style={styles.chartBlock}>
       <Text style={styles.chartTitle}>{title}</Text>
-      {data.length === 0 ? (
-        <Text style={styles.chartEmptyText}>표시할 데이터가 없습니다.</Text>
+      {data.length <= 1 ? (
+        <Text style={styles.chartEmptyText}>
+          완료된 할 일이 생기면 학습 진척도 변화를 확인할 수 있습니다.
+        </Text>
       ) : (
         <View style={[styles.lineChart, { width: chartWidth, height: chartHeight }]}>
-          <Text style={styles.yAxisMax}>{maxValue}</Text>
-          <View style={styles.lineAxis} />
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+            const y = topPadding + plotHeight - plotHeight * ratio;
+            return (
+              <View key={ratio} style={[styles.lineGridLine, { top: y }]}>
+                <Text style={styles.yAxisLabel}>{Math.round(maxValue * ratio)}</Text>
+                <View
+                  style={[
+                    styles.lineGridRule,
+                    ratio === 0 && styles.lineBaseRule,
+                  ]}
+                />
+              </View>
+            );
+          })}
+          <View
+            style={[
+              styles.yAxisLine,
+              { left: leftPadding, top: topPadding, height: plotHeight },
+            ]}
+          />
           {points.slice(1).map((point, index) => (
             <View
               key={`${point.date}-${index}`}
@@ -208,10 +343,10 @@ function LineChart({ title, data }: { title: string; data: TrendPoint[] }) {
               ]}
             />
           ))}
-          <Text style={styles.lineStartLabel}>
+          <Text style={[styles.lineDateLabel, { left: leftPadding }]}>
             {data[0]?.date.slice(5).replace("-", "/")}
           </Text>
-          <Text style={styles.lineEndLabel}>
+          <Text style={[styles.lineDateLabel, { right: rightPadding }]}>
             {data[data.length - 1]?.date.slice(5).replace("-", "/")}
           </Text>
         </View>
@@ -224,6 +359,7 @@ function ProgressSection({
   isLoading,
   error,
   subjectProgress,
+  studyAmountChartData,
   trend,
   summary,
   onRetry,
@@ -231,14 +367,12 @@ function ProgressSection({
   isLoading: boolean;
   error: string | null;
   subjectProgress: SubjectProgress[];
+  studyAmountChartData: StudyAmountChartItem[];
   trend: TrendPoint[];
   summary: ProgressSummary;
   onRetry: () => void;
 }) {
-  const hasProgressData =
-    subjectProgress.some(
-      (item) => item.studyAmount > 0 || item.completedTodoCount > 0
-    ) || trend.length > 0;
+  const hasSubjects = subjectProgress.length > 0;
 
   return (
     <View style={styles.progressSection}>
@@ -259,23 +393,15 @@ function ProgressSection({
             <Text style={styles.retryButtonText}>다시 시도</Text>
           </TouchableOpacity>
         </View>
-      ) : !hasProgressData ? (
+      ) : !hasSubjects ? (
         <View style={styles.progressState}>
-          <Text style={styles.emptyTitle}>아직 표시할 학습 데이터가 없습니다.</Text>
-          <Text style={styles.emptyDescription}>
-            과목, 할 일, 노트를 추가하면 학습 진척도를 확인할 수 있습니다.
-          </Text>
+          <Text style={styles.emptyTitle}>아직 등록된 과목이 없습니다.</Text>
         </View>
       ) : (
         <>
           <SummaryCard summary={summary} />
-          <BarChart title="과목별 학습량" data={subjectProgress} valueKey="studyAmount" />
-          <BarChart
-            title="과목별 완료율"
-            data={subjectProgress}
-            valueKey="completionRate"
-            suffix="%"
-          />
+          <BarChart title="과목별 학습량" data={studyAmountChartData} />
+          <SubjectCompletionBars title="과목별 완료율" data={subjectProgress} />
           <LineChart title="전체 학습 진척도" data={trend} />
         </>
       )}
@@ -292,6 +418,9 @@ export default function SubjectsScreen() {
   const [isProgressLoading, setIsProgressLoading] = useState(false);
   const [progressError, setProgressError] = useState<string | null>(null);
   const [subjectProgress, setSubjectProgress] = useState<SubjectProgress[]>([]);
+  const [studyAmountChartData, setStudyAmountChartData] = useState<
+    StudyAmountChartItem[]
+  >([]);
   const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [summary, setSummary] = useState<ProgressSummary>(emptySummary);
 
@@ -310,6 +439,7 @@ export default function SubjectsScreen() {
   const loadProgress = useCallback(async () => {
     if (!userId) {
       setSubjectProgress([]);
+      setStudyAmountChartData([]);
       setTrend([]);
       setSummary(emptySummary);
       return;
@@ -320,6 +450,7 @@ export default function SubjectsScreen() {
       setProgressError(null);
       const data = await fetchProgressData(userId);
       setSubjectProgress(data.subjectProgress as SubjectProgress[]);
+      setStudyAmountChartData(data.studyAmountChartData as StudyAmountChartItem[]);
       setTrend(data.trend as TrendPoint[]);
       setSummary(data.summary as ProgressSummary);
     } catch (error) {
@@ -407,6 +538,7 @@ export default function SubjectsScreen() {
         isLoading={isProgressLoading}
         error={progressError}
         subjectProgress={subjectProgress}
+        studyAmountChartData={studyAmountChartData}
         trend={trend}
         summary={summary}
         onRetry={loadProgress}
@@ -665,42 +797,92 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   barChart: {
-    height: 180,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 8,
-    paddingTop: 8,
-  },
-  barItem: {
-    flex: 1,
-    minWidth: 34,
-    alignItems: "center",
+    alignSelf: "center",
+    backgroundColor: "#f8faff",
+    borderColor: "#e2e8f0",
+    borderRadius: 10,
+    borderWidth: 1,
+    position: "relative",
   },
   barValue: {
+    position: "absolute",
     color: "#2563EB",
     fontSize: 12,
     fontWeight: "700",
-    marginBottom: 4,
-  },
-  barTrack: {
-    width: "78%",
-    height: 118,
-    borderRadius: 8,
-    backgroundColor: "#e2e8f0",
-    justifyContent: "flex-end",
-    overflow: "hidden",
+    textAlign: "center",
   },
   barFill: {
-    width: "100%",
+    position: "absolute",
     backgroundColor: "#2563EB",
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
+    borderRadius: 5,
   },
   barLabel: {
+    position: "absolute",
     color: "#64748b",
     fontSize: 11,
-    marginTop: 6,
-    maxWidth: 72,
+    textAlign: "center",
+  },
+  gridLine: {
+    position: "absolute",
+    left: 0,
+    right: 14,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  yAxisLabel: {
+    width: 28,
+    color: "#94a3b8",
+    fontSize: 10,
+    textAlign: "right",
+    marginRight: 6,
+  },
+  gridRule: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#e2e8f0",
+  },
+  yAxisLine: {
+    position: "absolute",
+    width: 1.5,
+    backgroundColor: "#94a3b8",
+  },
+  xAxisLine: {
+    position: "absolute",
+    height: 1.5,
+    backgroundColor: "#94a3b8",
+  },
+  completionList: {
+    gap: 12,
+  },
+  completionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  completionSubject: {
+    width: 92,
+    color: "#1E3A5F",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  completionBarOuter: {
+    flex: 1,
+    height: 12,
+    backgroundColor: "#e2e8f0",
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  completionBarInner: {
+    height: 12,
+    backgroundColor: "#2563EB",
+    borderRadius: 999,
+  },
+  completionPercent: {
+    width: 48,
+    color: "#2563EB",
+    fontSize: 13,
+    fontWeight: "800",
+    textAlign: "right",
   },
   lineChart: {
     alignSelf: "center",
@@ -708,22 +890,24 @@ const styles = StyleSheet.create({
     borderColor: "#e2e8f0",
     borderRadius: 10,
     borderWidth: 1,
+    position: "relative",
     overflow: "hidden",
   },
-  yAxisMax: {
+  lineGridLine: {
     position: "absolute",
-    left: 4,
-    top: 8,
-    color: "#94a3b8",
-    fontSize: 10,
+    left: 0,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
   },
-  lineAxis: {
-    position: "absolute",
-    left: 18,
-    right: 12,
-    bottom: 28,
+  lineGridRule: {
+    flex: 1,
     height: 1,
-    backgroundColor: "#cbd5e1",
+    backgroundColor: "#e2e8f0",
+  },
+  lineBaseRule: {
+    backgroundColor: "#94a3b8",
+    height: 1.5,
   },
   lineSegment: {
     position: "absolute",
@@ -740,17 +924,9 @@ const styles = StyleSheet.create({
     borderColor: "#2563EB",
     borderWidth: 2,
   },
-  lineStartLabel: {
+  lineDateLabel: {
     position: "absolute",
-    left: 18,
-    bottom: 8,
-    color: "#64748b",
-    fontSize: 11,
-  },
-  lineEndLabel: {
-    position: "absolute",
-    right: 12,
-    bottom: 8,
+    bottom: 12,
     color: "#64748b",
     fontSize: 11,
   },

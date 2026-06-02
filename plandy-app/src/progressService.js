@@ -81,11 +81,20 @@ export const calculateSubjectProgress = (subjects = [], todos = [], notes = []) 
   });
 };
 
+export const calculateStudyAmountChartData = (subjectProgressList = []) =>
+  subjectProgressList
+    .filter((item) => item.studyAmount > 0)
+    .map((item) => ({
+      subjectId: item.subjectId,
+      subjectTitle: item.subjectTitle,
+      value: item.studyAmount,
+    }));
+
 export const calculateOverallProgressTrend = (todos = []) => {
   const completedTodoDates = todos
     .filter((todo) => todo.is_completed === true)
     .map((todo) => {
-      // TODO: 추후 completed_at 필드가 추가되면 해당 필드를 기준으로 변경
+      // TODO: completed_at 필드가 추가되면 완료 날짜 기준으로 진척도 추이를 계산하도록 변경
       const completedDate = toDate(todo.deadline) || toDate(todo.created_at);
       return completedDate ? formatDateKey(completedDate) : null;
     })
@@ -131,19 +140,20 @@ export const fetchProgressData = async (userId) => {
     throw new Error("userId is required");
   }
 
-  const [subjects, todos, notes, quizResults] = await Promise.all([
+  const [subjects, todos, notes] = await Promise.all([
     fetchCollectionByUser("subjects", userId),
     fetchCollectionByUser("todos", userId),
     fetchCollectionByUser("notes", userId),
-    fetchCollectionByUser("quiz_results", userId),
   ]);
+
+  const subjectProgress = calculateSubjectProgress(subjects, todos, notes);
 
   return {
     subjects,
     todos,
     notes,
-    quizResults,
-    subjectProgress: calculateSubjectProgress(subjects, todos, notes),
+    subjectProgress,
+    studyAmountChartData: calculateStudyAmountChartData(subjectProgress),
     trend: calculateOverallProgressTrend(todos),
     summary: calculateOverallSummary(subjects, todos),
   };
