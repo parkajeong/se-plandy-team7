@@ -262,3 +262,17 @@ export async function deleteTodo(todoId) {
     throw error;
   }
 }
+
+export async function fetchTodosBySubject(userId, subjectId) {
+  const todosRef = collection(db, TODO_COLLECTION_NAME);
+  const q = query(
+    todosRef,
+    where('user_id', '==', userId),
+    where('subject_id', '==', subjectId)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({
+    id: d.id,
+    is_completed: Boolean(d.data().is_completed),
+  }));
+}

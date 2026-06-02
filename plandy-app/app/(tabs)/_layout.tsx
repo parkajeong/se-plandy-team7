@@ -151,6 +151,16 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      <Tabs.Screen
+        name="recommendation"
+        options={{
+          title: "추천",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="bulb-outline" size={size ?? 28} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
