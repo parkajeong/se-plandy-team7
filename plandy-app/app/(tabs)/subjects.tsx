@@ -409,6 +409,76 @@ function ProgressSection({
   );
 }
 
+function SubjectListHeader({
+  title,
+  goal,
+  isProgressLoading,
+  progressError,
+  subjectProgress,
+  studyAmountChartData,
+  trend,
+  summary,
+  onTitleChange,
+  onGoalChange,
+  onAdd,
+  onProgressRetry,
+}: {
+  title: string;
+  goal: string;
+  isProgressLoading: boolean;
+  progressError: string | null;
+  subjectProgress: SubjectProgress[];
+  studyAmountChartData: StudyAmountChartItem[];
+  trend: TrendPoint[];
+  summary: ProgressSummary;
+  onTitleChange: (value: string) => void;
+  onGoalChange: (value: string) => void;
+  onAdd: () => void;
+  onProgressRetry: () => void;
+}) {
+  return (
+    <>
+      <View style={styles.titleRow}>
+        <Ionicons name="book" size={28} color="#1E3A5F" />
+        <Text style={styles.pageTitle}>과목 관리</Text>
+      </View>
+
+      <View style={styles.form}>
+        <TextInput
+          style={styles.input}
+          placeholder="과목명"
+          placeholderTextColor="#94a3b8"
+          value={title}
+          onChangeText={onTitleChange}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="학습 목표 (선택)"
+          placeholderTextColor="#94a3b8"
+          value={goal}
+          onChangeText={onGoalChange}
+        />
+        <TouchableOpacity style={styles.addButton} onPress={onAdd}>
+          <Ionicons name="add-circle-outline" size={16} color="#fff" />
+          <Text style={styles.addButtonText}> 과목 추가</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ProgressSection
+        isLoading={isProgressLoading}
+        error={progressError}
+        subjectProgress={subjectProgress}
+        studyAmountChartData={studyAmountChartData}
+        trend={trend}
+        summary={summary}
+        onRetry={onProgressRetry}
+      />
+
+      <Text style={styles.listTitle}>과목 목록</Text>
+    </>
+  );
+}
+
 export default function SubjectsScreen() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [title, setTitle] = useState("");
@@ -425,45 +495,6 @@ export default function SubjectsScreen() {
   const [summary, setSummary] = useState<ProgressSummary>(emptySummary);
 
   const userId = getCurrentAppUserIdOrNull();
-
-  const calculateProgress = async (subjectId: string): Promise<number> => {
-    if (!userId) return 0;
-    const [todos, quizResults] = await Promise.all([
-      fetchTodosBySubject(userId, subjectId),
-      fetchQuizResultsBySubject(userId, subjectId),
-    ]);
-
-    const todoRate =
-      todos.length > 0
-        ? (todos.filter((t: any) => t.is_completed).length / todos.length) * 100
-        : 0;
-
-    let quizRate = 0;
-    if (quizResults.length > 0) {
-      const latestByQuiz = new Map<string, any>();
-      quizResults.forEach((r: any) => {
-        const existing = latestByQuiz.get(r.quiz_id);
-        const rTime = r.solved_at?.toDate?.()?.getTime?.() ?? 0;
-        const existingTime = existing?.solved_at?.toDate?.()?.getTime?.() ?? 0;
-        if (!existing || rTime > existingTime) {
-          latestByQuiz.set(r.quiz_id, r);
-        }
-      });
-      const latestResults = Array.from(latestByQuiz.values());
-      const sum = latestResults.reduce((acc: number, r: any) => {
-        const rate =
-          typeof r.correct_rate === "number"
-            ? r.correct_rate
-            : r.total_count > 0
-            ? Math.round((r.score / r.total_count) * 100)
-            : 0;
-        return acc + rate;
-      }, 0);
-      quizRate = sum / latestResults.length;
-    }
-
-    return Math.round(todoRate * 0.6 + quizRate * 0.4);
-  };
 
   const loadSubjects = useCallback(async () => {
     if (!userId) {
@@ -545,46 +576,21 @@ export default function SubjectsScreen() {
     refreshScreen();
   };
 
-  const renderHeader = () => (
-    <>
-      <View style={styles.titleRow}>
-        <Ionicons name="book" size={28} color="#1E3A5F" />
-        <Text style={styles.pageTitle}>과목 관리</Text>
-      </View>
-
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="과목명"
-          placeholderTextColor="#94a3b8"
-          value={title}
-          onChangeText={setTitle}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="학습 목표 (선택)"
-          placeholderTextColor="#94a3b8"
-          value={goal}
-          onChangeText={setGoal}
-        />
-        <TouchableOpacity style={styles.addButton} onPress={handleAdd}>
-          <Ionicons name="add-circle-outline" size={16} color="#fff" />
-          <Text style={styles.addButtonText}> 과목 추가</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ProgressSection
-        isLoading={isProgressLoading}
-        error={progressError}
-        subjectProgress={subjectProgress}
-        studyAmountChartData={studyAmountChartData}
-        trend={trend}
-        summary={summary}
-        onRetry={loadProgress}
-      />
-
-      <Text style={styles.listTitle}>과목 목록</Text>
-    </>
+  const listHeader = (
+    <SubjectListHeader
+      title={title}
+      goal={goal}
+      isProgressLoading={isProgressLoading}
+      progressError={progressError}
+      subjectProgress={subjectProgress}
+      studyAmountChartData={studyAmountChartData}
+      trend={trend}
+      summary={summary}
+      onTitleChange={setTitle}
+      onGoalChange={setGoal}
+      onAdd={handleAdd}
+      onProgressRetry={loadProgress}
+    />
   );
 
   return (
@@ -592,7 +598,7 @@ export default function SubjectsScreen() {
       <FlatList
         data={subjects}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={listHeader}
         ListEmptyComponent={
           <Text style={styles.subjectEmptyText}>등록된 과목이 없습니다.</Text>
         }
