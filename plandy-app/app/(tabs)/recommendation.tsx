@@ -56,7 +56,7 @@ export default function RecommendationScreen() {
     if (!fetched) return null;
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons name="school-outline" size={48} color="#cbd5e1" />
+        <Ionicons name="school-outline" size={48} color="#E5E7EB" />
         <Text style={styles.emptyText}>학습 데이터를 추가하면 추천을 받을 수 있어요</Text>
         <Text style={styles.emptySubText}>투두와 퀴즈를 먼저 등록해보세요.</Text>
       </View>
@@ -83,7 +83,7 @@ export default function RecommendationScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.titleRow}>
-        <Ionicons name="bulb-outline" size={28} color="#1E3A5F" />
+        <Ionicons name="bulb-outline" size={28} color="#2B2B2B" />
         <Text style={styles.pageTitle}> 오늘의 학습 추천</Text>
       </View>
 
@@ -104,14 +104,14 @@ export default function RecommendationScreen() {
 
       {errorMsg && (
         <View style={styles.errorBox}>
-          <Ionicons name="alert-circle-outline" size={16} color="#e53e3e" />
+          <Ionicons name="alert-circle-outline" size={16} color="#EF4444" />
           <Text style={styles.errorText}> {errorMsg}</Text>
         </View>
       )}
 
       {loading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color="#ff6a92" />
           <Text style={styles.loadingText}>AI가 학습 데이터를 분석하고 있어요...</Text>
         </View>
       )}
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 24,
-    backgroundColor: "#f8faff",
+    backgroundColor: "#F8F8FA",
   },
   titleRow: {
     flexDirection: "row",
@@ -143,10 +143,10 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#1E3A5F",
+    color: "#2B2B2B",
   },
   refreshButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#ff6a92",
     paddingVertical: 13,
     paddingHorizontal: 20,
     borderRadius: 12,
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
-    shadowColor: "#2563EB",
+    shadowColor: "#ff6a92",
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 3,
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   errorText: {
-    color: "#e53e3e",
+    color: "#EF4444",
     fontSize: 14,
     flex: 1,
   },
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   loadingText: {
-    color: "#64748b",
+    color: "#6B7280",
     fontSize: 14,
     textAlign: "center",
   },
@@ -205,13 +205,13 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 15,
-    color: "#64748b",
+    color: "#6B7280",
     fontWeight: "600",
     textAlign: "center",
   },
   emptySubText: {
     fontSize: 13,
-    color: "#94a3b8",
+    color: "#D1D5DB",
     textAlign: "center",
   },
   card: {
@@ -220,14 +220,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 14,
     overflow: "hidden",
-    shadowColor: "#2563EB",
+    shadowColor: "#ff6a92",
     shadowOpacity: 0.07,
     shadowRadius: 10,
     elevation: 2,
   },
   cardAccent: {
     width: 6,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#ff6a92",
     borderTopLeftRadius: 16,
     borderBottomLeftRadius: 16,
   },
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#ff6a92",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -257,12 +257,12 @@ const styles = StyleSheet.create({
   subjectTitle: {
     fontSize: 17,
     fontWeight: "800",
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     flex: 1,
   },
   reasonText: {
     fontSize: 14,
-    color: "#475569",
+    color: "#6B7280",
     lineHeight: 20,
   },
 });

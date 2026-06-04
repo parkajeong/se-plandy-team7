@@ -377,13 +377,13 @@ function ProgressSection({
   return (
     <View style={styles.progressSection}>
       <View style={styles.sectionHeader}>
-        <Ionicons name="analytics-outline" size={22} color="#2563EB" />
+        <Ionicons name="analytics-outline" size={22} color="#ff6a92" />
         <Text style={styles.sectionTitle}>학습 진척도</Text>
       </View>
 
       {isLoading ? (
         <View style={styles.progressState}>
-          <ActivityIndicator color="#2563EB" />
+          <ActivityIndicator color="#ff6a92" />
           <Text style={styles.stateText}>학습 데이터를 불러오는 중입니다.</Text>
         </View>
       ) : error ? (
@@ -439,7 +439,7 @@ function SubjectListHeader({
   return (
     <>
       <View style={styles.titleRow}>
-        <Ionicons name="book" size={28} color="#1E3A5F" />
+        <Ionicons name="book" size={28} color="#2B2B2B" />
         <Text style={styles.pageTitle}>과목 관리</Text>
       </View>
 
@@ -447,14 +447,14 @@ function SubjectListHeader({
         <TextInput
           style={styles.input}
           placeholder="과목명"
-          placeholderTextColor="#94a3b8"
+          placeholderTextColor="#D1D5DB"
           value={title}
           onChangeText={onTitleChange}
         />
         <TextInput
           style={styles.input}
           placeholder="학습 목표 (선택)"
-          placeholderTextColor="#94a3b8"
+          placeholderTextColor="#D1D5DB"
           value={goal}
           onChangeText={onGoalChange}
         />
@@ -620,7 +620,7 @@ export default function SubjectsScreen() {
                       value={editGoal}
                       onChangeText={setEditGoal}
                       placeholder="목표 수정"
-                      placeholderTextColor="#94a3b8"
+                      placeholderTextColor="#D1D5DB"
                     />
                     <TouchableOpacity
                       style={styles.saveButton}
@@ -637,7 +637,7 @@ export default function SubjectsScreen() {
                   </View>
                 ) : (
                   <View style={styles.goalRow}>
-                    <Ionicons name="flag-outline" size={14} color="#64748b" />
+                    <Ionicons name="flag-outline" size={14} color="#6B7280" />
                     <Text style={styles.goalText}>
                       {" "}
                       {item.goal || "목표 없음"}
@@ -669,14 +669,14 @@ export default function SubjectsScreen() {
                         setEditGoal(item.goal || "");
                       }}
                     >
-                      <Ionicons name="pencil-outline" size={14} color="#2563EB" />
+                      <Ionicons name="pencil-outline" size={14} color="#F2C75C" />
                       <Text style={styles.editButtonText}> 수정</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.deleteButton}
                       onPress={() => handleDelete(item.id)}
                     >
-                      <Ionicons name="trash-outline" size={14} color="#e53e3e" />
+                      <Ionicons name="trash-outline" size={14} color="#EF4444" />
                       <Text style={styles.deleteButtonText}> 삭제</Text>
                     </TouchableOpacity>
                   </View>
@@ -693,7 +693,7 @@ export default function SubjectsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8faff",
+    backgroundColor: "#F8F8FA",
   },
   listContent: {
     padding: 24,
@@ -708,30 +708,30 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#1E3A5F",
+    color: "#2B2B2B",
   },
   form: {
     backgroundColor: "#fff",
     borderRadius: 16,
     padding: 16,
     marginBottom: 18,
-    shadowColor: "#2563EB",
+    shadowColor: "#ff6a92",
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
   },
   input: {
     borderWidth: 1.5,
-    borderColor: "#e2e8f0",
+    borderColor: "#E5E7EB",
     borderRadius: 10,
     padding: 12,
     marginBottom: 10,
     fontSize: 15,
-    color: "#1E3A5F",
-    backgroundColor: "#f8faff",
+    color: "#2B2B2B",
+    backgroundColor: "#F8F8FA",
   },
   addButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#ff6a92",
     padding: 13,
     borderRadius: 10,
     alignItems: "center",
@@ -748,7 +748,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 20,
-    shadowColor: "#2563EB",
+    shadowColor: "#ff6a92",
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
@@ -762,7 +762,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 19,
     fontWeight: "800",
-    color: "#1E3A5F",
+    color: "#2B2B2B",
   },
   progressState: {
     alignItems: "center",
@@ -770,16 +770,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   stateText: {
-    color: "#64748b",
+    color: "#6B7280",
     fontSize: 14,
   },
   errorText: {
-    color: "#e53e3e",
+    color: "#EF4444",
     fontSize: 14,
     fontWeight: "600",
   },
   retryButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#ff6a92",
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -789,13 +789,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   emptyTitle: {
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     fontSize: 15,
     fontWeight: "700",
     textAlign: "center",
   },
   emptyDescription: {
-    color: "#64748b",
+    color: "#6B7280",
     fontSize: 13,
     textAlign: "center",
   },
@@ -808,62 +808,62 @@ const styles = StyleSheet.create({
   summaryItem: {
     flexGrow: 1,
     flexBasis: "45%",
-    backgroundColor: "#f8faff",
-    borderColor: "#e2e8f0",
+    backgroundColor: "#F8F8FA",
+    borderColor: "#E5E7EB",
     borderRadius: 10,
     borderWidth: 1,
     padding: 12,
   },
   summaryValue: {
-    color: "#2563EB",
+    color: "#ff6a92",
     fontSize: 20,
     fontWeight: "800",
   },
   summaryLabel: {
-    color: "#64748b",
+    color: "#6B7280",
     fontSize: 12,
     marginTop: 2,
   },
   chartBlock: {
     borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
+    borderTopColor: "#E5E7EB",
     paddingTop: 14,
     marginTop: 12,
   },
   chartTitle: {
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     fontSize: 16,
     fontWeight: "800",
     marginBottom: 10,
   },
   chartEmptyText: {
-    color: "#94a3b8",
+    color: "#D1D5DB",
     fontSize: 13,
     paddingVertical: 10,
   },
   barChart: {
     alignSelf: "center",
-    backgroundColor: "#f8faff",
-    borderColor: "#e2e8f0",
+    backgroundColor: "#F8F8FA",
+    borderColor: "#E5E7EB",
     borderRadius: 10,
     borderWidth: 1,
     position: "relative",
   },
   barValue: {
     position: "absolute",
-    color: "#2563EB",
+    color: "#ff6a92",
     fontSize: 12,
     fontWeight: "700",
     textAlign: "center",
   },
   barFill: {
     position: "absolute",
-    backgroundColor: "#2563EB",
+    backgroundColor: "#ff6a92",
     borderRadius: 5,
   },
   barLabel: {
     position: "absolute",
-    color: "#64748b",
+    color: "#6B7280",
     fontSize: 11,
     textAlign: "center",
   },
@@ -876,7 +876,7 @@ const styles = StyleSheet.create({
   },
   yAxisLabel: {
     width: 28,
-    color: "#94a3b8",
+    color: "#D1D5DB",
     fontSize: 10,
     textAlign: "right",
     marginRight: 6,
@@ -884,17 +884,17 @@ const styles = StyleSheet.create({
   gridRule: {
     flex: 1,
     height: 1,
-    backgroundColor: "#e2e8f0",
+    backgroundColor: "#E5E7EB",
   },
   yAxisLine: {
     position: "absolute",
     width: 1.5,
-    backgroundColor: "#94a3b8",
+    backgroundColor: "#D1D5DB",
   },
   xAxisLine: {
     position: "absolute",
     height: 1.5,
-    backgroundColor: "#94a3b8",
+    backgroundColor: "#D1D5DB",
   },
   completionList: {
     gap: 12,
@@ -906,33 +906,33 @@ const styles = StyleSheet.create({
   },
   completionSubject: {
     width: 92,
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     fontSize: 13,
     fontWeight: "700",
   },
   completionBarOuter: {
     flex: 1,
     height: 12,
-    backgroundColor: "#e2e8f0",
+    backgroundColor: "#E5E7EB",
     borderRadius: 999,
     overflow: "hidden",
   },
   completionBarInner: {
     height: 12,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#ff6a92",
     borderRadius: 999,
   },
   completionPercent: {
     width: 48,
-    color: "#2563EB",
+    color: "#ff6a92",
     fontSize: 13,
     fontWeight: "800",
     textAlign: "right",
   },
   lineChart: {
     alignSelf: "center",
-    backgroundColor: "#f8faff",
-    borderColor: "#e2e8f0",
+    backgroundColor: "#F8F8FA",
+    borderColor: "#E5E7EB",
     borderRadius: 10,
     borderWidth: 1,
     position: "relative",
@@ -948,16 +948,16 @@ const styles = StyleSheet.create({
   lineGridRule: {
     flex: 1,
     height: 1,
-    backgroundColor: "#e2e8f0",
+    backgroundColor: "#E5E7EB",
   },
   lineBaseRule: {
-    backgroundColor: "#94a3b8",
+    backgroundColor: "#D1D5DB",
     height: 1.5,
   },
   lineSegment: {
     position: "absolute",
     height: 3,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#ff6a92",
     borderRadius: 999,
   },
   linePoint: {
@@ -966,23 +966,23 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: "#fff",
-    borderColor: "#2563EB",
+    borderColor: "#ff6a92",
     borderWidth: 2,
   },
   lineDateLabel: {
     position: "absolute",
     bottom: 12,
-    color: "#64748b",
+    color: "#6B7280",
     fontSize: 11,
   },
   listTitle: {
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     fontSize: 18,
     fontWeight: "800",
     marginBottom: 12,
   },
   subjectEmptyText: {
-    color: "#64748b",
+    color: "#6B7280",
     fontSize: 14,
     textAlign: "center",
     paddingVertical: 18,
@@ -993,14 +993,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 14,
     overflow: "hidden",
-    shadowColor: "#2563EB",
+    shadowColor: "#ff6a92",
     shadowOpacity: 0.07,
     shadowRadius: 10,
     elevation: 2,
   },
   cardAccent: {
     width: 6,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#ff6a92",
     borderTopLeftRadius: 16,
     borderBottomLeftRadius: 16,
   },
@@ -1011,7 +1011,7 @@ const styles = StyleSheet.create({
   subjectTitle: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     marginBottom: 6,
   },
   goalRow: {
@@ -1021,26 +1021,26 @@ const styles = StyleSheet.create({
   },
   goalText: {
     fontSize: 14,
-    color: "#64748b",
+    color: "#6B7280",
   },
   progressRow: {
     marginBottom: 12,
   },
   progressLabel: {
     fontSize: 13,
-    color: "#2563EB",
+    color: "#ff6a92",
     fontWeight: "600",
     marginBottom: 4,
   },
   progressBarBg: {
     height: 6,
-    backgroundColor: "#e2e8f0",
+    backgroundColor: "#E5E7EB",
     borderRadius: 999,
     overflow: "hidden",
   },
   progressBarFill: {
     height: 6,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#ff6a92",
     borderRadius: 999,
   },
   actions: {
@@ -1050,28 +1050,30 @@ const styles = StyleSheet.create({
   editButton: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "#fff",
     borderWidth: 1.5,
-    borderColor: "#2563EB",
+    borderColor: "#F2C75C",
     borderRadius: 8,
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
   editButtonText: {
-    color: "#2563EB",
+    color: "#F2C75C",
     fontWeight: "600",
     fontSize: 13,
   },
   deleteButton: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "#fff",
     borderWidth: 1.5,
-    borderColor: "#e53e3e",
+    borderColor: "#EF4444",
     borderRadius: 8,
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
   deleteButtonText: {
-    color: "#e53e3e",
+    color: "#EF4444",
     fontWeight: "600",
     fontSize: 13,
   },
@@ -1086,7 +1088,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   saveButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#ff6a92",
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 14,
@@ -1097,13 +1099,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   cancelButton: {
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "#F8F8FA",
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 14,
   },
   cancelButtonText: {
-    color: "#64748b",
+    color: "#6B7280",
     fontWeight: "600",
     fontSize: 13,
   },

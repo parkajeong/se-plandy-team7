@@ -31,6 +31,8 @@ import {
 import { beginAppLogout } from "../src/appSession";
 
 const MAIN_ROUTE = "/(tabs)/subjects";
+const MAIN_PINK = "#ff6a92";
+const DANGER_RED = "#EF4444";
 
 export default function HomeScreen() {
   const [isSignUpMode, setIsSignUpMode] = useState(false);
@@ -163,7 +165,7 @@ export default function HomeScreen() {
         {
           text: "취소",
           style: "cancel",
-          onPress: resolve,
+          onPress: () => resolve(),
         },
         {
           text: "탈퇴 진행",
@@ -360,20 +362,21 @@ export default function HomeScreen() {
       )}
 
       {isSignUpMode ? (
-        <Button title="회원가입" onPress={handleSignUp} />
+        <Button title="회원가입" onPress={handleSignUp} color={MAIN_PINK} />
       ) : (
-        <Button title="로그인" onPress={handleLogin} />
+        <Button title="로그인" onPress={handleLogin} color={MAIN_PINK} />
       )}
 
       {!isSignUpMode && (
         <>
           <View style={styles.spacer} />
-          <Button title="Google로 로그인" onPress={handleGoogleLogin} />
+          <Button title="Google로 로그인" onPress={handleGoogleLogin} color={MAIN_PINK} />
           <View style={styles.spacer} />
           <Button
             title={isKakaoLoginLoading ? "카카오 로그인 중..." : "카카오로 로그인"}
             onPress={handleKakaoLogin}
             disabled={isKakaoLoginLoading}
+            color={MAIN_PINK}
           />
         </>
       )}
@@ -386,6 +389,7 @@ export default function HomeScreen() {
           setIsSignUpMode(!isSignUpMode);
           setPassword("");
         }}
+        color={MAIN_PINK}
       />
 
       {!isSignUpMode && (
@@ -457,7 +461,7 @@ export default function HomeScreen() {
               onPress={handleWithdrawWithGoogle}
             >
               {isWithdrawing && withdrawProvider === "google" ? (
-                <ActivityIndicator size="small" color="#374151" />
+                <ActivityIndicator size="small" color="#6B7280" />
               ) : (
                 <Text style={styles.withdrawProviderButtonText}>
                   Google 계정으로 탈퇴
@@ -471,7 +475,7 @@ export default function HomeScreen() {
               onPress={handleWithdrawWithKakao}
             >
               {isWithdrawing && withdrawProvider === "kakao" ? (
-                <ActivityIndicator size="small" color="#374151" />
+                <ActivityIndicator size="small" color="#6B7280" />
               ) : (
                 <Text style={styles.withdrawProviderButtonText}>
                   카카오 계정으로 탈퇴
@@ -500,27 +504,35 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
+    fontWeight: "700",
     marginBottom: 20,
+    color: "#2B2B2B",
   },
   input: {
     borderRadius: 8,
     borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
     marginBottom: 12,
     padding: 12,
+    color: "#2B2B2B",
   },
   passwordBox: {
     alignItems: "center",
     borderRadius: 8,
     borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
     flexDirection: "row",
     marginBottom: 12,
   },
   passwordInput: {
     flex: 1,
     padding: 12,
+    color: "#2B2B2B",
   },
   passwordToggle: {
-    color: "blue",
+    color: DANGER_RED,
     paddingHorizontal: 12,
   },
   spacer: {
@@ -533,7 +545,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   withdrawOpenButtonText: {
-    color: "#374151",
+    color: "#2B2B2B",
     fontSize: 15,
     fontWeight: "700",
   },
@@ -555,9 +567,10 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700",
     marginBottom: 10,
+    color: "#2B2B2B",
   },
   withdrawDescription: {
-    color: "#4b5563",
+    color: "#6B7280",
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 16,
@@ -586,7 +599,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   withdrawProviderButtonText: {
-    color: "#374151",
+    color: "#6B7280",
     fontSize: 15,
     fontWeight: "700",
   },
@@ -598,7 +611,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   withdrawCancelButtonText: {
-    color: "#374151",
+    color: "#2B2B2B",
     fontSize: 15,
     fontWeight: "700",
   },

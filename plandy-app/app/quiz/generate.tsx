@@ -87,7 +87,7 @@ export default function GenerateQuizScreen() {
     <View style={styles.container}>
       {isGenerating ? (
         <View style={styles.centerBox}>
-          <ActivityIndicator color="#2563EB" size="large" />
+          <ActivityIndicator color="#ff6a92" size="large" />
           <Text style={styles.title}>AI 퀴즈를 생성하고 있습니다.</Text>
           <Text style={styles.description}>
             퀴즈 생성에 시간이 조금 걸릴 수 있습니다.
@@ -96,7 +96,7 @@ export default function GenerateQuizScreen() {
         </View>
       ) : (
         <View style={styles.centerBox}>
-          <Ionicons name="alert-circle-outline" size={44} color="#e53e3e" />
+          <Ionicons name="alert-circle-outline" size={44} color="#EF4444" />
           <Text style={styles.title}>퀴즈 생성 실패</Text>
           <Text style={styles.errorText}>{errorMessage}</Text>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -111,7 +111,7 @@ export default function GenerateQuizScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8faff",
+    backgroundColor: "#F8F8FA",
     padding: 24,
   },
   centerBox: {
@@ -120,33 +120,33 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   title: {
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     fontSize: 22,
     fontWeight: "800",
     marginTop: 16,
     textAlign: "center",
   },
   description: {
-    color: "#64748b",
+    color: "#6B7280",
     fontSize: 15,
     marginTop: 8,
     textAlign: "center",
   },
   countText: {
-    color: "#2563EB",
+    color: "#ff6a92",
     fontSize: 14,
     fontWeight: "700",
     marginTop: 12,
   },
   errorText: {
-    color: "#64748b",
+    color: "#6B7280",
     fontSize: 15,
     lineHeight: 22,
     marginTop: 10,
     textAlign: "center",
   },
   backButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#ff6a92",
     borderRadius: 10,
     marginTop: 22,
     paddingHorizontal: 18,

@@ -884,18 +884,18 @@ export default function TodoScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f6f7fb',
+    backgroundColor: '#F8F8FA',
   },
   centerContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f6f7fb',
+    backgroundColor: '#F8F8FA',
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#666',
+    color: '#6B7280',
   },
   header: {
     paddingHorizontal: 20,
@@ -908,18 +908,18 @@ const styles = StyleSheet.create({
   screenTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#111827',
+    color: '#2B2B2B',
   },
   screenSubtitle: {
     marginTop: 4,
     fontSize: 13,
-    color: '#6b7280',
+    color: '#6B7280',
   },
   addButton: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: '#2563eb',
+    backgroundColor: '#ff6a92',
   },
   addButtonText: {
     color: '#ffffff',
@@ -940,12 +940,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: '#2B2B2B',
   },
   emptyDescription: {
     marginTop: 8,
     fontSize: 14,
-    color: '#6b7280',
+    color: '#6B7280',
     textAlign: 'center',
   },
   todoCard: {
@@ -968,13 +968,13 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#2563eb',
+    borderColor: '#ff6a92',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   checkBoxCompleted: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#ff6a92',
   },
   checkBoxText: {
     color: '#ffffff',
@@ -986,22 +986,22 @@ const styles = StyleSheet.create({
   todoTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#111827',
+    color: '#2B2B2B',
   },
   completedText: {
-    color: '#9ca3af',
+    color: '#9CA3AF',
     textDecorationLine: 'line-through',
   },
   todoMeta: {
     marginTop: 4,
     fontSize: 13,
-    color: '#6b7280',
+    color: '#6B7280',
   },
   todoDescription: {
     marginTop: 12,
     fontSize: 14,
     lineHeight: 20,
-    color: '#374151',
+    color: '#6B7280',
   },
   todoInfoRow: {
     marginTop: 14,
@@ -1015,17 +1015,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: '#eef2ff',
+    backgroundColor: '#F8F8FA',
   },
   deadlineText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#3730a3',
+    color: '#ff6a92',
   },
   todoStatus: {
     flexShrink: 0,
     fontSize: 13,
-    color: '#374151',
+    color: '#6B7280',
   },
   actionRow: {
     marginTop: 14,
@@ -1039,7 +1039,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   editButton: {
-    backgroundColor: '#e0f2fe',
+    backgroundColor: '#F8F8FA',
   },
   deleteButton: {
     backgroundColor: '#fee2e2',
@@ -1047,7 +1047,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#111827',
+    color: '#2B2B2B',
   },
   modalOverlay: {
     flex: 1,
@@ -1069,26 +1069,26 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     fontSize: 22,
     fontWeight: '800',
-    color: '#111827',
+    color: '#2B2B2B',
   },
   inputLabel: {
     marginBottom: 6,
     fontSize: 14,
     fontWeight: '700',
-    color: '#374151',
+    color: '#6B7280',
   },
   helperText: {
     marginTop: -2,
     marginBottom: 8,
     fontSize: 12,
-    color: '#6b7280',
+    color: '#6B7280',
   },
   input: {
     marginBottom: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: '#D1D5DB',
     borderRadius: 12,
     fontSize: 15,
     backgroundColor: '#ffffff',
@@ -1107,7 +1107,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: '#D1D5DB',
     backgroundColor: '#ffffff',
   },
   priorityButton: {
@@ -1115,19 +1115,19 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: '#D1D5DB',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#ffffff',
   },
   chipButtonSelected: {
-    borderColor: '#2563eb',
-    backgroundColor: '#2563eb',
+    borderColor: '#ff6a92',
+    backgroundColor: '#ff6a92',
   },
   chipButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#374151',
+    color: '#6B7280',
   },
   chipButtonTextSelected: {
     color: '#ffffff',
@@ -1161,16 +1161,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: '#D1D5DB',
     borderRadius: 12,
     backgroundColor: '#ffffff',
   },
   dateSelectText: {
     fontSize: 15,
-    color: '#111827',
+    color: '#2B2B2B',
   },
   placeholderText: {
-    color: '#9ca3af',
+    color: '#9CA3AF',
   },
   modalActionRow: {
     marginTop: 8,
@@ -1185,17 +1185,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#F8F8FA',
   },
   saveButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#ff6a92',
   },
   disabledButton: {
-    backgroundColor: '#9ca3af',
+    backgroundColor: '#9CA3AF',
   },
   cancelButtonText: {
     fontWeight: '800',
-    color: '#374151',
+    color: '#6B7280',
   },
   saveButtonText: {
     fontWeight: '800',
@@ -1241,7 +1241,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontWeight: 'bold',
-    color: '#555555',
+    color: '#6B7280',
   },
   daysContainer: {
     width: '100%',
@@ -1257,11 +1257,11 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   selectedDayBox: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#ff6a92',
   },
   dayText: {
     fontSize: 16,
-    color: '#111827',
+    color: '#2B2B2B',
   },
   selectedDayText: {
     color: '#ffffff',
@@ -1269,7 +1269,7 @@ const styles = StyleSheet.create({
   },
   closeCalendarButton: {
     marginTop: 20,
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#ff6a92',
     padding: 12,
     borderRadius: 10,
     alignItems: 'center',
@@ -1280,18 +1280,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   requiredMark: {
-    color: '#ef4444',
+    color: '#EF4444',
     fontWeight: '800',
   },
   inputError: {
-    borderColor: '#ef4444',
+    borderColor: '#EF4444',
     borderWidth: 1.5,
   },
   validationText: {
     marginTop: -10,
     marginBottom: 12,
     fontSize: 12,
-    color: '#ef4444',
+    color: '#EF4444',
     fontWeight: '500',
   },
   chipWrapContainer: {
@@ -1299,7 +1299,7 @@ const styles = StyleSheet.create({
   },
   selectionGroupError: {
     borderWidth: 1.5,
-    borderColor: '#ef4444',
+    borderColor: '#EF4444',
     borderRadius: 12,
     padding: 8,
   },

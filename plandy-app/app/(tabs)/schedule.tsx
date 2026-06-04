@@ -1308,11 +1308,11 @@ export default function ScheduleScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: "#fff" },
   title: { fontSize: 28, fontWeight: "bold", marginBottom: 20 },
-  loginNotice: { color: "#e53e3e", marginBottom: 15, fontSize: 15 },
+  loginNotice: { color: "#EF4444", marginBottom: 15, fontSize: 15 },
 
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#E5E7EB",
     borderRadius: 10,
     padding: 15,
     marginBottom: 15,
@@ -1320,10 +1320,10 @@ const styles = StyleSheet.create({
   },
 
   dateText: { fontSize: 16, color: "#000" },
-  placeholderText: { fontSize: 16, color: "#999" },
+  placeholderText: { fontSize: 16, color: "#9CA3AF" },
 
   button: {
-    backgroundColor: "#4A90E2",
+    backgroundColor: "#ff6a92",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
@@ -1333,10 +1333,10 @@ const styles = StyleSheet.create({
   buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
   listTitle: { fontSize: 22, fontWeight: "bold", marginBottom: 15 },
   listContent: { paddingBottom: 100 },
-  emptyText: { color: "#777", marginTop: 10 },
+  emptyText: { color: "#6B7280", marginTop: 10 },
 
   card: {
-    backgroundColor: "#F2F2F2",
+    backgroundColor: "#F8F8FA",
     padding: 15,
     borderRadius: 10,
     marginBottom: 15,
@@ -1358,7 +1358,7 @@ const styles = StyleSheet.create({
   ddayText: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#e53e3e",
+    color: "#EF4444",
     marginLeft: 10,
   },
 
@@ -1368,24 +1368,26 @@ const styles = StyleSheet.create({
   editButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#4A90E2",
+    borderColor: "#F2C75C",
     borderRadius: 8,
     padding: 10,
     alignItems: "center",
+    backgroundColor: "#FFFFFF",
   },
 
-  editButtonText: { color: "#4A90E2", fontWeight: "bold" },
+  editButtonText: { color: "#F2C75C", fontWeight: "bold" },
 
   deleteButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#e53e3e",
+    borderColor: "#EF4444",
     borderRadius: 8,
     padding: 10,
     alignItems: "center",
+    backgroundColor: "#FFFFFF",
   },
 
-  deleteButtonText: { color: "#e53e3e", fontWeight: "bold" },
+  deleteButtonText: { color: "#EF4444", fontWeight: "bold" },
 
   modalBackground: {
     flex: 1,
@@ -1423,7 +1425,7 @@ const styles = StyleSheet.create({
   customReminderBox: {
     marginTop: 15,
     padding: 15,
-    backgroundColor: "#F2F2F2",
+    backgroundColor: "#F8F8FA",
     borderRadius: 10,
   },
 
@@ -1432,7 +1434,7 @@ const styles = StyleSheet.create({
   customNumberInput: {
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#E5E7EB",
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
@@ -1443,27 +1445,27 @@ const styles = StyleSheet.create({
   unitButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#4A90E2",
+    borderColor: "#ff6a92",
     borderRadius: 8,
     padding: 10,
     alignItems: "center",
     backgroundColor: "#fff",
   },
 
-  selectedUnitButton: { backgroundColor: "#4A90E2" },
-  unitButtonText: { color: "#4A90E2", fontWeight: "bold" },
+  selectedUnitButton: { backgroundColor: "#ff6a92" },
+  unitButtonText: { color: "#ff6a92", fontWeight: "bold" },
   selectedUnitButtonText: { color: "#fff" },
 
-  customReminderGuide: { marginTop: 10, color: "#777", fontSize: 13 },
+  customReminderGuide: { marginTop: 10, color: "#6B7280", fontSize: 13 },
 
   cancelButton: {
-    backgroundColor: "#F2F2F2",
+    backgroundColor: "#F8F8FA",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
   },
 
-  cancelButtonText: { color: "#555", fontSize: 16, fontWeight: "bold" },
+  cancelButtonText: { color: "#6B7280", fontSize: 16, fontWeight: "bold" },
 
   calendarContainer: {
     width: "100%",
@@ -1487,7 +1489,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
     fontWeight: "bold",
-    color: "#555",
+    color: "#6B7280",
   },
 
   daysContainer: { width: "100%" },
@@ -1501,14 +1503,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
 
-  selectedDayBox: { backgroundColor: "#4A90E2" },
+  selectedDayBox: { backgroundColor: "#ff6a92" },
   dayText: { fontSize: 16 },
   selectedDayText: { color: "#fff", fontWeight: "bold" },
 
   timeSelector: {
     marginTop: 20,
     padding: 15,
-    backgroundColor: "#F2F2F2",
+    backgroundColor: "#F8F8FA",
     borderRadius: 10,
   },
 
@@ -1526,18 +1528,18 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#4A90E2",
+    borderColor: "#ff6a92",
     borderRadius: 8,
     padding: 8,
     alignItems: "center",
   },
 
-  timeButtonText: { color: "#4A90E2", fontSize: 18, fontWeight: "bold" },
+  timeButtonText: { color: "#ff6a92", fontSize: 18, fontWeight: "bold" },
   timeValue: { fontSize: 18, fontWeight: "bold", marginVertical: 8 },
 
   closeButton: {
     marginTop: 20,
-    backgroundColor: "#4A90E2",
+    backgroundColor: "#ff6a92",
     padding: 12,
     borderRadius: 10,
     alignItems: "center",
@@ -1555,7 +1557,7 @@ const styles = StyleSheet.create({
   deleteModalText: {
     fontSize: 16,
     marginBottom: 20,
-    color: "#333",
+    color: "#2B2B2B",
   },
 
   deleteModalButtonRow: {
@@ -1565,21 +1567,21 @@ const styles = StyleSheet.create({
 
   deleteCancelButton: {
     flex: 1,
-    backgroundColor: "#F2F2F2",
+    backgroundColor: "#F8F8FA",
     padding: 14,
     borderRadius: 10,
     alignItems: "center",
   },
 
   deleteCancelButtonText: {
-    color: "#555",
+    color: "#6B7280",
     fontSize: 16,
     fontWeight: "bold",
   },
 
   deleteConfirmButton: {
     flex: 1,
-    backgroundColor: "#e53e3e",
+    backgroundColor: "#EF4444",
     padding: 14,
     borderRadius: 10,
     alignItems: "center",

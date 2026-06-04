@@ -1356,10 +1356,10 @@ export default function StudyGroupScreen() {
                     {isHost ? (
                       <>
                         <TouchableOpacity
-                          style={styles.smallOutlineButton}
+                          style={[styles.smallOutlineButton, styles.smallEditButton]}
                           onPress={() => handleStartEditGroup(item)}
                         >
-                          <Text style={styles.smallOutlineButtonText}>수정</Text>
+                          <Text style={[styles.smallOutlineButtonText, styles.smallEditButtonText]}>수정</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -1478,10 +1478,10 @@ export default function StudyGroupScreen() {
                   {time.user_id === userId && (
                     <View style={styles.actionRow}>
                       <TouchableOpacity
-                        style={styles.smallOutlineButton}
+                        style={[styles.smallOutlineButton, styles.smallEditButton]}
                         onPress={() => handleStartEditAvailableTime(time)}
                       >
-                        <Text style={styles.smallOutlineButtonText}>수정</Text>
+                        <Text style={[styles.smallOutlineButtonText, styles.smallEditButtonText]}>수정</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -1620,10 +1620,10 @@ export default function StudyGroupScreen() {
                       {schedule.created_by === userId && (
                         <View style={styles.actionRow}>
                           <TouchableOpacity
-                            style={styles.smallOutlineButton}
+                            style={[styles.smallOutlineButton, styles.smallEditButton]}
                             onPress={() => handleStartEditSchedule(schedule)}
                           >
-                            <Text style={styles.smallOutlineButtonText}>수정</Text>
+                            <Text style={[styles.smallOutlineButtonText, styles.smallEditButtonText]}>수정</Text>
                           </TouchableOpacity>
 
                           <TouchableOpacity
@@ -1928,7 +1928,7 @@ const styles = StyleSheet.create({
   },
 
   loginNotice: {
-    color: "#e53e3e",
+    color: "#EF4444",
     marginBottom: 15,
     fontSize: 15,
   },
@@ -1936,7 +1936,7 @@ const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: "row",
     marginBottom: 20,
-    backgroundColor: "#F2F2F2",
+    backgroundColor: "#F8F8FA",
     borderRadius: 10,
     padding: 4,
   },
@@ -1949,13 +1949,13 @@ const styles = StyleSheet.create({
   },
 
   activeTabButton: {
-    backgroundColor: "#4A90E2",
+    backgroundColor: "#ff6a92",
   },
 
   tabButtonText: {
     fontSize: 14,
     fontWeight: "bold",
-    color: "#777",
+    color: "#6B7280",
   },
 
   activeTabButtonText: {
@@ -1971,7 +1971,7 @@ const styles = StyleSheet.create({
 
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#E5E7EB",
     borderRadius: 10,
     padding: 15,
     marginBottom: 12,
@@ -1986,11 +1986,11 @@ const styles = StyleSheet.create({
 
   placeholderText: {
     fontSize: 16,
-    color: "#999",
+    color: "#9CA3AF",
   },
 
   button: {
-    backgroundColor: "#4A90E2",
+    backgroundColor: "#ff6a92",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
@@ -2006,7 +2006,7 @@ const styles = StyleSheet.create({
 
   outlineButton: {
     borderWidth: 1,
-    borderColor: "#4A90E2",
+    borderColor: "#ff6a92",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
@@ -2014,13 +2014,13 @@ const styles = StyleSheet.create({
   },
 
   outlineButtonText: {
-    color: "#4A90E2",
+    color: "#ff6a92",
     fontSize: 17,
     fontWeight: "bold",
   },
 
   grayButton: {
-    backgroundColor: "#F2F2F2",
+    backgroundColor: "#F8F8FA",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
@@ -2028,29 +2028,29 @@ const styles = StyleSheet.create({
   },
 
   grayButtonText: {
-    color: "#555",
+    color: "#6B7280",
     fontSize: 16,
     fontWeight: "bold",
   },
 
   emptyText: {
-    color: "#777",
+    color: "#6B7280",
     marginTop: 10,
     fontSize: 15,
   },
 
   card: {
-    backgroundColor: "#F2F2F2",
+    backgroundColor: "#F8F8FA",
     padding: 15,
     borderRadius: 10,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#F2F2F2",
+    borderColor: "#F8F8FA",
   },
 
   selectedCard: {
-    borderColor: "#4A90E2",
-    backgroundColor: "#EEF5FF",
+    borderColor: "#ff6a92",
+    backgroundColor: "#F8F8FA",
   },
 
   groupName: {
@@ -2061,19 +2061,19 @@ const styles = StyleSheet.create({
 
   groupInfo: {
     fontSize: 15,
-    color: "#555",
+    color: "#6B7280",
     marginTop: 2,
   },
 
   hostText: {
     marginTop: 8,
-    color: "#4A90E2",
+    color: "#ff6a92",
     fontWeight: "bold",
   },
 
   selectedText: {
     marginTop: 8,
-    color: "#2F855A",
+    color: "#22C55E",
     fontWeight: "bold",
   },
 
@@ -2089,7 +2089,7 @@ const styles = StyleSheet.create({
 
   groupSelectButton: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#E5E7EB",
     borderRadius: 10,
     padding: 15,
     backgroundColor: "#fff",
@@ -2102,7 +2102,7 @@ const styles = StyleSheet.create({
 
   groupSelectPlaceholder: {
     fontSize: 16,
-    color: "#999",
+    color: "#9CA3AF",
   },
 
   groupModalContainer: {
@@ -2123,22 +2123,22 @@ const styles = StyleSheet.create({
 
   groupModalItemText: {
     fontSize: 16,
-    color: "#222",
+    color: "#2B2B2B",
   },
 
   groupModalSelectedText: {
     fontSize: 13,
-    color: "#4A90E2",
+    color: "#ff6a92",
     fontWeight: "bold",
   },
 
   scheduleCard: {
-    backgroundColor: "#F8F8F8",
+    backgroundColor: "#F8F8FA",
     padding: 15,
     borderRadius: 10,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: "#E5E7EB",
   },
 
   scheduleTitle: {
@@ -2148,18 +2148,18 @@ const styles = StyleSheet.create({
   },
 
   recommendCard: {
-    backgroundColor: "#EEF5FF",
+    backgroundColor: "#F8F8FA",
     padding: 15,
     borderRadius: 10,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#4A90E2",
+    borderColor: "#ff6a92",
   },
 
   recommendTitle: {
     fontSize: 17,
     fontWeight: "bold",
-    color: "#4A90E2",
+    color: "#ff6a92",
     marginBottom: 6,
   },
 
@@ -2172,30 +2172,38 @@ const styles = StyleSheet.create({
   smallOutlineButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#4A90E2",
+    borderColor: "#ff6a92",
     borderRadius: 8,
     padding: 10,
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#FFFFFF",
   },
 
   smallOutlineButtonText: {
-    color: "#4A90E2",
+    color: "#ff6a92",
     fontWeight: "bold",
+  },
+
+  smallEditButton: {
+    borderColor: "#F2C75C",
+  },
+
+  smallEditButtonText: {
+    color: "#F2C75C",
   },
 
   smallDangerButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#E53E3E",
+    borderColor: "#EF4444",
     borderRadius: 8,
     padding: 10,
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#FFFFFF",
   },
 
   smallDangerButtonText: {
-    color: "#E53E3E",
+    color: "#EF4444",
     fontWeight: "bold",
   },
 
@@ -2247,7 +2255,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
     fontWeight: "bold",
-    color: "#555",
+    color: "#6B7280",
   },
 
   dayRow: {
@@ -2263,7 +2271,7 @@ const styles = StyleSheet.create({
   },
 
   selectedDayBox: {
-    backgroundColor: "#4A90E2",
+    backgroundColor: "#ff6a92",
   },
 
   dayText: {
@@ -2278,7 +2286,7 @@ const styles = StyleSheet.create({
   timeSelector: {
     marginTop: 20,
     padding: 15,
-    backgroundColor: "#F2F2F2",
+    backgroundColor: "#F8F8FA",
     borderRadius: 10,
   },
 
@@ -2303,14 +2311,14 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#4A90E2",
+    borderColor: "#ff6a92",
     borderRadius: 8,
     padding: 8,
     alignItems: "center",
   },
 
   timeButtonText: {
-    color: "#4A90E2",
+    color: "#ff6a92",
     fontSize: 18,
     fontWeight: "bold",
   },
@@ -2323,7 +2331,7 @@ const styles = StyleSheet.create({
 
   closeButton: {
     marginTop: 20,
-    backgroundColor: "#4A90E2",
+    backgroundColor: "#ff6a92",
     padding: 12,
     borderRadius: 10,
     alignItems: "center",
@@ -2337,14 +2345,14 @@ const styles = StyleSheet.create({
 
   cancelButton: {
     marginTop: 10,
-    backgroundColor: "#F2F2F2",
+    backgroundColor: "#F8F8FA",
     padding: 12,
     borderRadius: 10,
     alignItems: "center",
   },
 
   cancelButtonText: {
-    color: "#555",
+    color: "#6B7280",
     fontSize: 16,
     fontWeight: "bold",
   },
