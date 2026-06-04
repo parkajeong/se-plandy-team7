@@ -1,6 +1,7 @@
+import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -36,10 +37,11 @@ const getParam = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value;
 
 export const unstable_settings = {
-  title: "Quiz / Question",
+  title: "퀴즈",
 };
 
 export default function QuizDetailScreen() {
+  const navigation = useNavigation();
   const params = useLocalSearchParams();
   const quizId = getParam(params.quizId);
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -186,6 +188,14 @@ export default function QuizDetailScreen() {
   useEffect(() => {
     loadQuiz();
   }, [loadQuiz]);
+
+  useLayoutEffect(() => {
+    if (quiz?.title) {
+      navigation.setOptions({
+        title: quiz.title,
+      });
+    }
+  }, [navigation, quiz?.title]);
 
   if (isLoading) {
     return (

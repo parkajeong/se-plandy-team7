@@ -19,6 +19,7 @@ type SubjectDropdownProps = {
   placeholder?: string;
   emptyMessage?: string;
   disabled?: boolean;
+  hasError?: boolean;
   onSelect: (subject: SubjectOption) => void;
   onOpen?: () => void | Promise<unknown>;
 };
@@ -29,6 +30,7 @@ export default function SubjectDropdown({
   placeholder = "과목 선택",
   emptyMessage = "먼저 과목을 등록해주세요.",
   disabled = false,
+  hasError = false,
   onSelect,
   onOpen,
 }: SubjectDropdownProps) {
@@ -50,7 +52,11 @@ export default function SubjectDropdown({
   return (
     <>
       <Pressable
-        style={[styles.trigger, disabled && styles.triggerDisabled]}
+        style={[
+          styles.trigger,
+          disabled && styles.triggerDisabled,
+          hasError && styles.triggerError,
+        ]}
         onPress={handleOpen}
         disabled={disabled}
       >
@@ -134,6 +140,10 @@ const styles = StyleSheet.create({
   placeholderText: {
     fontSize: 16,
     color: "#9ca3af",
+  },
+  triggerError: {
+    borderColor: "#ef4444",
+    borderWidth: 1.5,
   },
   modalBackground: {
     flex: 1,
