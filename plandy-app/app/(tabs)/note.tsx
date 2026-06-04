@@ -52,6 +52,7 @@ type IncorrectNoteItem = {
 };
 
 type IncorrectNoteGroup = {
+  result_id?: string;
   quiz_id: string;
   quiz_title: string;
   solved_at: string;
@@ -590,7 +591,9 @@ export default function NoteScreen() {
 
               <FlatList
                 data={incorrectNoteGroups}
-                keyExtractor={(item) => `${item.quiz_id}-${item.result_id || item.solved_at}`}
+                keyExtractor={(group, index) =>
+                  `${group.result_id || group.quiz_id}-${group.solved_at || index}`
+                }
                 ListEmptyComponent={
                   <Text style={styles.emptyText}>
                     {isLoadingIncorrectNotes
@@ -764,7 +767,7 @@ const styles = StyleSheet.create({
   },
 
   loginNotice: {
-    color: "#e53e3e",
+    color: "#EF4444",
     marginBottom: 15,
     fontSize: 15,
   },
@@ -772,7 +775,7 @@ const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: "row",
     marginBottom: 20,
-    backgroundColor: "#F2F2F2",
+    backgroundColor: "#F8F8FA",
     borderRadius: 10,
     padding: 4,
   },
@@ -785,13 +788,13 @@ const styles = StyleSheet.create({
   },
 
   activeTabButton: {
-    backgroundColor: "#4A90E2",
+    backgroundColor: "#ff6a92",
   },
 
   tabButtonText: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#777",
+    color: "#6B7280",
   },
 
   activeTabButtonText: {
@@ -807,7 +810,7 @@ const styles = StyleSheet.create({
 
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#E5E7EB",
     borderRadius: 10,
     padding: 15,
     marginBottom: 15,
@@ -821,12 +824,12 @@ const styles = StyleSheet.create({
 
   placeholderText: {
     fontSize: 16,
-    color: "#999",
+    color: "#9CA3AF",
   },
 
   noteInput: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#E5E7EB",
     borderRadius: 10,
     padding: 15,
     marginBottom: 15,
@@ -835,7 +838,7 @@ const styles = StyleSheet.create({
   },
 
   button: {
-    backgroundColor: "#4A90E2",
+    backgroundColor: "#ff6a92",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
@@ -843,7 +846,7 @@ const styles = StyleSheet.create({
   },
 
   searchButton: {
-    backgroundColor: "#4A90E2",
+    backgroundColor: "#ff6a92",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
@@ -869,7 +872,7 @@ const styles = StyleSheet.create({
   searchTabButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: "#E5E7EB",
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: "center",
@@ -877,14 +880,14 @@ const styles = StyleSheet.create({
   },
 
   searchTabText: {
-    color: "#475569",
+    color: "#6B7280",
     fontSize: 15,
     fontWeight: "700",
   },
 
   activeSearchTabButton: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB",
+    backgroundColor: "#ff6a92",
+    borderColor: "#ff6a92",
   },
 
   activeSearchTabText: {
@@ -899,7 +902,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#E5E7EB",
     padding: 16,
     marginBottom: 16,
   },
@@ -911,20 +914,20 @@ const styles = StyleSheet.create({
   },
 
   incorrectSummaryText: {
-    color: "#64748b",
+    color: "#6B7280",
     fontSize: 14,
     marginBottom: 12,
   },
 
   incorrectCard: {
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#F8F8FA",
     borderRadius: 10,
     padding: 14,
     marginBottom: 12,
   },
 
   answerInfoText: {
-    color: "#475569",
+    color: "#6B7280",
     fontSize: 14,
     marginTop: 4,
   },
@@ -936,7 +939,7 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: "#F2F2F2",
+    backgroundColor: "#F8F8FA",
     padding: 15,
     borderRadius: 10,
     marginBottom: 15,
@@ -968,46 +971,48 @@ const styles = StyleSheet.create({
   editButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#4A90E2",
+    borderColor: "#F2C75C",
     borderRadius: 8,
     padding: 10,
     alignItems: "center",
+    backgroundColor: "#FFFFFF",
   },
 
   editButtonText: {
-    color: "#4A90E2",
+    color: "#F2C75C",
     fontWeight: "bold",
   },
 
   deleteButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#e53e3e",
+    borderColor: "#EF4444",
     borderRadius: 8,
     padding: 10,
     alignItems: "center",
+    backgroundColor: "#FFFFFF",
   },
 
   deleteButtonText: {
-    color: "#e53e3e",
+    color: "#EF4444",
     fontWeight: "bold",
   },
 
   cancelButton: {
-    backgroundColor: "#F2F2F2",
+    backgroundColor: "#F8F8FA",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
   },
 
   cancelButtonText: {
-    color: "#555",
+    color: "#6B7280",
     fontSize: 16,
     fontWeight: "bold",
   },
 
   emptyText: {
-    color: "#777",
+    color: "#6B7280",
     marginTop: 10,
   },
 
@@ -1019,7 +1024,7 @@ const styles = StyleSheet.create({
   },
 
   disabledButton: {
-    backgroundColor: "#9ca3af",
+    backgroundColor: "#9CA3AF",
   },
 
   modalBackground: {
@@ -1056,7 +1061,7 @@ const styles = StyleSheet.create({
 
   closeButton: {
     marginTop: 15,
-    backgroundColor: "#4A90E2",
+    backgroundColor: "#ff6a92",
     padding: 12,
     borderRadius: 10,
     alignItems: "center",
@@ -1078,7 +1083,7 @@ const styles = StyleSheet.create({
   deleteModalText: {
     fontSize: 16,
     marginBottom: 20,
-    color: "#333",
+    color: "#2B2B2B",
   },
 
   deleteModalButtonRow: {
@@ -1088,21 +1093,21 @@ const styles = StyleSheet.create({
 
   deleteCancelButton: {
     flex: 1,
-    backgroundColor: "#F2F2F2",
+    backgroundColor: "#F8F8FA",
     padding: 14,
     borderRadius: 10,
     alignItems: "center",
   },
 
   deleteCancelButtonText: {
-    color: "#555",
+    color: "#6B7280",
     fontSize: 16,
     fontWeight: "bold",
   },
 
   deleteConfirmButton: {
     flex: 1,
-    backgroundColor: "#e53e3e",
+    backgroundColor: "#EF4444",
     padding: 14,
     borderRadius: 10,
     alignItems: "center",
@@ -1125,7 +1130,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: "#e53e3e",
+    borderLeftColor: "#EF4444",
   },
 
   incorrectItemHeader: {
@@ -1138,26 +1143,26 @@ const styles = StyleSheet.create({
   quizTitleText: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     flex: 1,
   },
 
   dateText: {
     fontSize: 12,
-    color: "#64748b",
+    color: "#6B7280",
   },
 
   questionNumber: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#2563EB",
+    color: "#ff6a92",
     marginBottom: 6,
   },
 
   questionContentText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     lineHeight: 21,
     marginBottom: 10,
   },
@@ -1167,17 +1172,17 @@ const styles = StyleSheet.create({
   },
 
   incorrectItemOption: {
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#F8F8FA",
     borderRadius: 8,
     padding: 10,
     marginBottom: 6,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#E5E7EB",
   },
 
   correctAnswerOption: {
     backgroundColor: "#dcfce7",
-    borderColor: "#4ade80",
+    borderColor: "#22C55E",
   },
 
   wrongAnswerOption: {
@@ -1187,28 +1192,28 @@ const styles = StyleSheet.create({
 
   optionNumberText: {
     fontSize: 13,
-    color: "#334155",
+    color: "#2B2B2B",
     lineHeight: 19,
   },
 
   correctAnswerText: {
-    color: "#166534",
+    color: "#22C55E",
     fontWeight: "700",
   },
 
   wrongAnswerText: {
-    color: "#b91c1c",
+    color: "#EF4444",
     fontWeight: "700",
   },
 
   correctLabel: {
-    color: "#166534",
+    color: "#22C55E",
     fontWeight: "700",
     fontSize: 12,
   },
 
   wrongLabel: {
-    color: "#b91c1c",
+    color: "#EF4444",
     fontWeight: "700",
     fontSize: 12,
   },
@@ -1217,19 +1222,19 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
+    borderTopColor: "#E5E7EB",
   },
 
   explanationTitle: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     marginBottom: 4,
   },
 
   explanationText: {
     fontSize: 13,
-    color: "#475569",
+    color: "#6B7280",
     lineHeight: 20,
   },
 

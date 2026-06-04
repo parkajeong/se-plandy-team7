@@ -3,10 +3,10 @@ import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Button,
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -31,6 +31,8 @@ import {
 import { beginAppLogout } from "../src/appSession";
 
 const MAIN_ROUTE = "/(tabs)/subjects";
+const MAIN_PINK = "#ff6a92";
+const DANGER_RED = "#EF4444";
 
 export default function HomeScreen() {
   const [isSignUpMode, setIsSignUpMode] = useState(false);
@@ -163,7 +165,7 @@ export default function HomeScreen() {
         {
           text: "취소",
           style: "cancel",
-          onPress: resolve,
+          onPress: () => resolve(),
         },
         {
           text: "탈퇴 진행",
@@ -300,13 +302,19 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={styles.formContainer}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.formContainer}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.authPanel}>
       <Text style={styles.title}>{isSignUpMode ? "회원가입" : "로그인"}</Text>
 
       {isSignUpMode ? (
         <>
           <TextInput
             placeholder="아이디"
+            placeholderTextColor="#9CA3AF"
             value={loginId}
             onChangeText={setLoginId}
             autoCapitalize="none"
@@ -315,6 +323,7 @@ export default function HomeScreen() {
 
           <TextInput
             placeholder="이메일"
+            placeholderTextColor="#9CA3AF"
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -325,6 +334,7 @@ export default function HomeScreen() {
       ) : (
         <TextInput
           placeholder="아이디 또는 이메일"
+          placeholderTextColor="#9CA3AF"
           value={idOrEmail}
           onChangeText={setIdOrEmail}
           autoCapitalize="none"
@@ -336,6 +346,7 @@ export default function HomeScreen() {
       <View style={styles.passwordBox}>
         <TextInput
           placeholder="비밀번호"
+          placeholderTextColor="#9CA3AF"
           value={password}
           onChangeText={setPassword}
           secureTextEntry={!showPassword}
@@ -353,6 +364,7 @@ export default function HomeScreen() {
       {isSignUpMode && (
         <TextInput
           placeholder="닉네임"
+          placeholderTextColor="#9CA3AF"
           value={nickname}
           onChangeText={setNickname}
           style={styles.input}
@@ -360,45 +372,63 @@ export default function HomeScreen() {
       )}
 
       {isSignUpMode ? (
-        <Button title="회원가입" onPress={handleSignUp} />
+        <Pressable style={styles.primaryButton} onPress={handleSignUp}>
+          <Text style={styles.primaryButtonText}>회원가입</Text>
+        </Pressable>
       ) : (
-        <Button title="로그인" onPress={handleLogin} />
+        <Pressable style={styles.primaryButton} onPress={handleLogin}>
+          <Text style={styles.primaryButtonText}>로그인</Text>
+        </Pressable>
       )}
 
       {!isSignUpMode && (
         <>
-          <View style={styles.spacer} />
-          <Button title="Google로 로그인" onPress={handleGoogleLogin} />
-          <View style={styles.spacer} />
-          <Button
-            title={isKakaoLoginLoading ? "카카오 로그인 중..." : "카카오로 로그인"}
-            onPress={handleKakaoLogin}
-            disabled={isKakaoLoginLoading}
-          />
+          <View style={styles.divider} />
+          <View style={styles.buttonGrid}>
+            <Pressable style={styles.gridPrimaryButton} onPress={handleGoogleLogin}>
+              <Text style={styles.primaryButtonText}>Google로 로그인</Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.gridPrimaryButton,
+                isKakaoLoginLoading && styles.disabledButton,
+              ]}
+              onPress={handleKakaoLogin}
+              disabled={isKakaoLoginLoading}
+            >
+              <Text style={styles.primaryButtonText}>
+                {isKakaoLoginLoading ? "카카오 로그인 중..." : "카카오로 로그인"}
+              </Text>
+            </Pressable>
+          </View>
         </>
       )}
 
-      <View style={styles.spacer} />
+      <View style={styles.divider} />
 
-      <Button
-        title={isSignUpMode ? "이미 계정이 있나요? 로그인" : "계정이 없나요? 회원가입"}
-        onPress={() => {
-          setIsSignUpMode(!isSignUpMode);
-          setPassword("");
-        }}
-      />
+      <View style={styles.buttonGrid}>
+        <Pressable
+          style={styles.gridSecondaryButton}
+          onPress={() => {
+            setIsSignUpMode(!isSignUpMode);
+            setPassword("");
+          }}
+        >
+          <Text style={styles.secondaryButtonText}>
+            {isSignUpMode ? "이미 계정이 있나요? 로그인" : "계정이 없나요? 회원가입"}
+          </Text>
+        </Pressable>
 
-      {!isSignUpMode && (
-        <>
-          <View style={styles.spacer} />
+        {!isSignUpMode && (
           <Pressable
-            style={styles.withdrawOpenButton}
+            style={styles.gridSecondaryButton}
             onPress={handleOpenWithdrawAccount}
           >
-            <Text style={styles.withdrawOpenButtonText}>회원 탈퇴</Text>
+            <Text style={styles.secondaryButtonText}>회원 탈퇴</Text>
           </Pressable>
-        </>
-      )}
+        )}
+      </View>
+      </View>
 
       <Modal
         visible={isWithdrawModalVisible}
@@ -457,7 +487,7 @@ export default function HomeScreen() {
               onPress={handleWithdrawWithGoogle}
             >
               {isWithdrawing && withdrawProvider === "google" ? (
-                <ActivityIndicator size="small" color="#374151" />
+                <ActivityIndicator size="small" color="#6B7280" />
               ) : (
                 <Text style={styles.withdrawProviderButtonText}>
                   Google 계정으로 탈퇴
@@ -471,7 +501,7 @@ export default function HomeScreen() {
               onPress={handleWithdrawWithKakao}
             >
               {isWithdrawing && withdrawProvider === "kakao" ? (
-                <ActivityIndicator size="small" color="#374151" />
+                <ActivityIndicator size="small" color="#6B7280" />
               ) : (
                 <Text style={styles.withdrawProviderButtonText}>
                   카카오 계정으로 탈퇴
@@ -489,53 +519,114 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#F8F8FA",
+  },
   formContainer: {
-    marginTop: 60,
+    alignItems: "center",
+    flexGrow: 1,
+    justifyContent: "center",
     padding: 24,
+  },
+  authPanel: {
+    width: "100%",
+    maxWidth: 520,
   },
   title: {
     fontSize: 24,
+    fontWeight: "700",
     marginBottom: 20,
+    color: "#2B2B2B",
   },
   input: {
     borderRadius: 8,
     borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
     marginBottom: 12,
     padding: 12,
+    color: "#2B2B2B",
   },
   passwordBox: {
     alignItems: "center",
     borderRadius: 8,
     borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
     flexDirection: "row",
     marginBottom: 12,
   },
   passwordInput: {
     flex: 1,
     padding: 12,
+    color: "#2B2B2B",
   },
   passwordToggle: {
-    color: "blue",
+    color: DANGER_RED,
     paddingHorizontal: 12,
   },
-  spacer: {
-    height: 12,
-  },
-  withdrawOpenButton: {
+  primaryButton: {
     alignItems: "center",
-    backgroundColor: "#e5e7eb",
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: MAIN_PINK,
+    borderRadius: 10,
+    justifyContent: "center",
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
   },
-  withdrawOpenButtonText: {
-    color: "#374151",
+  primaryButtonText: {
+    color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "700",
+    textAlign: "center",
+  },
+  divider: {
+    backgroundColor: "#E5E7EB",
+    height: 1,
+    marginVertical: 18,
+    width: "100%",
+  },
+  buttonGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    width: "100%",
+  },
+  gridPrimaryButton: {
+    alignItems: "center",
+    backgroundColor: MAIN_PINK,
+    borderRadius: 10,
+    flexBasis: 0,
+    flexGrow: 1,
+    justifyContent: "center",
+    minHeight: 46,
+    minWidth: 130,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  gridSecondaryButton: {
+    alignItems: "center",
+    backgroundColor: "#E5E7EB",
+    borderRadius: 10,
+    flexBasis: 0,
+    flexGrow: 1,
+    justifyContent: "center",
+    minHeight: 46,
+    minWidth: 130,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  secondaryButtonText: {
+    color: "#2B2B2B",
+    fontSize: 14,
+    fontWeight: "700",
+    textAlign: "center",
   },
   modalBackground: {
     alignItems: "center",
@@ -555,9 +646,10 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700",
     marginBottom: 10,
+    color: "#2B2B2B",
   },
   withdrawDescription: {
-    color: "#4b5563",
+    color: "#6B7280",
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 16,
@@ -586,7 +678,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   withdrawProviderButtonText: {
-    color: "#374151",
+    color: "#6B7280",
     fontSize: 15,
     fontWeight: "700",
   },
@@ -598,7 +690,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   withdrawCancelButtonText: {
-    color: "#374151",
+    color: "#2B2B2B",
     fontSize: 15,
     fontWeight: "700",
   },

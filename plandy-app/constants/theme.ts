@@ -5,16 +5,30 @@
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
+// Unified Color Palette
+const tintColorLight = '#ff6a92'; // Main Pink
 const tintColorDark = '#fff';
+
+export const COLORS = {
+  primary: '#ff6a92',      // Main Pink
+  secondary: '#F2C75C',    // Secondary Yellow
+  background: '#FFFFFF',   // Main Background
+  surface: '#F8F8FA',      // Secondary Background
+  text: '#2B2B2B',         // Main Text (Dark Gray)
+  subText: '#6B7280',      // Sub Text (Gray)
+  border: '#E5E7EB',       // Border (Light Gray)
+  buttonText: '#FFFFFF',   // Button Text (White)
+  danger: '#EF4444',       // Error/Danger Red
+  success: '#22C55E',      // Success Green
+};
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
+    text: COLORS.text,
+    background: COLORS.background,
     tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
+    icon: COLORS.subText,
+    tabIconDefault: COLORS.subText,
     tabIconSelected: tintColorLight,
   },
   dark: {

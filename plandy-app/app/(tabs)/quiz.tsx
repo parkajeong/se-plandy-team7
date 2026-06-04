@@ -318,7 +318,7 @@ export default function QuizScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.titleRow}>
-        <Ionicons name="help-circle-outline" size={28} color="#1E3A5F" />
+        <Ionicons name="help-circle-outline" size={28} color="#2B2B2B" />
         <Text style={styles.pageTitle}> 퀴즈 관리</Text>
       </View>
 
@@ -392,7 +392,7 @@ export default function QuizScreen() {
       </TouchableOpacity>
 
       {isLoading ? (
-        <ActivityIndicator style={styles.loader} color="#2563EB" />
+        <ActivityIndicator style={styles.loader} color="#ff6a92" />
       ) : (
         <FlatList
           data={quizzes}
@@ -420,7 +420,7 @@ export default function QuizScreen() {
               <View style={styles.cardHeader}>
                 <Text style={styles.quizTitle}>{item.title || "AI 노트 퀴즈"}</Text>
                 <TouchableOpacity onPress={() => handleDeleteQuiz(item.id)}>
-                  <Ionicons name="trash-outline" size={18} color="#e53e3e" />
+                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
                 </TouchableOpacity>
               </View>
               <Text style={styles.metaText}>
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 24,
-    backgroundColor: "#f8faff",
+    backgroundColor: "#F8F8FA",
   },
   titleRow: {
     flexDirection: "row",
@@ -526,18 +526,18 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#1E3A5F",
+    color: "#2B2B2B",
   },
   statsCard: {
     backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#E5E7EB",
     padding: 16,
     marginBottom: 16,
   },
   statsTitle: {
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     fontSize: 15,
     fontWeight: "800",
     marginBottom: 10,
@@ -548,18 +548,18 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   statsLabel: {
-    color: "#475569",
+    color: "#6B7280",
     fontSize: 13,
   },
   statsValue: {
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     fontSize: 13,
     fontWeight: "700",
   },
   recentList: {
     marginTop: 10,
     borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
+    borderTopColor: "#E5E7EB",
     paddingTop: 10,
   },
   recentItem: {
@@ -568,11 +568,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   recentText: {
-    color: "#475569",
+    color: "#6B7280",
     fontSize: 13,
   },
   recentRateText: {
-    color: "#2563EB",
+    color: "#ff6a92",
     fontSize: 13,
     fontWeight: "700",
   },
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   generateButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#ff6a92",
     borderRadius: 10,
     padding: 14,
     alignItems: "center",
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   disabledButton: {
-    backgroundColor: "#9ca3af",
+    backgroundColor: "#9CA3AF",
   },
   loader: {
     marginTop: 24,
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#E5E7EB",
   },
   cardHeader: {
     flexDirection: "row",
@@ -620,17 +620,17 @@ const styles = StyleSheet.create({
   },
   quizTitle: {
     flex: 1,
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     fontSize: 17,
     fontWeight: "800",
   },
   metaText: {
-    color: "#64748b",
+    color: "#6B7280",
     fontSize: 13,
     marginTop: 2,
   },
   emptyText: {
-    color: "#64748b",
+    color: "#6B7280",
     marginTop: 12,
   },
   modalBackground: {
@@ -650,11 +650,11 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     marginBottom: 12,
   },
   optionLabel: {
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     fontSize: 14,
     fontWeight: "800",
     marginBottom: 8,
@@ -666,7 +666,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   questionCountButton: {
-    borderColor: "#cbd5e1",
+    borderColor: "#E5E7EB",
     borderRadius: 8,
     borderWidth: 1,
     minWidth: 48,
@@ -675,11 +675,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   questionCountButtonSelected: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB",
+    backgroundColor: "#ff6a92",
+    borderColor: "#ff6a92",
   },
   questionCountText: {
-    color: "#334155",
+    color: "#2B2B2B",
     fontWeight: "700",
   },
   questionCountTextSelected: {
@@ -687,33 +687,33 @@ const styles = StyleSheet.create({
   },
   noteItem: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#E5E7EB",
     borderRadius: 8,
     padding: 14,
     marginBottom: 10,
     backgroundColor: "#fff",
   },
   noteItemDisabled: {
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "#F8F8FA",
   },
   noteTitle: {
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     fontWeight: "700",
     marginBottom: 6,
   },
   notePreview: {
-    color: "#64748b",
+    color: "#6B7280",
     lineHeight: 20,
   },
   cancelButton: {
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "#F8F8FA",
     borderRadius: 10,
     padding: 14,
     alignItems: "center",
     marginTop: 6,
   },
   cancelButtonText: {
-    color: "#64748b",
+    color: "#6B7280",
     fontWeight: "700",
   },
 });

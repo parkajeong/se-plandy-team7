@@ -6,8 +6,6 @@ import React, { useEffect, useState } from "react";
 import UserHeaderRight from "@/components/UserHeaderRight";
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
   getAppUser,
   hasActiveSession,
@@ -18,9 +16,10 @@ import {
 import { auth } from "@/src/firebase";
 
 const AUTH_CHECK_TIMEOUT_MS = 2000;
+const MAIN_PINK = "#ff6a92";
+const INACTIVE_GRAY = "#9CA3AF";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -77,8 +76,13 @@ export default function TabLayout() {
     <Tabs
       initialRouteName="subjects"
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
+        tabBarActiveTintColor: MAIN_PINK,
+        tabBarInactiveTintColor: INACTIVE_GRAY,
+        tabBarStyle: {
+          backgroundColor: "#FFFFFF",
+        },
         headerShown: true,
+        headerTitle: "",
         headerRight: () => <UserHeaderRight />,
         tabBarButton: HapticTab,
       }}
@@ -104,8 +108,6 @@ export default function TabLayout() {
         name="todo"
         options={{
           title: "TodoList",
-          tabBarActiveTintColor: "#a8a8aaf4",
-          tabBarInactiveTintColor: "#a0a6b0f7",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="checkbox-outline" size={size ?? 28} color={color} />
           ),

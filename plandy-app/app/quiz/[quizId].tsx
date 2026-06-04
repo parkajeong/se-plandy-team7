@@ -200,7 +200,7 @@ export default function QuizDetailScreen() {
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator color="#2563EB" size="large" />
+        <ActivityIndicator color="#ff6a92" size="large" />
         <Text style={styles.loadingText}>퀴즈를 불러오는 중...</Text>
       </View>
     );
@@ -209,7 +209,7 @@ export default function QuizDetailScreen() {
   if (errorMessage || !quiz) {
     return (
       <View style={styles.centerContainer}>
-        <Ionicons name="alert-circle-outline" size={42} color="#e53e3e" />
+        <Ionicons name="alert-circle-outline" size={42} color="#EF4444" />
         <Text style={styles.errorTitle}>퀴즈 조회 실패</Text>
         <Text style={styles.errorText}>{errorMessage}</Text>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -344,28 +344,28 @@ export default function QuizDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8faff",
+    backgroundColor: "#F8F8FA",
     padding: 24,
     paddingBottom: 32,
   },
   centerContainer: {
     flex: 1,
     alignItems: "center",
-    backgroundColor: "#f8faff",
+    backgroundColor: "#F8F8FA",
     justifyContent: "center",
     padding: 24,
   },
   loadingText: {
-    color: "#64748b",
+    color: "#6B7280",
     marginTop: 12,
   },
   title: {
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     fontSize: 26,
     fontWeight: "800",
   },
   summary: {
-    color: "#64748b",
+    color: "#6B7280",
     marginBottom: 16,
     marginTop: 6,
   },
@@ -374,27 +374,27 @@ const styles = StyleSheet.create({
   },
   questionCard: {
     backgroundColor: "#fff",
-    borderColor: "#e2e8f0",
+    borderColor: "#E5E7EB",
     borderRadius: 8,
     borderWidth: 1,
     marginBottom: 14,
     padding: 16,
   },
   questionLabel: {
-    color: "#2563EB",
+    color: "#ff6a92",
     fontSize: 13,
     fontWeight: "800",
     marginBottom: 8,
   },
   questionText: {
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     fontSize: 16,
     fontWeight: "700",
     lineHeight: 23,
     marginBottom: 12,
   },
   optionRow: {
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#F8F8FA",
     borderRadius: 8,
     marginBottom: 8,
     padding: 10,
@@ -403,27 +403,27 @@ const styles = StyleSheet.create({
     backgroundColor: "#dcfce7",
   },
   optionText: {
-    color: "#334155",
+    color: "#2B2B2B",
     lineHeight: 20,
   },
   answerOptionText: {
-    color: "#166534",
+    color: "#22C55E",
     fontWeight: "700",
   },
   optionTextSelected: {
-    color: "#1f2937",
+    color: "#2B2B2B",
     fontWeight: "700",
   },
   optionTextCorrect: {
-    color: "#166534",
+    color: "#22C55E",
     fontWeight: "700",
   },
   optionTextIncorrect: {
-    color: "#b91c1c",
+    color: "#EF4444",
     fontWeight: "700",
   },
   optionSelected: {
-    backgroundColor: "#e0f2fe",
+    backgroundColor: "#F8F8FA",
   },
   optionCorrect: {
     backgroundColor: "#dcfce7",
@@ -432,13 +432,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#fee2e2",
   },
   questionCardCorrect: {
-    borderColor: "#4ade80",
+    borderColor: "#22C55E",
   },
   questionCardIncorrect: {
     borderColor: "#fca5a5",
   },
   answerText: {
-    color: "#166534",
+    color: "#22C55E",
     fontWeight: "800",
     marginTop: 6,
   },
@@ -446,32 +446,32 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
+    borderTopColor: "#E5E7EB",
   },
   explanationText: {
-    color: "#64748b",
+    color: "#6B7280",
     lineHeight: 21,
     marginTop: 6,
   },
   resultBanner: {
-    backgroundColor: "#eff6ff",
+    backgroundColor: "#F8F8FA",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#60a5fa",
+    borderColor: "#ff6a92",
     marginBottom: 16,
     padding: 14,
   },
   resultBannerText: {
-    color: "#1d4ed8",
+    color: "#ff6a92",
     fontSize: 16,
     fontWeight: "800",
   },
   resultBannerSubText: {
-    color: "#4f46e5",
+    color: "#ff6a92",
     marginTop: 4,
   },
   submitButton: {
-    backgroundColor: "#2563eb",
+    backgroundColor: "#ff6a92",
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",
@@ -487,38 +487,42 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#E5E7EB",
     padding: 16,
     marginTop: 12,
   },
   reviewTitle: {
-    color: "#1e3a5f",
+    color: "#2B2B2B",
     fontSize: 15,
     fontWeight: "800",
     marginBottom: 8,
   },
   reviewItemText: {
-    color: "#334155",
+    color: "#2B2B2B",
     lineHeight: 22,
     marginBottom: 4,
   },
+  emptyText: {
+    color: "#6B7280",
+    lineHeight: 22,
+  },
   disabledButton: {
-    backgroundColor: "#94a3b8",
+    backgroundColor: "#D1D5DB",
   },
   errorTitle: {
-    color: "#1E3A5F",
+    color: "#2B2B2B",
     fontSize: 21,
     fontWeight: "800",
     marginTop: 14,
   },
   errorText: {
-    color: "#64748b",
+    color: "#6B7280",
     lineHeight: 22,
     marginTop: 8,
     textAlign: "center",
   },
   backButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#ff6a92",
     borderRadius: 10,
     marginTop: 20,
     paddingHorizontal: 18,

@@ -123,7 +123,7 @@ export default function SubjectDropdown({
 const styles = StyleSheet.create({
   trigger: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: "#D1D5DB",
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 14,
@@ -131,18 +131,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
   },
   triggerDisabled: {
-    backgroundColor: "#f3f4f6",
+    backgroundColor: "#F8F8FA",
   },
   selectedText: {
     fontSize: 16,
-    color: "#111827",
+    color: "#2B2B2B",
   },
   placeholderText: {
     fontSize: 16,
-    color: "#9ca3af",
+    color: "#9CA3AF",
   },
   triggerError: {
-    borderColor: "#ef4444",
+    borderColor: "#EF4444",
     borderWidth: 1.5,
   },
   modalBackground: {
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "bold",
     marginBottom: 15,
-    color: "#111827",
+    color: "#2B2B2B",
   },
   subjectItem: {
     padding: 15,
@@ -171,23 +171,23 @@ const styles = StyleSheet.create({
     borderBottomColor: "#eeeeee",
   },
   subjectItemSelected: {
-    backgroundColor: "#eff6ff",
+    backgroundColor: "#F8F8FA",
   },
   subjectItemText: {
     fontSize: 16,
-    color: "#111827",
+    color: "#2B2B2B",
   },
   subjectItemTextSelected: {
     fontWeight: "700",
-    color: "#2563eb",
+    color: "#ff6a92",
   },
   emptyText: {
-    color: "#777777",
+    color: "#6B7280",
     marginTop: 10,
   },
   closeButton: {
     marginTop: 15,
-    backgroundColor: "#4A90E2",
+    backgroundColor: "#ff6a92",
     padding: 12,
     borderRadius: 10,
     alignItems: "center",
