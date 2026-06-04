@@ -165,6 +165,7 @@ export default function TodoScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const subjectTitleMap = useMemo(() => {
     return subjects.reduce<Record<string, string>>((acc, subject) => {
@@ -176,6 +177,41 @@ export default function TodoScreen() {
   const calendarWeeks = useMemo(() => {
     return getCalendarWeeks(currentMonth);
   }, [currentMonth]);
+
+  const validateForm = (): Record<string, string> => {
+    const errors: Record<string, string> = {};
+
+    if (!form.title.trim()) {
+      errors.title = '할 일 제목을 입력해주세요.';
+    }
+
+    if (!form.subject_id) {
+      errors.subject_id = '과목을 선택해주세요.';
+    }
+
+    if (!form.category) {
+      errors.category = '유형을 선택해주세요.';
+    }
+
+    if (!form.deadline) {
+      errors.deadline = '마감일을 선택해주세요.';
+    }
+
+    const priority = Number(form.priority);
+    if (!Number.isInteger(priority) || priority < 1 || priority > 5) {
+      errors.priority = '우선순위를 선택해주세요.';
+    }
+
+    return errors;
+  };
+
+  const clearValidationError = (fieldName: string) => {
+    setValidationErrors((prev) => {
+      const next = { ...prev };
+      delete next[fieldName];
+      return next;
+    });
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -225,6 +261,7 @@ export default function TodoScreen() {
       subject_id: subjects[0]?.id || '',
     });
     setCurrentMonth(new Date());
+    setValidationErrors({});
     setIsTodoModalVisible(true);
   };
 
@@ -241,6 +278,7 @@ export default function TodoScreen() {
       description: todo.description || '',
     });
     setCurrentMonth(parsedDeadline || new Date());
+    setValidationErrors({});
     setIsTodoModalVisible(true);
   };
 
@@ -253,6 +291,7 @@ export default function TodoScreen() {
     setIsCalendarVisible(false);
     setEditingTodoId(null);
     setForm(initialForm);
+    setValidationErrors({});
   };
 
   const handlePrevMonth = () => {
@@ -287,8 +326,11 @@ export default function TodoScreen() {
       return;
     }
 
-    if (!form.subject_id) {
-      Alert.alert('과목 선택', '저장할 과목을 선택해주세요.');
+    // Validate form
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      Alert.alert('필수 입력 항목 확인', '필수 입력 항목을 모두 채워주세요.');
       return;
     }
 
@@ -530,29 +572,53 @@ export default function TodoScreen() {
                 {editingTodoId ? '할 일 수정' : '할 일 등록'}
               </Text>
 
-              <Text style={styles.inputLabel}>할 일 제목</Text>
+              <Text style={styles.inputLabel}>
+                할 일 제목
+                {validationErrors.title ? <Text style={styles.requiredMark}> *</Text> : null}
+              </Text>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  validationErrors.title && styles.inputError,
+                ]}
                 placeholder="예: 소프트웨어공학 과제 제출"
                 value={form.title}
-                onChangeText={(text) =>
-                  setForm((prev) => ({ ...prev, title: text }))
-                }
-              />
-
-              <Text style={styles.inputLabel}>과목명</Text>
-              {subjects.length > 0 ? (
-                <SubjectDropdown
-                  subjects={subjects}
-                  selectedSubjectId={form.subject_id}
-                  placeholder="과목 선택"
-                  onSelect={(subject) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      subject_id: subject.id,
-                    }))
+                onChangeText={(text) => {
+                  setForm((prev) => ({ ...prev, title: text }));
+                  if (validationErrors.title) {
+                    clearValidationError('title');
                   }
-                />
+                }}
+              />
+              {validationErrors.title ? (
+                <Text style={styles.validationText}>{validationErrors.title}</Text>
+              ) : null}
+
+              <Text style={styles.inputLabel}>
+                과목명
+                {validationErrors.subject_id ? <Text style={styles.requiredMark}> *</Text> : null}
+              </Text>
+              {subjects.length > 0 ? (
+                <>
+                  <SubjectDropdown
+                    subjects={subjects}
+                    selectedSubjectId={form.subject_id}
+                    placeholder="과목 선택"
+                    onSelect={(subject) => {
+                      setForm((prev) => ({
+                        ...prev,
+                        subject_id: subject.id,
+                      }));
+                      if (validationErrors.subject_id) {
+                        clearValidationError('subject_id');
+                      }
+                    }}
+                    hasError={!!validationErrors.subject_id}
+                  />
+                  {validationErrors.subject_id ? (
+                    <Text style={styles.validationText}>{validationErrors.subject_id}</Text>
+                  ) : null}
+                </>
               ) : (
                 <View style={styles.warningBox}>
                   <Text style={styles.warningText}>
@@ -569,42 +635,69 @@ export default function TodoScreen() {
                 </View>
               )}
 
-              <Text style={styles.inputLabel}>유형</Text>
-              <View style={styles.chipWrap}>
-                {TODO_CATEGORIES.map((category) => {
-                  const selected = form.category === category;
+              <Text style={styles.inputLabel}>
+                유형
+                {validationErrors.category ? <Text style={styles.requiredMark}> *</Text> : null}
+              </Text>
+              <View
+                style={[
+                  styles.chipWrapContainer,
+                  validationErrors.category && styles.selectionGroupError,
+                ]}
+              >
+                <View style={styles.chipWrap}>
+                  {TODO_CATEGORIES.map((category) => {
+                    const selected = form.category === category;
 
-                  return (
-                    <Pressable
-                      key={category}
-                      style={[
-                        styles.chipButton,
-                        selected && styles.chipButtonSelected,
-                      ]}
-                      onPress={() =>
-                        setForm((prev) => ({
-                          ...prev,
-                          category,
-                        }))
-                      }
-                    >
-                      <Text
+                    return (
+                      <Pressable
+                        key={category}
                         style={[
-                          styles.chipButtonText,
-                          selected && styles.chipButtonTextSelected,
+                          styles.chipButton,
+                          selected && styles.chipButtonSelected,
                         ]}
+                        onPress={() => {
+                          setForm((prev) => ({
+                            ...prev,
+                            category,
+                          }));
+                          if (validationErrors.category) {
+                            clearValidationError('category');
+                          }
+                        }}
                       >
-                        {category}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+                        <Text
+                          style={[
+                            styles.chipButtonText,
+                            selected && styles.chipButtonTextSelected,
+                          ]}
+                        >
+                          {category}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
+              {validationErrors.category ? (
+                <Text style={styles.validationText}>{validationErrors.category}</Text>
+              ) : null}
 
-              <Text style={styles.inputLabel}>마감일</Text>
+              <Text style={styles.inputLabel}>
+                마감일
+                {validationErrors.deadline ? <Text style={styles.requiredMark}> *</Text> : null}
+              </Text>
               <Pressable
-                style={styles.dateSelectButton}
-                onPress={() => setIsCalendarVisible(true)}
+                style={[
+                  styles.dateSelectButton,
+                  validationErrors.deadline && styles.inputError,
+                ]}
+                onPress={() => {
+                  setIsCalendarVisible(true);
+                  if (validationErrors.deadline) {
+                    clearValidationError('deadline');
+                  }
+                }}
               >
                 <Text
                   style={[
@@ -617,41 +710,60 @@ export default function TodoScreen() {
                     : '달력에서 날짜 선택'}
                 </Text>
               </Pressable>
+              {validationErrors.deadline ? (
+                <Text style={styles.validationText}>{validationErrors.deadline}</Text>
+              ) : null}
 
-              <Text style={styles.inputLabel}>우선순위</Text>
+              <Text style={styles.inputLabel}>
+                우선순위
+                {validationErrors.priority ? <Text style={styles.requiredMark}> *</Text> : null}
+              </Text>
               <Text style={styles.helperText}>
                 1이 가장 중요하고, 5가 가장 낮은 중요도입니다.
               </Text>
-              <View style={styles.chipWrap}>
-                {['1', '2', '3', '4', '5'].map((priority) => {
-                  const selected = form.priority === priority;
+              <View
+                style={[
+                  styles.chipWrapContainer,
+                  validationErrors.priority && styles.selectionGroupError,
+                ]}
+              >
+                <View style={styles.chipWrap}>
+                  {['1', '2', '3', '4', '5'].map((priority) => {
+                    const selected = form.priority === priority;
 
-                  return (
-                    <Pressable
-                      key={priority}
-                      style={[
-                        styles.priorityButton,
-                        selected && styles.chipButtonSelected,
-                      ]}
-                      onPress={() =>
-                        setForm((prev) => ({
-                          ...prev,
-                          priority,
-                        }))
-                      }
-                    >
-                      <Text
+                    return (
+                      <Pressable
+                        key={priority}
                         style={[
-                          styles.chipButtonText,
-                          selected && styles.chipButtonTextSelected,
+                          styles.priorityButton,
+                          selected && styles.chipButtonSelected,
                         ]}
+                        onPress={() => {
+                          setForm((prev) => ({
+                            ...prev,
+                            priority,
+                          }));
+                          if (validationErrors.priority) {
+                            clearValidationError('priority');
+                          }
+                        }}
                       >
-                        {priority}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+                        <Text
+                          style={[
+                            styles.chipButtonText,
+                            selected && styles.chipButtonTextSelected,
+                          ]}
+                        >
+                          {priority}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
+              {validationErrors.priority ? (
+                <Text style={styles.validationText}>{validationErrors.priority}</Text>
+              ) : null}
 
               <Text style={styles.inputLabel}>할 일 내용</Text>
               <TextInput
@@ -1166,5 +1278,29 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  requiredMark: {
+    color: '#ef4444',
+    fontWeight: '800',
+  },
+  inputError: {
+    borderColor: '#ef4444',
+    borderWidth: 1.5,
+  },
+  validationText: {
+    marginTop: -10,
+    marginBottom: 12,
+    fontSize: 12,
+    color: '#ef4444',
+    fontWeight: '500',
+  },
+  chipWrapContainer: {
+    marginBottom: 14,
+  },
+  selectionGroupError: {
+    borderWidth: 1.5,
+    borderColor: '#ef4444',
+    borderRadius: 12,
+    padding: 8,
   },
 });
