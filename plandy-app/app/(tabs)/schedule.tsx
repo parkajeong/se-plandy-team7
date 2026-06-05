@@ -26,11 +26,8 @@ import {
 } from "firebase/firestore";
 
 import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "@/src/firebase";
 import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
-
-const firebase = require("../../src/firebase");
-const db = firebase.db;
-const auth = firebase.auth;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -166,7 +163,7 @@ export default function ScheduleScreen() {
     return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
   };
 
-  const toDateObject = (value: any) => {
+  const toDateObject = useCallback((value: any) => {
     if (!value) {
       return null;
     }
@@ -186,7 +183,7 @@ export default function ScheduleScreen() {
     }
 
     return convertedDate;
-  };
+  }, []);
 
   const combineDateAndTime = (date: Date, hour: number, minute: number) => {
     return new Date(
@@ -209,7 +206,7 @@ export default function ScheduleScreen() {
     return `${formatDate(date)} ${formatTime(date.getHours(), date.getMinutes())}`;
   };
 
-  const getTimeValue = (value: any) => {
+  const getTimeValue = useCallback((value: any) => {
     const date = toDateObject(value);
 
     if (!date) {
@@ -217,7 +214,7 @@ export default function ScheduleScreen() {
     }
 
     return date.getTime();
-  };
+  }, [toDateObject]);
 
   const getDdayText = (value: any) => {
     const targetDate = toDateObject(value);
@@ -547,7 +544,7 @@ export default function ScheduleScreen() {
     setIsCalendarVisible(false);
   };
 
-  const fetchSchedules = async () => {
+  const fetchSchedules = useCallback(async () => {
     if (!userId) {
       setSchedules([]);
       return;
@@ -579,17 +576,17 @@ export default function ScheduleScreen() {
       void error;
       Alert.alert("오류", "일정 조회 실패");
     }
-  };
+  }, [getTimeValue, userId]);
 
   useEffect(() => {
     fetchSchedules();
-  }, [userId]);
+  }, [fetchSchedules]);
 
   useFocusEffect(
     useCallback(() => {
       syncUserId();
       fetchSchedules();
-    }, [syncUserId, userId])
+    }, [fetchSchedules, syncUserId])
   );
 
   const validateCustomReminder = (
@@ -795,8 +792,6 @@ export default function ScheduleScreen() {
     setDeletingSchedule(schedule);
     setIsDeleteScheduleModalVisible(true);
   };
-
-  const calendarWeeks = getCalendarWeeks();
 
   const currentSelectedDate =
     calendarTarget === "add" ? selectedDate : editDate;

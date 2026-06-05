@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "@/src/firebase";
 import {
   addDoc,
   collection,
@@ -27,10 +28,6 @@ import {
 } from "firebase/firestore";
 
 import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
-
-const firebase = require("../../src/firebase");
-const db = firebase.db;
-const auth = firebase.auth;
 
 type Mode = "group" | "available" | "recommend";
 type DateTimeTarget = "availableStart" | "availableEnd";
@@ -416,9 +413,10 @@ export default function StudyGroupScreen() {
           endDate,
         };
       })
-      .filter(Boolean) as Array<
-      AvailableTime & { startDate: Date; endDate: Date }
-    >;
+      .filter(Boolean) as (AvailableTime & {
+      startDate: Date;
+      endDate: Date;
+    })[];
 
     const boundaries = Array.from(
       new Set(

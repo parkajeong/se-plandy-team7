@@ -25,13 +25,10 @@ import {
 
 import { onAuthStateChanged } from "firebase/auth";
 import { getSubjects } from "@/src/subjectService";
+import { auth, db } from "@/src/firebase";
 import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
 import { getIncorrectNoteGroupsByUser } from "@/src/quizService";
 import SubjectDropdown from "../../components/SubjectDropdown";
-
-const firebase = require("../../src/firebase");
-const db = firebase.db;
-const auth = firebase.auth;
 
 type Subject = {
   id: string;
@@ -153,7 +150,7 @@ export default function NoteScreen() {
     };
   }, [syncUserId]);
 
-  const fetchSubjects = async () => {
+  const fetchSubjects = useCallback(async () => {
     if (!userId) {
       setSubjects([]);
       return [];
@@ -168,11 +165,11 @@ export default function NoteScreen() {
       Alert.alert("오류", "과목 목록 조회 실패");
       return [];
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
     fetchSubjects();
-  }, [userId]);
+  }, [fetchSubjects]);
 
   const fetchNotesBySubject = async (
     targetSubject: Subject,
@@ -214,7 +211,7 @@ export default function NoteScreen() {
     useCallback(() => {
       syncUserId();
       fetchSubjects();
-    }, [syncUserId, userId])
+    }, [fetchSubjects, syncUserId])
   );
 
   const fetchIncorrectNoteGroups = async () => {
