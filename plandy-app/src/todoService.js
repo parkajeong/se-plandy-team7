@@ -258,7 +258,6 @@ export async function deleteTodo(todoId) {
   try {
     await deleteDoc(todoRef);
   } catch (error) {
-    console.error(`[todoService] Failed to delete todo ${todoId}:`, error);
     throw error;
   }
 }

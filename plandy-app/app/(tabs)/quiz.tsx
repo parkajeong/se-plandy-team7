@@ -49,13 +49,6 @@ type Quiz = {
 };
 
 const QUESTION_COUNT_OPTIONS = [5, 10, 15, 20, 25, 30];
-const DEBUG_QUIZ = process.env.EXPO_PUBLIC_DEBUG_QUIZ === "true";
-
-const debugQuiz = (...args: unknown[]) => {
-  if (DEBUG_QUIZ) {
-    console.debug("[quiz]", ...args);
-  }
-};
 
 const formatDate = (value: any) => {
   const date = value?.toDate?.() || (value instanceof Date ? value : null);
@@ -85,11 +78,6 @@ export default function QuizScreen() {
 
   const syncUserId = useCallback(() => {
     const currentUserId = getCurrentAppUserIdOrNull();
-
-    debugQuiz("syncUserId", {
-      firebaseUid: auth.currentUser?.uid || null,
-      resolvedUserId: currentUserId,
-    });
 
     setUserId(currentUserId);
   }, []);
@@ -131,7 +119,6 @@ export default function QuizScreen() {
           setNotes(noteResult.value as Note[]);
         } else {
           noteError = noteResult.reason?.message || "노트 조회 중 오류가 발생했습니다.";
-          console.error("[quiz] notes query failed", noteResult.reason);
           setNotes([]);
           setNoteLoadError(noteError);
         }
@@ -140,10 +127,6 @@ export default function QuizScreen() {
           setQuizzes(quizResult.value as Quiz[]);
         } else {
           const userMessage = getQuizErrorMessage(quizResult.reason);
-
-          if (DEBUG_QUIZ) {
-            console.error("[quiz] quizzes query failed", quizResult.reason);
-          }
 
           setQuizzes([]);
           setQuizLoadError(userMessage);
@@ -174,8 +157,8 @@ export default function QuizScreen() {
         return bTime - aTime;
       });
       setQuizResults(sortedResults);
-    } catch (error: any) {
-      console.error("[quiz] quiz results load failed", error);
+    } catch (error) {
+      void error;
       setQuizResults([]);
     }
   }, [userId]);
@@ -267,7 +250,6 @@ export default function QuizScreen() {
       setQuizzes((prev) => prev.filter((quiz) => quiz.id !== quizId));
       Alert.alert("삭제 완료", "퀴즈가 삭제되었습니다.");
     } catch (error: any) {
-      console.error("[quiz] delete failed", error);
       Alert.alert("삭제 실패", error?.message || "퀴즈를 삭제하지 못했습니다.");
     }
   };

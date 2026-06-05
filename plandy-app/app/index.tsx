@@ -210,12 +210,10 @@ export default function HomeScreen() {
           resetWithdrawState();
           showAlert("회원 탈퇴 완료", "회원 탈퇴가 완료되었습니다.");
         } catch (error: any) {
-          console.log("[HomeScreen] account withdrawal failed", error);
           showAlert("회원 탈퇴 실패", getWithdrawAccountErrorMessage(error));
         }
       });
     } catch (error: any) {
-      console.log("[HomeScreen] password withdrawal authentication failed", error);
       showAlert("회원 탈퇴 실패", getWithdrawAccountErrorMessage(error));
     } finally {
       await clearLocalSession();
@@ -238,7 +236,7 @@ export default function HomeScreen() {
         beginAppLogout();
         googleUser = await signInWithGoogleOnly({ cancelLogout: false });
       } catch (error) {
-        console.log("[HomeScreen] Google withdrawal authentication failed", error);
+        void error;
         showAlert("회원 탈퇴 실패", "Google 인증에 실패했습니다. 다시 시도해주세요.");
         return;
       }
@@ -249,7 +247,6 @@ export default function HomeScreen() {
           resetWithdrawState();
           showAlert("회원 탈퇴 완료", "회원 탈퇴가 완료되었습니다.");
         } catch (error: any) {
-          console.log("[HomeScreen] Google account withdrawal failed", error);
           showAlert("회원 탈퇴 실패", getWithdrawAccountErrorMessage(error));
         }
       });
@@ -278,7 +275,7 @@ export default function HomeScreen() {
           persistAppUser: false,
         });
       } catch (error) {
-        console.log("[HomeScreen] Kakao withdrawal authentication failed", error);
+        void error;
         showAlert("회원 탈퇴 실패", "카카오 인증에 실패했습니다. 다시 시도해주세요.");
         return;
       }
@@ -289,7 +286,6 @@ export default function HomeScreen() {
           resetWithdrawState();
           showAlert("회원 탈퇴 완료", "회원 탈퇴가 완료되었습니다.");
         } catch (error: any) {
-          console.log("[HomeScreen] Kakao account withdrawal failed", error);
           showAlert("회원 탈퇴 실패", getWithdrawAccountErrorMessage(error));
         }
       });

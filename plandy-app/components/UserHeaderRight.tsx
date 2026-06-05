@@ -59,16 +59,12 @@ export default function UserHeaderRight() {
       const profileLoadId = profileLoadIdRef.current + 1;
       profileLoadIdRef.current = profileLoadId;
 
-      try {
-        const nextProfile = await getCurrentUserProfile();
-        if (isMounted && profileLoadId === profileLoadIdRef.current) {
-          setProfile(nextProfile);
-        }
-      } catch (error) {
-        console.error("[UserHeaderRight] failed to load profile", error);
-        if (isMounted && profileLoadId === profileLoadIdRef.current) {
-          setProfile(normalizeUserProfile(getAppUser()));
-        }
+      const nextProfile = await getCurrentUserProfile().catch(() =>
+        normalizeUserProfile(getAppUser())
+      );
+
+      if (isMounted && profileLoadId === profileLoadIdRef.current) {
+        setProfile(nextProfile);
       }
     };
 
@@ -111,15 +107,11 @@ export default function UserHeaderRight() {
 
     try {
       beginAppLogout();
-      replaceToLogin();
-    } catch (error) {
-      console.warn("[UserHeaderRight] local logout cleanup failed", error);
+    } finally {
       replaceToLogin();
     }
 
-    void logoutExternalProviders().catch((error) => {
-      console.warn("[UserHeaderRight] external logout cleanup failed", error);
-    });
+    void logoutExternalProviders().catch(() => undefined);
   };
 
   if (!profile && !isLoggingOut) {

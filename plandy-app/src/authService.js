@@ -71,12 +71,6 @@ const configureNativeGoogleSignIn = () => {
 export const signUpWithEmail = async ({ email, password, loginId, nickname }) => {
   cancelAppLogout();
 
-  console.log("[signUpWithEmail] called", {
-    email,
-    loginId,
-    nickname,
-    passwordLength: password?.length ?? 0,
-  });
 
   const trimmedEmail = email.trim();
   const trimmedLoginId = loginId.trim();
@@ -175,18 +169,14 @@ export const logoutExternalProviders = async () => {
 
   if (!isWeb && isGoogleSigninConfigured) {
     logoutTasks.push(
-      withTimeout(GoogleSignin.signOut()).catch((error) => {
-        console.warn("[logout] Google signOut failed", error);
-      })
+      withTimeout(GoogleSignin.signOut()).catch(() => undefined)
     );
   }
 
   logoutTasks.push(
     withTimeout(
       signOut(auth)
-    ).catch((error) => {
-      console.warn("[logout] Firebase signOut failed", error);
-    })
+    ).catch(() => undefined)
   );
 
   await Promise.allSettled(logoutTasks);
@@ -199,7 +189,6 @@ const createGoogleUserDocumentIfNeeded = async (user) => {
   const userSnap = await getDoc(userRef);
   const photoURL = user.photoURL || "";
 
-  console.log("[Google] login user.photoURL:", photoURL);
 
   if (!userSnap.exists()) {
     await setDoc(userRef, {
@@ -212,7 +201,6 @@ const createGoogleUserDocumentIfNeeded = async (user) => {
       created_at: serverTimestamp(),
     });
 
-    console.log("[Google] created users/{uid} photoURL:", photoURL);
     return;
   }
 
@@ -224,7 +212,6 @@ const createGoogleUserDocumentIfNeeded = async (user) => {
     updated_at: serverTimestamp(),
   });
 
-  console.log("[Google] updated users/{uid} photoURL:", photoURL);
 };
 
 const createKakaoUserDocumentIfNeeded = async (user) => {
@@ -262,13 +249,6 @@ const createKakaoUserDocumentIfNeeded = async (user) => {
 const exchangeKakaoCodeForToken = async ({ code, redirectUri }) => {
   const restApiKey = KAKAO_REST_API_KEY;
 
-  console.log("[Kakao] token request", {
-    grantType: "authorization_code",
-    restApiKeyExists: !!restApiKey,
-    redirectUri,
-    codeExists: !!code,
-    codePreview: code ? `${code.slice(0, 10)}...` : null,
-  });
 
   const tokenRequestBody = new URLSearchParams({
     grant_type: "authorization_code",
@@ -286,11 +266,6 @@ const exchangeKakaoCodeForToken = async ({ code, redirectUri }) => {
   });
 
   const tokenData = await response.json();
-  console.log("[Kakao] token response", {
-    status: response.status,
-    ok: response.ok,
-    tokenData,
-  });
 
   if (!response.ok) {
     throw new Error(tokenData.error_description || tokenData.error || "카카오 토큰 발급에 실패했습니다.");
@@ -446,9 +421,6 @@ export const signInWithKakaoOnly = async ({
 
   const restApiKey = KAKAO_REST_API_KEY;
 
-  console.log("[loginWithKakao] service entered", {
-    hasRestApiKey: !!restApiKey,
-  });
 
   if (!restApiKey) {
     throw new Error("EXPO_PUBLIC_KAKAO_REST_API_KEY가 설정되지 않았습니다.");
@@ -456,9 +428,6 @@ export const signInWithKakaoOnly = async ({
 
   const redirectUri = KAKAO_REDIRECT_URI;
 
-  console.log("[Kakao] restApiKey exists:", !!restApiKey);
-  console.log("[Kakao] redirectUri:", redirectUri);
-  console.log("[Kakao] appReturnUri:", KAKAO_APP_RETURN_URI);
 
   const authUrl =
     "https://kauth.kakao.com/oauth/authorize?" +
@@ -476,7 +445,6 @@ export const signInWithKakaoOnly = async ({
       authUrl,
       KAKAO_APP_RETURN_URI
     );
-    console.log("[Kakao] auth result:", result);
 
     if (result.type !== "success") {
       throw new Error("카카오 로그인이 완료되지 않았습니다.");
@@ -493,7 +461,6 @@ export const signInWithKakaoOnly = async ({
     code = resultUrl.searchParams.get("code");
   }
 
-  console.log("[Kakao] code exists:", !!code);
 
   if (!code) {
     throw new Error("카카오 인가 코드를 가져오지 못했습니다.");

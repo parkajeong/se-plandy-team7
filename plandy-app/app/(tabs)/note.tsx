@@ -164,7 +164,7 @@ export default function NoteScreen() {
       setSubjects(data as Subject[]);
       return data as Subject[];
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "과목 목록 조회 실패");
       return [];
     }
@@ -205,7 +205,7 @@ export default function NoteScreen() {
 
       setNotes(data);
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "노트 조회 실패");
     }
   };
@@ -228,7 +228,7 @@ export default function NoteScreen() {
       const groups = (await getIncorrectNoteGroupsByUser(userId)) as IncorrectNoteGroup[];
       setIncorrectNoteGroups(groups);
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "오답노트 조회 실패");
       setIncorrectNoteGroups([]);
     } finally {
@@ -267,7 +267,7 @@ export default function NoteScreen() {
       setNoteTitle("");
       setContent("");
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "노트 저장 실패");
     }
   };
@@ -346,7 +346,7 @@ export default function NoteScreen() {
         fetchNotesBySubject(searchSubject, false);
       }
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "노트 수정 실패");
     }
   };
@@ -364,7 +364,7 @@ export default function NoteScreen() {
 
       Alert.alert("성공", "노트가 삭제되었습니다.");
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "노트 삭제 실패");
     }
   };

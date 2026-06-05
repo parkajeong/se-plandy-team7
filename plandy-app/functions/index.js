@@ -36,8 +36,6 @@ const callGeminiGenerateContent = async (
   prompt,
   { responseMimeType, userErrorMessage = "Gemini API 호출에 실패했습니다." } = {}
 ) => {
-  console.log("Using Gemini model:", GEMINI_MODEL);
-
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
     {
@@ -58,21 +56,12 @@ const callGeminiGenerateContent = async (
   const data = await response.json();
 
   if (!response.ok) {
-    console.error("Gemini API request failed", {
-      model: GEMINI_MODEL,
-      status: response.status,
-      error: data?.error || data,
-    });
     throw new HttpsError("internal", userErrorMessage);
   }
 
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
   if (!text) {
-    console.error("Gemini API response text is empty", {
-      model: GEMINI_MODEL,
-      response: data,
-    });
     throw new HttpsError("internal", userErrorMessage);
   }
 
@@ -215,7 +204,6 @@ ${JSON.stringify(subjectQuizSummary)}
       const clean = text.replace(/```json|```/g, "").trim();
       return JSON.parse(clean);
     } catch (error) {
-      console.error("Study recommendation generation failed", error);
       throw new HttpsError("internal", "추천 데이터를 불러오지 못했습니다.");
     }
   }
@@ -316,12 +304,6 @@ exports.generateQuizFromNote = onCall(
         )
       ) {
         throw error;
-      }
-
-      if (error instanceof SyntaxError) {
-        console.error("Gemini quiz JSON parsing failed", error);
-      } else {
-        console.error("Quiz generation failed", error);
       }
 
       throw new HttpsError("internal", GEMINI_GENERATE_ERROR_MESSAGE);

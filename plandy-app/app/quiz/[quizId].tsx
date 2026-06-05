@@ -89,7 +89,6 @@ export default function QuizDetailScreen() {
       setQuiz(data);
       setErrorMessage("");
     } catch (error: any) {
-      console.error("[quiz] detail load failed", error);
       setErrorMessage(getQuizErrorMessage(error));
     } finally {
       setIsLoading(false);
@@ -177,8 +176,8 @@ export default function QuizDetailScreen() {
         "제출 완료",
         `총 ${totalCount}문제 중 ${correctCount}문제 정답입니다. 정답률 ${correctRate}%`
       );
-    } catch (error: any) {
-      console.error("[quiz] submit failed", error);
+    } catch (error) {
+      void error;
       Alert.alert("제출 실패", "결과 저장에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setIsSubmitting(false);

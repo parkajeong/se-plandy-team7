@@ -576,7 +576,7 @@ export default function ScheduleScreen() {
 
       setSchedules(data);
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "일정 조회 실패");
     }
   };
@@ -664,7 +664,7 @@ export default function ScheduleScreen() {
 
       fetchSchedules();
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "일정 등록 실패");
     }
   };
@@ -760,7 +760,7 @@ export default function ScheduleScreen() {
 
       fetchSchedules();
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "일정 수정 실패");
     }
   };
@@ -781,7 +781,7 @@ export default function ScheduleScreen() {
       Alert.alert("성공", "일정이 삭제되었습니다.");
       fetchSchedules();
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "일정 삭제 실패");
     }
   };

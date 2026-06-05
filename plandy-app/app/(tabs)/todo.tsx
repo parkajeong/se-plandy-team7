@@ -223,7 +223,6 @@ export default function TodoScreen() {
       setSubjects(subjectList);
       setTodos(todoList);
     } catch (error) {
-      console.error('[TodoScreen] Failed to load todos or subjects:', error);
       Alert.alert('조회 실패', getErrorMessage(error));
     }
   }, []);
@@ -355,7 +354,6 @@ export default function TodoScreen() {
       await loadData();
       closeTodoModal();
     } catch (error) {
-      console.error('[TodoScreen] Failed to save todo:', error);
       Alert.alert('저장 실패', getErrorMessage(error));
     } finally {
       setIsSaving(false);
@@ -372,7 +370,6 @@ export default function TodoScreen() {
 
       await loadData();
     } catch (error) {
-      console.error('[TodoScreen] Failed to toggle todo completion:', error);
       Alert.alert('상태 변경 실패', getErrorMessage(error));
     }
   };
@@ -380,7 +377,6 @@ export default function TodoScreen() {
   const performDeleteTodo = async (todoId: string) => {
     if (!todoId) {
       const error = new Error('Todo id is missing. Cannot delete todo.');
-      console.error('[TodoScreen] Failed to delete todo:', error);
       Alert.alert('삭제 실패', getErrorMessage(error));
       return;
     }
@@ -396,7 +392,6 @@ export default function TodoScreen() {
       await loadData();
     } catch (error) {
       setTodos(previousTodos);
-      console.error(`[TodoScreen] Failed to delete todo ${todoId}:`, error);
       Alert.alert('삭제 실패', getErrorMessage(error));
     }
   };

@@ -73,7 +73,7 @@ export default function GenerateQuizScreen() {
           params: { quizId },
         });
       } catch (error) {
-        console.error("[quiz] generate failed", error);
+        void error;
         setErrorMessage(GENERATE_ERROR_MESSAGE);
       } finally {
         setIsGenerating(false);

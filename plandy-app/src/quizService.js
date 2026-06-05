@@ -1,5 +1,4 @@
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -12,14 +11,6 @@ import {
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "./firebase";
-
-const DEBUG_QUIZ = process.env.EXPO_PUBLIC_DEBUG_QUIZ === "true";
-
-const debugQuiz = (...args) => {
-  if (DEBUG_QUIZ) {
-    console.debug("[quiz]", ...args);
-  }
-};
 
 const mapDoc = (snapshot) => ({
   ...snapshot.data(),
@@ -52,7 +43,6 @@ export const getQuizErrorMessage = (error) => {
 };
 
 export const fetchQuizzesBySubject = async (userId, subjectId) => {
-  debugQuiz("fetchQuizzesBySubject", { userId, subjectId });
 
   const q = query(
     collection(db, "quizzes"),
@@ -62,13 +52,11 @@ export const fetchQuizzesBySubject = async (userId, subjectId) => {
 
   const snapshot = await getDocs(q);
   const quizzes = sortByCreatedAtDesc(snapshot.docs.map(mapDoc));
-  debugQuiz("fetchQuizzesBySubject result", { count: quizzes.length });
 
   return quizzes;
 };
 
 export const fetchQuizzes = async (userId) => {
-  debugQuiz("fetchQuizzes", { userId });
 
   const q = query(
     collection(db, "quizzes"),
@@ -77,13 +65,11 @@ export const fetchQuizzes = async (userId) => {
 
   const snapshot = await getDocs(q);
   const quizzes = sortByCreatedAtDesc(snapshot.docs.map(mapDoc));
-  debugQuiz("fetchQuizzes result", { count: quizzes.length });
 
   return quizzes;
 };
 
 export const fetchQuizById = async (quizId) => {
-  debugQuiz("fetchQuizById", { quizId });
 
   const snapshot = await getDoc(doc(db, "quizzes", quizId));
 
@@ -95,7 +81,6 @@ export const fetchQuizById = async (quizId) => {
 };
 
 export const fetchNotesBySubject = async (userId, subjectId) => {
-  debugQuiz("fetchNotesBySubject", { userId, subjectId });
 
   const q = query(
     collection(db, "notes"),
@@ -105,11 +90,6 @@ export const fetchNotesBySubject = async (userId, subjectId) => {
 
   const snapshot = await getDocs(q);
   const notes = snapshot.docs.map(mapDoc);
-  debugQuiz("fetchNotesBySubject result", {
-    count: notes.length,
-    noteIds: notes.map((note) => note.id),
-    subjectIds: [...new Set(notes.map((note) => note.subject_id))],
-  });
 
   return notes;
 };
@@ -123,15 +103,6 @@ export const submitQuizResult = async ({
   correct_rate,
   incorrect_items,
 }) => {
-  debugQuiz("submitQuizResult", {
-    userId,
-    quizId,
-    score,
-    total_count,
-    correct_count,
-    correct_rate,
-    incorrect_items,
-  });
 
   if (!userId || !quizId) {
     throw new Error("submitQuizResult: userId and quizId are required");
@@ -162,7 +133,6 @@ export const submitQuizResult = async ({
 };
 
 export const getQuizResultsByUser = async (userId) => {
-  debugQuiz("getQuizResultsByUser", { userId });
 
   const q = query(
     collection(db, "quiz_results"),
@@ -171,7 +141,6 @@ export const getQuizResultsByUser = async (userId) => {
 
   const snapshot = await getDocs(q);
   const results = snapshot.docs.map(mapDoc);
-  debugQuiz("getQuizResultsByUser result", { count: results.length });
   return results;
 };
 
@@ -209,12 +178,6 @@ export const generateQuizFromNote = async ({
   subjectId,
   questionCount,
 }) => {
-  debugQuiz("generateQuizFromNote", {
-    noteId,
-    userId,
-    subjectId,
-    questionCount,
-  });
 
   const callable = httpsCallable(functions, "generateQuizFromNote");
   const result = await callable({ noteId, userId, subjectId, questionCount });
@@ -222,7 +185,6 @@ export const generateQuizFromNote = async ({
 };
 
 export const getIncorrectNoteGroupsByUser = async (userId) => {
-  debugQuiz("getIncorrectNoteGroupsByUser", { userId });
 
   const quizResultsQuery = query(
     collection(db, "quiz_results"),
@@ -340,9 +302,6 @@ export const getIncorrectNoteGroupsByUser = async (userId) => {
     return dateB - dateA;
   });
 
-  debugQuiz("getIncorrectNoteGroupsByUser result", {
-    count: sortedGroups.length,
-  });
 
   return sortedGroups;
 };

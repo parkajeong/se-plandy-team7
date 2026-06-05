@@ -262,7 +262,7 @@ export default function StudyGroupScreen() {
 
       applyGroupsToState(data);
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "스터디 그룹 목록 조회 실패");
     }
   }, [userId, applyGroupsToState]);
@@ -291,7 +291,6 @@ export default function StudyGroupScreen() {
         applyGroupsToState(data);
       },
       (error) => {
-        console.log(error);
         Alert.alert("오류", "스터디 그룹 실시간 조회 실패");
       }
     );
@@ -509,7 +508,7 @@ export default function StudyGroupScreen() {
 
       await fetchGroups();
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "스터디 그룹 생성 실패");
     }
   };
@@ -566,7 +565,7 @@ export default function StudyGroupScreen() {
 
       await fetchGroups();
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "스터디 그룹 참여 실패");
     }
   };
@@ -630,7 +629,7 @@ export default function StudyGroupScreen() {
 
       await fetchGroups();
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "스터디 그룹명 수정 실패");
     }
   };
@@ -665,7 +664,7 @@ export default function StudyGroupScreen() {
 
       await fetchGroups();
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "스터디 그룹 삭제 실패");
     }
   };
@@ -728,7 +727,7 @@ export default function StudyGroupScreen() {
 
       await fetchGroups();
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "스터디 그룹 탈퇴 실패");
     }
   };
@@ -950,7 +949,7 @@ export default function StudyGroupScreen() {
 
       await fetchGroups();
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "가능 시간 저장 실패");
     }
   };
@@ -1010,7 +1009,7 @@ export default function StudyGroupScreen() {
 
       await fetchGroups();
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "가능 시간 삭제 실패");
     }
   };
@@ -1099,7 +1098,7 @@ export default function StudyGroupScreen() {
 
       await fetchGroups();
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "스터디 일정 등록 실패");
     }
   };
@@ -1174,7 +1173,7 @@ export default function StudyGroupScreen() {
 
       await fetchGroups();
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "스터디 일정 수정 실패");
     }
   };
@@ -1217,7 +1216,7 @@ export default function StudyGroupScreen() {
 
       await fetchGroups();
     } catch (error) {
-      console.log(error);
+      void error;
       Alert.alert("오류", "스터디 일정 삭제 실패");
     }
   };

@@ -524,7 +524,7 @@ export default function SubjectsScreen() {
       setTrend(data.trend as TrendPoint[]);
       setSummary(data.summary as ProgressSummary);
     } catch (error) {
-      console.error("[subjects] Failed to load progress data:", error);
+      void error;
       setProgressError("학습 진척도 데이터를 불러오지 못했습니다.");
     } finally {
       setIsProgressLoading(false);

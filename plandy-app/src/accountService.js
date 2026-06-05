@@ -198,7 +198,6 @@ export const cleanupUserData = async (uid, userInfo = {}) => {
 
 export const clearLocalSession = async () => {
   await signOut(auth).catch((error) => {
-    console.log("[accountService] signOut during local session cleanup failed", error);
   });
   clearAppUser();
   finishAppLogout();
@@ -224,7 +223,6 @@ export const withdrawCurrentAccount = async () => {
     clearAppUser();
     finishAppLogout();
   } catch (error) {
-    console.log("[accountService] withdrawCurrentAccount failed", error);
     await clearLocalSession();
     throw error;
   }
@@ -256,7 +254,6 @@ export const withdrawAccountWithPassword = async ({ idOrEmail, password }) => {
     clearAppUser();
     finishAppLogout();
   } catch (error) {
-    console.log("[accountService] withdrawAccountWithPassword failed", error);
     await clearLocalSession();
     throw error;
   }
@@ -287,7 +284,6 @@ export const authenticateWithPasswordForWithdraw = async ({
 
     return userCredential.user;
   } catch (error) {
-    console.log("[accountService] authenticateWithPasswordForWithdraw failed", error);
     await clearLocalSession();
     throw error;
   }
@@ -302,7 +298,6 @@ export const withdrawFirebaseAuthAccount = async (user) => {
     clearAppUser();
     finishAppLogout();
   } catch (error) {
-    console.log("[accountService] withdrawFirebaseAuthAccount failed", error);
     await clearLocalSession();
     throw error;
   }
@@ -324,7 +319,6 @@ export const withdrawExternalAppAccount = async (appUser) => {
     clearAppUser();
     finishAppLogout();
   } catch (error) {
-    console.log("[accountService] withdrawExternalAppAccount failed", error);
     await clearLocalSession();
     throw error;
   }
