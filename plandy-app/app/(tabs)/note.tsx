@@ -25,6 +25,7 @@ import {
 
 import { onAuthStateChanged } from "firebase/auth";
 import { getSubjects } from "@/src/subjectService";
+import { COLORS } from "@/constants/theme";
 import { auth, db } from "@/src/firebase";
 import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
 import { getIncorrectNoteGroupsByUser } from "@/src/quizService";
@@ -60,7 +61,6 @@ type IncorrectNoteGroup = {
 export default function NoteScreen() {
   const [userId, setUserId] = useState<string | null>(null);
 
-  const [mode, setMode] = useState<"write" | "search">("write");
   const [searchTab, setSearchTab] = useState<"note" | "incorrect">("note");
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -74,6 +74,8 @@ export default function NoteScreen() {
   const [notes, setNotes] = useState<any[]>([]);
   const [incorrectNoteGroups, setIncorrectNoteGroups] = useState<IncorrectNoteGroup[]>([]);
   const [isLoadingIncorrectNotes, setIsLoadingIncorrectNotes] = useState(false);
+
+  const [isCreateNoteModalVisible, setIsCreateNoteModalVisible] = useState(false);
 
   const [isEditNoteModalVisible, setIsEditNoteModalVisible] = useState(false);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -263,10 +265,24 @@ export default function NoteScreen() {
       setSelectedSubject(null);
       setNoteTitle("");
       setContent("");
+      setIsCreateNoteModalVisible(false);
     } catch (error) {
       void error;
       Alert.alert("오류", "노트 저장 실패");
     }
+  };
+
+  const openCreateNoteModal = async () => {
+    if (!userId) {
+      Alert.alert("오류", "로그인 후 노트를 작성할 수 있습니다.");
+      return;
+    }
+
+    await fetchSubjects();
+    setSelectedSubject(null);
+    setNoteTitle("");
+    setContent("");
+    setIsCreateNoteModalVisible(true);
   };
 
   const handleSearchNotes = async () => {
@@ -378,7 +394,15 @@ export default function NoteScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>노트 관리</Text>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.screenTitle}>노트</Text>
+          <Text style={styles.screenSubtitle}>학습 노트와 오답노트를 확인하세요</Text>
+        </View>
+        <TouchableOpacity style={styles.addButton} onPress={openCreateNoteModal}>
+          <Text style={styles.addButtonText}>+ 노트 작성</Text>
+        </TouchableOpacity>
+      </View>
 
       {!userId && (
         <Text style={styles.loginNotice}>
@@ -386,88 +410,10 @@ export default function NoteScreen() {
         </Text>
       )}
 
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tabButton, mode === "write" && styles.activeTabButton]}
-          onPress={() => setMode("write")}
-        >
-          <Text
-            style={[
-              styles.tabButtonText,
-              mode === "write" && styles.activeTabButtonText,
-            ]}
-          >
-            노트 작성
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.searchContainer}>
+        <Text style={styles.sectionTitle}>과목별 노트 조회</Text>
 
-        <TouchableOpacity
-          style={[styles.tabButton, mode === "search" && styles.activeTabButton]}
-          onPress={() => setMode("search")}
-        >
-          <Text
-            style={[
-              styles.tabButtonText,
-              mode === "search" && styles.activeTabButtonText,
-            ]}
-          >
-            노트 조회
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {mode === "write" && (
-        <View>
-          <Text style={styles.sectionTitle}>노트 작성</Text>
-
-          <SubjectDropdown
-            subjects={subjects}
-            selectedSubjectId={selectedSubject?.id}
-            placeholder="과목 선택"
-            disabled={!userId || subjects.length === 0}
-            onOpen={fetchSubjects}
-            onSelect={(subject) => setSelectedSubject(subject as Subject)}
-          />
-
-          {userId && subjects.length === 0 && (
-            <Text style={styles.subjectNotice}>
-              먼저 과목을 등록해주세요.
-            </Text>
-          )}
-
-          <TextInput
-            style={styles.input}
-            placeholder="노트 제목"
-            value={noteTitle}
-            onChangeText={setNoteTitle}
-          />
-
-          <TextInput
-            style={styles.noteInput}
-            placeholder="학습 노트 내용을 입력하세요"
-            value={content}
-            onChangeText={setContent}
-            multiline
-          />
-
-          <TouchableOpacity
-            style={[
-              styles.button,
-              (!userId || subjects.length === 0) && styles.disabledButton,
-            ]}
-            onPress={handleAddNote}
-            disabled={!userId || subjects.length === 0}
-          >
-            <Text style={styles.buttonText}>저장하기</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {mode === "search" && (
-        <View style={styles.searchContainer}>
-          <Text style={styles.sectionTitle}>과목별 노트 조회</Text>
-
-          <View style={styles.searchTabContainer}>
+        <View style={styles.searchTabContainer}>
             <TouchableOpacity
               style={[
                 styles.searchTabButton,
@@ -540,7 +486,9 @@ export default function NoteScreen() {
                 data={notes}
                 keyExtractor={(item) => item.id}
                 ListEmptyComponent={
-                  <Text style={styles.emptyText}>조회된 노트가 없습니다.</Text>
+                  <Text style={styles.emptyText}>
+                    아직 작성한 노트가 없어요. 노트를 작성해보세요!
+                  </Text>
                 }
                 renderItem={({ item }) => (
                   <View style={styles.card}>
@@ -641,7 +589,67 @@ export default function NoteScreen() {
             </View>
           )}
         </View>
-      )}
+
+      <Modal
+        visible={isCreateNoteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsCreateNoteModalVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>노트 작성</Text>
+
+            <SubjectDropdown
+              subjects={subjects}
+              selectedSubjectId={selectedSubject?.id}
+              placeholder="과목 선택"
+              disabled={!userId || subjects.length === 0}
+              onOpen={fetchSubjects}
+              onSelect={(subject) => setSelectedSubject(subject as Subject)}
+            />
+
+            {userId && subjects.length === 0 && (
+              <Text style={styles.subjectNotice}>
+                먼저 과목을 등록해주세요.
+              </Text>
+            )}
+
+            <TextInput
+              style={styles.input}
+              placeholder="노트 제목"
+              value={noteTitle}
+              onChangeText={setNoteTitle}
+            />
+
+            <TextInput
+              style={styles.noteInput}
+              placeholder="학습 노트 내용을 입력하세요"
+              value={content}
+              onChangeText={setContent}
+              multiline
+            />
+
+            <TouchableOpacity
+              style={[
+                styles.button,
+                (!userId || subjects.length === 0) && styles.disabledButton,
+              ]}
+              onPress={handleAddNote}
+              disabled={!userId || subjects.length === 0}
+            >
+              <Text style={styles.buttonText}>저장하기</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setIsCreateNoteModalVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={isEditNoteModalVisible}
@@ -757,45 +765,43 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
 
-  title: {
+  header: {
+    paddingHorizontal: 0,
+    paddingBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  screenTitle: {
     fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 20,
+    fontWeight: "700",
+    color: COLORS.text,
+  },
+
+  screenSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: COLORS.subText,
+  },
+
+  addButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+
+  addButtonText: {
+    color: COLORS.buttonText,
+    fontSize: 14,
+    fontWeight: "600",
   },
 
   loginNotice: {
     color: "#EF4444",
     marginBottom: 15,
     fontSize: 15,
-  },
-
-  tabContainer: {
-    flexDirection: "row",
-    marginBottom: 20,
-    backgroundColor: "#F8F8FA",
-    borderRadius: 10,
-    padding: 4,
-  },
-
-  tabButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-
-  activeTabButton: {
-    backgroundColor: "#ff6a92",
-  },
-
-  tabButtonText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#6B7280",
-  },
-
-  activeTabButtonText: {
-    color: "#fff",
   },
 
   sectionTitle: {

@@ -26,6 +26,7 @@ import {
 } from "firebase/firestore";
 
 import { onAuthStateChanged } from "firebase/auth";
+import { COLORS } from "@/constants/theme";
 import { auth, db } from "@/src/firebase";
 import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
 
@@ -50,6 +51,8 @@ type ReminderUnit = "minute" | "hour" | "day";
 
 export default function ScheduleScreen() {
   const [userId, setUserId] = useState<string | null>(null);
+
+  const [isAddScheduleModalVisible, setIsAddScheduleModalVisible] = useState(false);
 
   const [title, setTitle] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -658,12 +661,30 @@ export default function ScheduleScreen() {
       setReminderType("none");
       setCustomReminderValue("1");
       setCustomReminderUnit("minute");
+      setIsAddScheduleModalVisible(false);
 
       fetchSchedules();
     } catch (error) {
       void error;
       Alert.alert("오류", "일정 등록 실패");
     }
+  };
+
+  const openAddScheduleModal = () => {
+    if (!userId) {
+      Alert.alert("오류", "로그인 후 일정을 등록할 수 있습니다.");
+      return;
+    }
+
+    setTitle("");
+    setSelectedDate(null);
+    setSelectedHour(9);
+    setSelectedMinute(0);
+    setType("");
+    setReminderType("none");
+    setCustomReminderValue("1");
+    setCustomReminderUnit("minute");
+    setIsAddScheduleModalVisible(true);
   };
 
   const handleOpenEditModal = (schedule: any) => {
@@ -804,75 +825,21 @@ export default function ScheduleScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>일정 관리</Text>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.screenTitle}>일정</Text>
+          <Text style={styles.screenSubtitle}>등록된 일정을 확인하세요</Text>
+        </View>
+        <TouchableOpacity style={styles.addButton} onPress={openAddScheduleModal}>
+          <Text style={styles.addButtonText}>+ 일정 추가</Text>
+        </TouchableOpacity>
+      </View>
 
       {!userId && (
         <Text style={styles.loginNotice}>
           로그인 후 일정 등록 및 조회가 가능합니다.
         </Text>
       )}
-
-      <TextInput
-        style={styles.input}
-        placeholder="일정 제목"
-        value={title}
-        onChangeText={setTitle}
-      />
-
-      <TouchableOpacity
-        style={styles.input}
-        onPress={() => {
-          if (!userId) {
-            Alert.alert("오류", "로그인 후 날짜와 시간을 선택할 수 있습니다.");
-            return;
-          }
-
-          setCalendarTarget("add");
-          setIsCalendarVisible(true);
-        }}
-      >
-        <Text style={selectedDate ? styles.dateText : styles.placeholderText}>
-          {selectedDate
-            ? `${formatDate(selectedDate)} ${formatTime(
-                selectedHour,
-                selectedMinute
-              )}`
-            : "날짜 및 시간 선택"}
-        </Text>
-      </TouchableOpacity>
-
-      <TextInput
-        style={styles.input}
-        placeholder="유형 (시험 / 과제 / 공부)"
-        value={type}
-        onChangeText={setType}
-      />
-
-      <TouchableOpacity
-        style={styles.input}
-        onPress={() => {
-          if (!userId) {
-            Alert.alert("오류", "로그인 후 알림을 설정할 수 있습니다.");
-            return;
-          }
-
-          setReminderTarget("add");
-          setIsReminderModalVisible(true);
-        }}
-      >
-        <Text style={styles.dateText}>
-          알림:{" "}
-          {getReminderLabel(
-            reminderType,
-            customReminderValue,
-            customReminderUnit
-          )}
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.button} onPress={handleAddSchedule}>
-        <Text style={styles.buttonText}>등록하기</Text>
-      </TouchableOpacity>
 
       <Text style={styles.listTitle}>등록된 일정</Text>
 
@@ -883,7 +850,7 @@ export default function ScheduleScreen() {
         ListEmptyComponent={
           <Text style={styles.emptyText}>
             {userId
-              ? "등록된 일정이 없습니다."
+              ? "등록된 일정이 없어요. 일정을 추가해보세요!"
               : "로그인 후 등록된 일정을 확인할 수 있습니다."}
           </Text>
         }
@@ -929,6 +896,79 @@ export default function ScheduleScreen() {
           </View>
         )}
       />
+
+      {/* 일정 등록 모달 */}
+      <Modal
+        visible={isAddScheduleModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsAddScheduleModalVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.addModalContainer}>
+            <Text style={styles.modalTitle}>일정 등록</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="일정 제목"
+              value={title}
+              onChangeText={setTitle}
+            />
+
+            <TouchableOpacity
+              style={styles.input}
+              onPress={() => {
+                setCalendarTarget("add");
+                setIsCalendarVisible(true);
+              }}
+            >
+              <Text style={selectedDate ? styles.dateText : styles.placeholderText}>
+                {selectedDate
+                  ? `${formatDate(selectedDate)} ${formatTime(
+                      selectedHour,
+                      selectedMinute
+                    )}`
+                  : "날짜 및 시간 선택"}
+              </Text>
+            </TouchableOpacity>
+
+            <TextInput
+              style={styles.input}
+              placeholder="유형 (시험 / 과제 / 공부)"
+              value={type}
+              onChangeText={setType}
+            />
+
+            <TouchableOpacity
+              style={styles.input}
+              onPress={() => {
+                setReminderTarget("add");
+                setIsReminderModalVisible(true);
+              }}
+            >
+              <Text style={styles.dateText}>
+                알림:{" "}
+                {getReminderLabel(
+                  reminderType,
+                  customReminderValue,
+                  customReminderUnit
+                )}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.button} onPress={handleAddSchedule}>
+              <Text style={styles.buttonText}>등록하기</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setIsAddScheduleModalVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* 일정 수정 모달 */}
       <Modal
@@ -1302,7 +1342,39 @@ export default function ScheduleScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: "#fff" },
-  title: { fontSize: 28, fontWeight: "bold", marginBottom: 20 },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+
+  screenTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: COLORS.text,
+  },
+
+  screenSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: COLORS.subText,
+  },
+
+  addButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+
+  addButtonText: {
+    color: COLORS.buttonText,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
   loginNotice: { color: "#EF4444", marginBottom: 15, fontSize: 15 },
 
   input: {
@@ -1389,6 +1461,13 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.4)",
     justifyContent: "center",
     alignItems: "center",
+    padding: 20,
+  },
+
+  addModalContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 15,
     padding: 20,
   },
 
