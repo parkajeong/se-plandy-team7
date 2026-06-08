@@ -124,13 +124,15 @@ export default function TabLayout() {
         }}
       />
 
+      {/*
+        노트 탭은 과목(subjects → subject-notes) 화면과 퀴즈 화면의 오답노트 탭으로 기능이
+        통합되어 더 이상 노출하지 않는다. note.tsx 파일은 팀원 조율 후 삭제 예정이므로
+        파일은 그대로 두고 href: null 로만 탭 바 노출을 막는다(index 탭과 동일한 방식).
+      */}
       <Tabs.Screen
         name="note"
         options={{
-          title: "노트",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="document-text-outline" size={size ?? 28} color={color} />
-          ),
+          href: null,
         }}
       />
 
