@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -35,6 +36,17 @@ type Quiz = {
 
 const getParam = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value;
+
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && typeof window.alert === "function") {
+      window.alert(`${title}\n\n${message}`);
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [{ text: "확인" }]);
+};
 
 export const unstable_settings = {
   title: "퀴즈",
@@ -113,7 +125,7 @@ export default function QuizDetailScreen() {
     );
 
     if (missingIndex !== -1) {
-      Alert.alert("제출 불가", "모든 문제를 선택한 후 제출해 주세요.");
+      showAlert("제출 불가", "모든 문제를 선택한 후 제출해 주세요.");
       return;
     }
 
@@ -147,7 +159,7 @@ export default function QuizDetailScreen() {
       const userId = getCurrentAppUserIdOrNull();
 
       if (!userId) {
-        Alert.alert("로그인 필요", "로그인 후 퀴즈를 제출할 수 있습니다.");
+        showAlert("로그인 필요", "로그인 후 퀴즈를 제출할 수 있습니다.");
         return;
       }
 
@@ -173,17 +185,16 @@ export default function QuizDetailScreen() {
       setSubmitted(true);
 
       if (incorrectItems.length === 0) {
-        Alert.alert("🎉 완벽해요!", "모든 문제를 맞혔습니다. 오답노트가 없습니다.");
+        showAlert("🎉 완벽해요!", "모든 문제를 맞혔습니다. 오답노트가 없습니다.");
       } else {
-        Alert.alert(
+        showAlert(
           "✅ 저장 완료",
-          `틀린 문제 ${incorrectItems.length}개가 오답노트에 저장되었습니다.`,
-          [{ text: "확인", style: "default" }]
+          `틀린 문제 ${incorrectItems.length}개가 오답노트에 저장되었습니다.`
         );
       }
     } catch (error) {
       void error;
-      Alert.alert("저장 실패", "오답노트 저장 중 오류가 발생했습니다. 다시 시도해주세요.");
+      showAlert("저장 실패", "오답노트 저장 중 오류가 발생했습니다. 다시 시도해주세요.");
     } finally {
       setIsSubmitting(false);
     }
@@ -247,6 +258,7 @@ export default function QuizDetailScreen() {
       <FlatList
         data={questions}
         keyExtractor={(_, index) => `${quiz.id}-${index}`}
+        style={styles.questionList}
         contentContainerStyle={styles.listContent}
         renderItem={({ item, index }) => {
           const selectedIndex = selectedAnswers[index];
@@ -279,13 +291,13 @@ export default function QuizDetailScreen() {
                     optionStateStyle = styles.optionCorrect;
                     optionTextStateStyle = styles.optionTextCorrect;
                     stateIcon = (
-                      <Ionicons name="checkmark-circle" size={20} color="#2E7D32" />
+                      <Ionicons name="checkmark-circle" size={20} color="#22C55E" />
                     );
                   } else if (isSelected && !isAnswerOption) {
                     optionStateStyle = styles.optionIncorrect;
                     optionTextStateStyle = styles.optionTextIncorrect;
                     stateIcon = (
-                      <Ionicons name="close-circle" size={20} color="#C62828" />
+                      <Ionicons name="close-circle" size={20} color="#EF4444" />
                     );
                   } else if (isAnswerOption) {
                     optionStateStyle = styles.optionCorrect;
@@ -386,6 +398,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     marginTop: 6,
   },
+  questionList: {
+    flex: 1,
+  },
   listContent: {
     paddingBottom: 24,
   },
@@ -414,8 +429,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#F5F5F5",
-    borderColor: "#E0E0E0",
+    backgroundColor: "#F8F8FA",
+    borderColor: "#E5E7EB",
     borderRadius: 8,
     borderWidth: 1,
     marginBottom: 8,
@@ -425,7 +440,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#dcfce7",
   },
   optionText: {
-    color: "#333333",
+    color: "#2B2B2B",
     flex: 1,
     lineHeight: 20,
   },
@@ -434,28 +449,28 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   optionTextSelected: {
-    color: "#1565C0",
+    color: "#ff6a92",
     fontWeight: "700",
   },
   optionTextCorrect: {
-    color: "#2E7D32",
+    color: "#15803D",
     fontWeight: "700",
   },
   optionTextIncorrect: {
-    color: "#C62828",
+    color: "#B91C1C",
     fontWeight: "700",
   },
   optionSelected: {
-    backgroundColor: "#E3F2FD",
-    borderColor: "#1565C0",
+    backgroundColor: "#FFF0F4",
+    borderColor: "#ff6a92",
   },
   optionCorrect: {
-    backgroundColor: "#E8F5E9",
-    borderColor: "#2E7D32",
+    backgroundColor: "#F0FDF4",
+    borderColor: "#22C55E",
   },
   optionIncorrect: {
-    backgroundColor: "#FFEBEE",
-    borderColor: "#C62828",
+    backgroundColor: "#FEF2F2",
+    borderColor: "#EF4444",
   },
   questionCardCorrect: {
     borderColor: "#22C55E",
