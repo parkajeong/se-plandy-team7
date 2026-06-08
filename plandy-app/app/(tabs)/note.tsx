@@ -10,7 +10,7 @@ import {
   Modal,
 } from "react-native";
 
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 
 import {
   collection,
@@ -592,51 +592,49 @@ export default function NoteScreen() {
                   `${group.result_id || group.quiz_id}-${group.solved_at || index}`
                 }
                 ListEmptyComponent={
-                  <Text style={styles.emptyText}>
-                    {isLoadingIncorrectNotes
-                      ? "오답노트를 불러오는 중..."
-                      : "저장된 오답노트가 없습니다."}
-                  </Text>
-                }
-                renderItem={({ item }) => (
-                  <View style={styles.incorrectGroupCard}>
-                    <View style={styles.incorrectGroupHeader}>
-                      <Text style={styles.quizTitleText}>{item.quiz_title}</Text>
-                      <Text style={styles.dateText}>{item.solved_at}</Text>
+                  isLoadingIncorrectNotes ? (
+                    <Text style={styles.emptyText}>오답노트를 불러오는 중...</Text>
+                  ) : (
+                    <View style={styles.emptyIncorrectContainer}>
+                      <Text style={styles.emptyIncorrectTitle}>
+                        아직 오답노트가 없어요 😊
+                      </Text>
+                      <Text style={styles.emptyIncorrectSubtitle}>
+                        퀴즈를 풀면 틀린 문제가 여기에 저장돼요
+                      </Text>
                     </View>
-                    <Text style={styles.incorrectSummaryText}>
-                      오답 {item.incorrect_count}개
-                    </Text>
+                  )
+                }
+                renderItem={({ item }) => {
+                  const hasReviewNeeded = item.items.some(
+                    (incorrect) => incorrect.is_review_needed === true
+                  );
 
-                    {item.items.map((incorrect, idx) => (
-                      <View key={`${item.quiz_id}-${incorrect.question_index}-${idx}`} style={styles.incorrectCard}>
-                        <Text style={styles.questionNumber}>
-                          문제 {incorrect.question_index + 1}
-                        </Text>
-                        <Text style={styles.questionContentText}>
-                          {incorrect.question}
-                        </Text>
-                        <Text style={styles.answerInfoText}>
-                          내 답: {incorrect.user_answer_text}
-                        </Text>
-                        <Text style={styles.answerInfoText}>
-                          정답: {incorrect.correct_answer_text}
-                        </Text>
-                        {incorrect.explanation ? (
-                          <View style={styles.explanationSection}>
-                            <Text style={styles.explanationTitle}>해설</Text>
-                            <Text style={styles.explanationText}>
-                              {incorrect.explanation}
-                            </Text>
+                  return (
+                    <TouchableOpacity
+                      style={styles.cardContainer}
+                      activeOpacity={0.8}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/incorrect-note/[resultId]",
+                          params: { resultId: item.result_id || item.quiz_id },
+                        })
+                      }
+                    >
+                      <View style={styles.cardHeaderRow}>
+                        <Text style={styles.quizTitle}>📝 {item.quiz_title}</Text>
+                        {hasReviewNeeded && (
+                          <View style={styles.reviewBadge}>
+                            <Text style={styles.reviewBadgeText}>복습 필요</Text>
                           </View>
-                        ) : null}
-                        <Text style={styles.reviewNeededTextBlock}>
-                          {incorrect.is_review_needed ? "복습 필요" : "복습 불필요"}
-                        </Text>
+                        )}
                       </View>
-                    ))}
-                  </View>
-                )}
+                      <Text style={styles.incorrectCount}>
+                        오답 {item.incorrect_count}개 · {item.solved_at}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                }}
               />
             </View>
           )}
@@ -895,44 +893,62 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  incorrectGroupCard: {
-    backgroundColor: "#fff",
+  cardContainer: {
+    backgroundColor: "#F8F8FA",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 12,
   },
 
-  incorrectGroupHeader: {
+  cardHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 8,
+    alignItems: "center",
   },
 
-  incorrectSummaryText: {
-    color: "#6B7280",
+  quizTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2B2B2B",
+    flex: 1,
+  },
+
+  incorrectCount: {
     fontSize: 14,
-    marginBottom: 12,
-  },
-
-  incorrectCard: {
-    backgroundColor: "#F8F8FA",
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 12,
-  },
-
-  answerInfoText: {
     color: "#6B7280",
-    fontSize: 14,
     marginTop: 4,
   },
 
-  reviewNeededTextBlock: {
-    marginTop: 10,
-    color: "#92400e",
-    fontWeight: "700",
+  reviewBadge: {
+    backgroundColor: "#FFF7ED",
+    borderColor: "#F97316",
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+
+  reviewBadgeText: {
+    fontSize: 12,
+    color: "#F97316",
+  },
+
+  emptyIncorrectContainer: {
+    alignItems: "center",
+    marginTop: 60,
+  },
+
+  emptyIncorrectTitle: {
+    color: "#6B7280",
+    fontSize: 15,
+  },
+
+  emptyIncorrectSubtitle: {
+    color: "#6B7280",
+    fontSize: 13,
+    marginTop: 6,
   },
 
   card: {
@@ -1116,137 +1132,4 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
-  incorrectItemsContainer: {
-    flex: 1,
-    marginTop: 12,
-  },
-
-  incorrectItemCard: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: "#EF4444",
-  },
-
-  incorrectItemHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-
-  quizTitleText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#2B2B2B",
-    flex: 1,
-  },
-
-  dateText: {
-    fontSize: 12,
-    color: "#6B7280",
-  },
-
-  questionNumber: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#ff6a92",
-    marginBottom: 6,
-  },
-
-  questionContentText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#2B2B2B",
-    lineHeight: 21,
-    marginBottom: 10,
-  },
-
-  optionsContainer: {
-    marginBottom: 10,
-  },
-
-  incorrectItemOption: {
-    backgroundColor: "#F8F8FA",
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-
-  correctAnswerOption: {
-    backgroundColor: "#dcfce7",
-    borderColor: "#22C55E",
-  },
-
-  wrongAnswerOption: {
-    backgroundColor: "#fee2e2",
-    borderColor: "#fca5a5",
-  },
-
-  optionNumberText: {
-    fontSize: 13,
-    color: "#2B2B2B",
-    lineHeight: 19,
-  },
-
-  correctAnswerText: {
-    color: "#22C55E",
-    fontWeight: "700",
-  },
-
-  wrongAnswerText: {
-    color: "#EF4444",
-    fontWeight: "700",
-  },
-
-  correctLabel: {
-    color: "#22C55E",
-    fontWeight: "700",
-    fontSize: 12,
-  },
-
-  wrongLabel: {
-    color: "#EF4444",
-    fontWeight: "700",
-    fontSize: 12,
-  },
-
-  explanationSection: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
-  },
-
-  explanationTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#2B2B2B",
-    marginBottom: 4,
-  },
-
-  explanationText: {
-    fontSize: 13,
-    color: "#6B7280",
-    lineHeight: 20,
-  },
-
-  reviewNeededBadge: {
-    backgroundColor: "#fef3c7",
-    borderRadius: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    marginTop: 10,
-    alignSelf: "flex-start",
-  },
-
-  reviewNeededText: {
-    fontSize: 12,
-    color: "#92400e",
-    fontWeight: "600",
-  },
 });
