@@ -172,13 +172,18 @@ export default function QuizDetailScreen() {
       });
       setSubmitted(true);
 
-      Alert.alert(
-        "제출 완료",
-        `총 ${totalCount}문제 중 ${correctCount}문제 정답입니다. 정답률 ${correctRate}%`
-      );
+      if (incorrectItems.length === 0) {
+        Alert.alert("🎉 완벽해요!", "모든 문제를 맞혔습니다. 오답노트가 없습니다.");
+      } else {
+        Alert.alert(
+          "✅ 저장 완료",
+          `틀린 문제 ${incorrectItems.length}개가 오답노트에 저장되었습니다.`,
+          [{ text: "확인", style: "default" }]
+        );
+      }
     } catch (error) {
       void error;
-      Alert.alert("제출 실패", "결과 저장에 실패했습니다. 다시 시도해 주세요.");
+      Alert.alert("저장 실패", "오답노트 저장 중 오류가 발생했습니다. 다시 시도해주세요.");
     } finally {
       setIsSubmitting(false);
     }
@@ -264,8 +269,32 @@ export default function QuizDetailScreen() {
               {(item.options || []).map((option, optionIndex) => {
                 const isSelected = selectedIndex === optionIndex;
                 const isAnswerOption = answerIndex === optionIndex;
-                const showCorrectState = submitted && isAnswerOption;
-                const showWrongState = submitted && isSelected && !isAnswerOption;
+
+                let optionStateStyle = null;
+                let optionTextStateStyle = null;
+                let stateIcon = null;
+
+                if (submitted) {
+                  if (isSelected && isAnswerOption) {
+                    optionStateStyle = styles.optionCorrect;
+                    optionTextStateStyle = styles.optionTextCorrect;
+                    stateIcon = (
+                      <Ionicons name="checkmark-circle" size={20} color="#2E7D32" />
+                    );
+                  } else if (isSelected && !isAnswerOption) {
+                    optionStateStyle = styles.optionIncorrect;
+                    optionTextStateStyle = styles.optionTextIncorrect;
+                    stateIcon = (
+                      <Ionicons name="close-circle" size={20} color="#C62828" />
+                    );
+                  } else if (isAnswerOption) {
+                    optionStateStyle = styles.optionCorrect;
+                    optionTextStateStyle = styles.optionTextCorrect;
+                  }
+                } else if (isSelected) {
+                  optionStateStyle = styles.optionSelected;
+                  optionTextStateStyle = styles.optionTextSelected;
+                }
 
                 return (
                   <TouchableOpacity
@@ -273,23 +302,12 @@ export default function QuizDetailScreen() {
                     activeOpacity={0.8}
                     disabled={submitted}
                     onPress={() => handleSelectAnswer(index, optionIndex)}
-                    style={[
-                      styles.optionRow,
-                      isSelected && styles.optionSelected,
-                      showCorrectState && styles.optionCorrect,
-                      showWrongState && styles.optionIncorrect,
-                    ]}
+                    style={[styles.optionRow, optionStateStyle]}
                   >
-                    <Text
-                      style={[
-                        styles.optionText,
-                        isSelected && styles.optionTextSelected,
-                        showCorrectState && styles.optionTextCorrect,
-                        showWrongState && styles.optionTextIncorrect,
-                      ]}
-                    >
+                    <Text style={[styles.optionText, optionTextStateStyle]}>
                       {optionIndex + 1}. {option}
                     </Text>
+                    {stateIcon}
                   </TouchableOpacity>
                 );
               })}
@@ -393,8 +411,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   optionRow: {
-    backgroundColor: "#F8F8FA",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#F5F5F5",
+    borderColor: "#E0E0E0",
     borderRadius: 8,
+    borderWidth: 1,
     marginBottom: 8,
     padding: 10,
   },
@@ -402,7 +425,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#dcfce7",
   },
   optionText: {
-    color: "#2B2B2B",
+    color: "#333333",
+    flex: 1,
     lineHeight: 20,
   },
   answerOptionText: {
@@ -410,25 +434,28 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   optionTextSelected: {
-    color: "#2B2B2B",
+    color: "#1565C0",
     fontWeight: "700",
   },
   optionTextCorrect: {
-    color: "#22C55E",
+    color: "#2E7D32",
     fontWeight: "700",
   },
   optionTextIncorrect: {
-    color: "#EF4444",
+    color: "#C62828",
     fontWeight: "700",
   },
   optionSelected: {
-    backgroundColor: "#F8F8FA",
+    backgroundColor: "#E3F2FD",
+    borderColor: "#1565C0",
   },
   optionCorrect: {
-    backgroundColor: "#dcfce7",
+    backgroundColor: "#E8F5E9",
+    borderColor: "#2E7D32",
   },
   optionIncorrect: {
-    backgroundColor: "#fee2e2",
+    backgroundColor: "#FFEBEE",
+    borderColor: "#C62828",
   },
   questionCardCorrect: {
     borderColor: "#22C55E",
