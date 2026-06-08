@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"/c/Users/admin/OneDrive/ドキュメント/GitHub/se-study-mate-team7/plandy-app/app/\\(tabs\\)/study/[subjectId]\")",
+      "Bash(awk 'NR==1,/^}/' \"app/\\(tabs\\)/studyGroup.tsx\")"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\admin\\OneDrive\\ドキュメント\\GitHub\\se-study-mate-team7\\plandy-app\\app\\(tabs)\\study"
+    ]
+  }
+}

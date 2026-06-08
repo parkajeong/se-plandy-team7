@@ -28,7 +28,7 @@ const PROTECTED_PATHS = new Set([
   "/(tabs)/note",
   "/(tabs)/quiz",
 ]);
-const PROTECTED_SEGMENTS = new Set(["(tabs)", "subjects", "todo", "schedule", "note", "quiz"]);
+const PROTECTED_SEGMENTS = new Set(["(tabs)", "subjects", "todo", "schedule", "note", "quiz", "incorrect-note"]);
 
 export const unstable_settings = {
   anchor: "index",
@@ -86,6 +86,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="quiz" options={{ headerShown: true, title: "Quiz" }} />
+        <Stack.Screen name="incorrect-note" options={{ headerShown: true, title: "오답노트" }} />
         <Stack.Screen name="kakao-auth" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />
       </Stack>
