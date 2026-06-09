@@ -186,10 +186,10 @@ export default function QuizDetailScreen() {
       setSubmitted(true);
 
       if (incorrectItems.length === 0) {
-        showAlert("🎉 완벽해요!", "모든 문제를 맞혔습니다. 오답노트가 없습니다.");
+        showAlert("완벽해요!", "모든 문제를 맞혔습니다. 오답노트가 없습니다.");
       } else {
         showAlert(
-          "✅ 저장 완료",
+          "저장 완료",
           `틀린 문제 ${incorrectItems.length}개가 오답노트에 저장되었습니다.`
         );
       }

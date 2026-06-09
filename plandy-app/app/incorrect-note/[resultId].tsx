@@ -157,7 +157,6 @@ export default function IncorrectNoteDetailScreen() {
                 <Text style={styles.wrongAnswerText}>
                   {getCircledNumber(item.user_answer_index)} {item.user_answer_text}
                 </Text>
-                <Text style={styles.wrongAnswerText}> ❌</Text>
               </Text>
               <Text style={styles.answerRow}>
                 <Text style={styles.answerLabel}>정답: </Text>
@@ -165,14 +164,13 @@ export default function IncorrectNoteDetailScreen() {
                   {getCircledNumber(item.correct_answer_index)}{" "}
                   {item.correct_answer_text}
                 </Text>
-                <Text style={styles.correctAnswerText}> ✅</Text>
               </Text>
             </View>
 
             {item.explanation ? (
               <View style={styles.explanationSection}>
                 <Text style={styles.explanationText}>
-                  💡 해설: {item.explanation}
+                  해설: {item.explanation}
                 </Text>
               </View>
             ) : null}

@@ -16,10 +16,13 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS } from '@/constants/theme';
 import {
   completeTodo,
   createTodo,
@@ -61,6 +64,20 @@ type TodoForm = {
   deadline: Date | null;
   priority: string;
   description: string;
+};
+
+type FilterType = 'all' | 'completed' | 'incomplete';
+
+const getDdayText = (deadline: string | null) => {
+  if (!deadline) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(deadline);
+  due.setHours(0, 0, 0, 0);
+  const diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diff < 0) return `D+${Math.abs(diff)}`;
+  if (diff === 0) return 'D-day';
+  return `D-${diff}`;
 };
 
 const TODO_CATEGORIES: TodoCategory[] = ['시험', '과제', '복습', '기타'];
@@ -164,6 +181,8 @@ export default function TodoScreen() {
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
+  const [filter, setFilter] = useState<FilterType>('all');
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -179,6 +198,13 @@ export default function TodoScreen() {
   const calendarWeeks = useMemo(() => {
     return getCalendarWeeks(currentMonth);
   }, [currentMonth]);
+
+  const filteredAndSortedTodos = useMemo(() => {
+    let result = [...todos];
+    if (filter === 'completed') result = result.filter(t => t.is_completed);
+    if (filter === 'incomplete') result = result.filter(t => !t.is_completed);
+    return result;
+  }, [todos, filter]);
 
   const validateForm = (): Record<string, string> => {
     const errors: Record<string, string> = {};
@@ -430,69 +456,57 @@ export default function TodoScreen() {
 
   const renderTodoItem = ({ item }: { item: Todo }) => {
     const subjectTitle = subjectTitleMap[item.subject_id] || '과목 정보 없음';
+    const ddayText = getDdayText(item.deadline);
+    const isUrgent = ddayText?.startsWith('D+') || ddayText === 'D-day';
 
     return (
-      <View style={styles.todoCard}>
-        <View style={styles.todoHeader}>
-          <Pressable
-            style={[
-              styles.checkBox,
-              item.is_completed && styles.checkBoxCompleted,
-            ]}
-            onPress={() => handleToggleComplete(item)}
-          >
-            <Text style={styles.checkBoxText}>
-              {item.is_completed ? '✓' : ''}
-            </Text>
-          </Pressable>
+      <Pressable
+        style={styles.card}
+        onPress={() => openEditModal(item)}
+      >
+        <Pressable
+          style={[styles.checkBox, item.is_completed && styles.checkBoxCompleted]}
+          onPress={() => handleToggleComplete(item)}
+        >
+          <Text style={styles.checkBoxText}>{item.is_completed ? '✓' : ''}</Text>
+        </Pressable>
 
-          <View style={styles.todoTitleArea}>
+        <View style={styles.cardContent}>
+          <View style={styles.cardTopRow}>
             <Text
-              style={[
-                styles.todoTitle,
-                item.is_completed && styles.completedText,
-              ]}
+              style={[styles.cardTitle, item.is_completed && styles.completedText]}
+              numberOfLines={1}
             >
               {item.title}
             </Text>
+            <View style={styles.cardBadgeRow}>
+              {ddayText && (
+                <Text style={isUrgent ? styles.deadlineUrgent : styles.deadlineBadge}>
+                  {ddayText}
+                </Text>
+              )}
+              {ddayText && <Text style={styles.deadlineBadge}> · </Text>}
+              <Text style={styles.statusBadge}>
+                {item.is_completed ? '완료' : '진행중'}
+              </Text>
+            </View>
+          </View>
 
-            <Text style={styles.todoMeta}>
-              {subjectTitle} · {item.category} · 우선순위 {item.priority}
+          <View style={styles.cardBottomRow}>
+            <Text style={[styles.subjectLabel, { flex: 1 }]} numberOfLines={1}>
+              {subjectTitle} · {item.category}
             </Text>
+            <Text style={styles.deadlineBadge}>{item.deadline || ''}</Text>
           </View>
         </View>
 
-        {!!item.description && (
-          <Text style={styles.todoDescription}>{item.description}</Text>
-        )}
-
-        <View style={styles.todoInfoRow}>
-          <View style={styles.deadlineBadge}>
-            <Text style={styles.deadlineText}>
-              마감일: {item.deadline || '미설정'}
-            </Text>
-          </View>
-          <Text style={styles.todoStatus}>
-            {item.is_completed ? '완료' : '진행 중'}
-          </Text>
-        </View>
-
-        <View style={styles.actionRow}>
-          <Pressable
-            style={[styles.actionButton, styles.editButton]}
-            onPress={() => openEditModal(item)}
-          >
-            <Text style={styles.actionButtonText}>수정</Text>
-          </Pressable>
-
-          <Pressable
-            style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => handleDeleteTodo(item)}
-          >
-            <Text style={styles.actionButtonText}>삭제</Text>
-          </Pressable>
-        </View>
-      </View>
+        <TouchableOpacity
+          onPress={() => handleDeleteTodo(item)}
+          hitSlop={8}
+        >
+          <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
+        </TouchableOpacity>
+      </Pressable>
     );
   };
 
@@ -526,15 +540,30 @@ export default function TodoScreen() {
       </View>
 
       <FlatList
-        data={todos}
+        data={filteredAndSortedTodos}
         keyExtractor={(item) => item.id}
         renderItem={renderTodoItem}
         contentContainerStyle={[
           styles.listContent,
-          todos.length === 0 && styles.emptyListContent,
+          filteredAndSortedTodos.length === 0 && styles.emptyListContent,
         ]}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
+        }
+        ListHeaderComponent={
+          <View style={styles.filterRow}>
+            {(['all', 'incomplete', 'completed'] as FilterType[]).map((f) => (
+              <TouchableOpacity
+                key={f}
+                style={[styles.filterButton, filter === f && styles.filterButtonActive]}
+                onPress={() => setFilter(f)}
+              >
+                <Text style={filter === f ? styles.filterTextActive : styles.filterText}>
+                  {f === 'all' ? '전체' : f === 'incomplete' ? '미완료' : '완료'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         }
         ListEmptyComponent={
           <View style={styles.emptyBox}>
@@ -950,20 +979,63 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
   },
-  todoCard: {
-    marginBottom: 12,
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: '#ffffff',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  todoHeader: {
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: 10,
+  },
+  cardContent: {
+    flex: 1,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.text,
+    flex: 1,
+  },
+  cardBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  deadlineBadge: {
+    fontSize: 12,
+    color: COLORS.subText,
+  },
+  deadlineUrgent: {
+    fontSize: 12,
+    color: COLORS.danger,
+    fontWeight: '600',
+  },
+  statusBadge: {
+    fontSize: 11,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  cardBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  subjectLabel: {
+    fontSize: 12,
+    color: COLORS.subText,
+  },
+  categoryLabel: {
+    fontSize: 12,
+    color: COLORS.subText,
   },
   checkBox: {
     width: 26,
@@ -973,7 +1045,6 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
   checkBoxCompleted: {
     backgroundColor: COLORS.secondary,
@@ -982,74 +1053,35 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '800',
   },
-  todoTitleArea: {
-    flex: 1,
-  },
-  todoTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#2B2B2B',
-  },
   completedText: {
     color: '#9CA3AF',
     textDecorationLine: 'line-through',
   },
-  todoMeta: {
-    marginTop: 4,
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  todoDescription: {
-    marginTop: 12,
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#6B7280',
-  },
-  todoInfoRow: {
-    marginTop: 14,
+  filterRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 8,
+    marginBottom: 12,
+    flexWrap: 'wrap',
   },
-  deadlineBadge: {
-    flexShrink: 1,
-    paddingHorizontal: 10,
+  filterButton: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 20,
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#F8F8FA',
   },
-  deadlineText: {
+  filterButtonActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  filterText: {
     fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.primary,
+    color: COLORS.subText,
   },
-  todoStatus: {
-    flexShrink: 0,
+  filterTextActive: {
     fontSize: 13,
-    color: '#6B7280',
-  },
-  actionRow: {
-    marginTop: 14,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  actionButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  editButton: {
-    backgroundColor: '#F8F8FA',
-  },
-  deleteButton: {
-    backgroundColor: '#fee2e2',
-  },
-  actionButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#2B2B2B',
+    color: COLORS.buttonText,
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
