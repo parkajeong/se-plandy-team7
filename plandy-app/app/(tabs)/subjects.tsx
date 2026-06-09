@@ -105,6 +105,7 @@ export default function SubjectsScreen() {
   const [subjectProgress, setSubjectProgress] = useState<SubjectProgress[]>([]);
   const [summary, setSummary] = useState<ProgressSummary>(emptySummary);
   const [isAddSubjectModalVisible, setIsAddSubjectModalVisible] = useState(false);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   const userId = getCurrentAppUserIdOrNull();
 
@@ -214,6 +215,7 @@ export default function SubjectsScreen() {
           <Text style={styles.subjectEmptyText}>등록된 과목이 없습니다.</Text>
         }
         contentContainerStyle={styles.listContent}
+        onScrollBeginDrag={() => setMenuOpenId(null)}
         renderItem={({ item }) => {
           const stats = progressBySubjectId.get(item.id);
           const completionRate = stats?.completionRate ?? item.progress ?? 0;
@@ -229,12 +231,47 @@ export default function SubjectsScreen() {
                 })
               }
             >
-              <View style={styles.cardAccent} />
+              <View style={styles.cardTopLine} />
               <View style={styles.cardContent}>
                 <View style={styles.cardTitleRow}>
                   <Text style={styles.subjectTitle}>{item.title}</Text>
-                  <Text style={styles.noteCountBadge}>📝 노트 {noteCount}개</Text>
+                  <TouchableOpacity
+                    onPress={() => setMenuOpenId(menuOpenId === item.id ? null : item.id)}
+                    style={styles.menuButton}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="ellipsis-vertical" size={18} color={COLORS.subText} />
+                  </TouchableOpacity>
                 </View>
+
+                {menuOpenId === item.id && (
+                  <View style={styles.menuDropdown}>
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={() => {
+                        setMenuOpenId(null);
+                        setEditingId(item.id);
+                        setEditGoal(item.goal || '');
+                      }}
+                    >
+                      <Ionicons name="pencil-outline" size={15} color={COLORS.primary} />
+                      <Text style={styles.menuItemText}>수정</Text>
+                    </TouchableOpacity>
+                    <View style={styles.menuDivider} />
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={() => {
+                        setMenuOpenId(null);
+                        handleDelete(item.id);
+                      }}
+                    >
+                      <Ionicons name="trash-outline" size={15} color={COLORS.danger} />
+                      <Text style={[styles.menuItemText, { color: COLORS.danger }]}>삭제</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                <Text style={styles.noteCountBadge}>📝 노트 {noteCount}개</Text>
 
                 {editingId === item.id ? (
                   <View style={styles.editRow}>
@@ -282,28 +319,6 @@ export default function SubjectsScreen() {
                     />
                   </View>
                 </View>
-
-                {editingId !== item.id && (
-                  <View style={styles.actions}>
-                    <TouchableOpacity
-                      style={styles.editButton}
-                      onPress={() => {
-                        setEditingId(item.id);
-                        setEditGoal(item.goal || "");
-                      }}
-                    >
-                      <Ionicons name="pencil-outline" size={14} color={COLORS.primary} />
-                      <Text style={styles.editButtonText}> 수정</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() => handleDelete(item.id)}
-                    >
-                      <Ionicons name="trash-outline" size={14} color="#EF4444" />
-                      <Text style={styles.deleteButtonText}> 삭제</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
               </View>
             </Pressable>
           );
@@ -488,21 +503,22 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
   card: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     borderRadius: 16,
     marginBottom: 14,
-    overflow: "hidden",
+    overflow: 'hidden',
     shadowColor: COLORS.primary,
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  cardAccent: {
-    width: 10,
+  cardTopLine: {
+    height: 4,
     backgroundColor: COLORS.secondary,
     borderTopLeftRadius: 16,
-    borderBottomLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
   cardContent: {
     flex: 1,
@@ -553,39 +569,39 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.secondary,
     borderRadius: 999,
   },
-  actions: {
-    flexDirection: "row",
+  menuButton: {
+    padding: 4,
+  },
+  menuDropdown: {
+    position: 'absolute',
+    right: 16,
+    top: 44,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 100,
+    minWidth: 100,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
+    padding: 12,
   },
-  editButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderWidth: 1.5,
-    borderColor: COLORS.primary,
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  editButtonText: {
+  menuItemText: {
+    fontSize: 14,
     color: COLORS.primary,
-    fontWeight: "600",
-    fontSize: 13,
+    fontWeight: '500',
   },
-  deleteButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderWidth: 1.5,
-    borderColor: "#EF4444",
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  deleteButtonText: {
-    color: "#EF4444",
-    fontWeight: "600",
-    fontSize: 13,
+  menuDivider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginHorizontal: 8,
   },
   editRow: {
     flexDirection: "row",
