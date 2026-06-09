@@ -597,7 +597,7 @@ export default function NoteScreen() {
                   ) : (
                     <View style={styles.emptyIncorrectContainer}>
                       <Text style={styles.emptyIncorrectTitle}>
-                        아직 오답노트가 없어요 😊
+                        아직 오답노트가 없어요
                       </Text>
                       <Text style={styles.emptyIncorrectSubtitle}>
                         퀴즈를 풀면 틀린 문제가 여기에 저장돼요
@@ -622,7 +622,7 @@ export default function NoteScreen() {
                       }
                     >
                       <View style={styles.cardHeaderRow}>
-                        <Text style={styles.quizTitle}>📝 {item.quiz_title}</Text>
+                        <Text style={styles.quizTitle}>{item.quiz_title}</Text>
                         {hasReviewNeeded && (
                           <View style={styles.reviewBadge}>
                             <Text style={styles.reviewBadgeText}>복습 필요</Text>

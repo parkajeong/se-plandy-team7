@@ -300,7 +300,7 @@ export default function QuizScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.titleRow}>
-        <Ionicons name="help-circle-outline" size={28} color="#2B2B2B" />
+        <Ionicons name="newspaper-outline" size={28} color="#2B2B2B" />
         <Text style={styles.pageTitle}> 퀴즈 관리</Text>
       </View>
 
