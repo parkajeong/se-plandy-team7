@@ -322,7 +322,7 @@ function ProgressSection({
   return (
     <View style={styles.progressSection}>
       <View style={styles.sectionHeader}>
-        <Ionicons name="analytics-outline" size={22} color={COLORS.secondary} />
+        <Ionicons name="analytics-outline" size={22} color={COLORS.primary} />
         <Text style={styles.sectionTitle}>학습 진척도</Text>
       </View>
 
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
     color: "#2B2B2B",
   },
   refreshButton: {
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.primary,
     paddingVertical: 13,
     paddingHorizontal: 20,
     borderRadius: 12,
@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   refreshButtonText: {
-    color: "#1E293B",
+    color: COLORS.buttonText,
     fontWeight: "700",
     fontSize: 15,
   },

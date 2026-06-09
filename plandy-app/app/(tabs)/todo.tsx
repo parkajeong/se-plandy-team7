@@ -915,10 +915,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.primary,
   },
   addButtonText: {
-    color: '#1E293B',
+    color: COLORS.buttonText,
     fontWeight: '700',
   },
   listContent: {
@@ -1016,7 +1016,7 @@ const styles = StyleSheet.create({
   deadlineText: {
     fontSize: 13,
     fontWeight: '700',
-    color: COLORS.secondary,
+    color: COLORS.primary,
   },
   todoStatus: {
     flexShrink: 0,
@@ -1117,8 +1117,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   chipButtonSelected: {
-    borderColor: COLORS.secondary,
-    backgroundColor: COLORS.secondary,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
   },
   chipButtonText: {
     fontSize: 14,
@@ -1184,7 +1184,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F8FA',
   },
   saveButton: {
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.primary,
   },
   disabledButton: {
     backgroundColor: '#9CA3AF',
@@ -1195,7 +1195,7 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     fontWeight: '800',
-    color: '#1E293B',
+    color: COLORS.buttonText,
   },
   calendarModalBackground: {
     position: 'absolute',

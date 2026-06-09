@@ -542,13 +542,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   addButton: {
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   addButtonText: {
-    color: "#1E293B",
+    color: COLORS.buttonText,
     fontSize: 14,
     fontWeight: "700",
   },
@@ -689,15 +689,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   questionCountButtonSelected: {
-    backgroundColor: COLORS.secondary,
-    borderColor: COLORS.secondary,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   questionCountText: {
     color: "#2B2B2B",
     fontWeight: "700",
   },
   questionCountTextSelected: {
-    color: "#fff",
+    color: COLORS.buttonText,
   },
   noteItem: {
     borderWidth: 1,

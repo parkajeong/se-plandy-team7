@@ -292,7 +292,7 @@ export default function SubjectsScreen() {
                         setEditGoal(item.goal || "");
                       }}
                     >
-                      <Ionicons name="pencil-outline" size={14} color={COLORS.secondary} />
+                      <Ionicons name="pencil-outline" size={14} color={COLORS.primary} />
                       <Text style={styles.editButtonText}> 수정</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -378,13 +378,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   addSubjectButton: {
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   addSubjectButtonText: {
-    color: "#1E293B",
+    color: COLORS.buttonText,
     fontSize: 14,
     fontWeight: "700",
   },
@@ -418,14 +418,14 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   modalSubmitButton: {
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.primary,
     padding: 14,
     borderRadius: 10,
     alignItems: "center",
     marginBottom: 10,
   },
   modalSubmitButtonText: {
-    color: "#1E293B",
+    color: COLORS.buttonText,
     fontSize: 16,
     fontWeight: "700",
   },
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
   todoSummaryValue: {
     fontSize: 18,
     fontWeight: "700",
-    color: COLORS.secondary,
+    color: COLORS.primary,
   },
   subjectCount: {
     fontSize: 12,
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     fontSize: 13,
-    color: COLORS.secondary,
+    color: COLORS.primary,
     fontWeight: "600",
     marginBottom: 4,
   },
@@ -562,13 +562,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#fff",
     borderWidth: 1.5,
-    borderColor: COLORS.secondary,
+    borderColor: COLORS.primary,
     borderRadius: 8,
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
   editButtonText: {
-    color: COLORS.secondary,
+    color: COLORS.primary,
     fontWeight: "600",
     fontSize: 13,
   },

@@ -1363,14 +1363,14 @@ const styles = StyleSheet.create({
   },
 
   addButton: {
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
 
   addButtonText: {
-    color: "#1E293B",
+    color: COLORS.buttonText,
     fontSize: 14,
     fontWeight: "700",
   },
@@ -1390,14 +1390,14 @@ const styles = StyleSheet.create({
   placeholderText: { fontSize: 16, color: "#9CA3AF" },
 
   button: {
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.primary,
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
     marginBottom: 15,
   },
 
-  buttonText: { color: "#1E293B", fontSize: 18, fontWeight: "bold" },
+  buttonText: { color: COLORS.buttonText, fontSize: 18, fontWeight: "bold" },
   listTitle: { fontSize: 22, fontWeight: "bold", marginBottom: 15 },
   listContent: { paddingBottom: 100 },
   emptyText: { color: "#6B7280", marginTop: 10 },
@@ -1435,14 +1435,14 @@ const styles = StyleSheet.create({
   editButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: COLORS.secondary,
+    borderColor: COLORS.primary,
     borderRadius: 8,
     padding: 10,
     alignItems: "center",
     backgroundColor: "#FFFFFF",
   },
 
-  editButtonText: { color: COLORS.secondary, fontWeight: "bold" },
+  editButtonText: { color: COLORS.primary, fontWeight: "bold" },
 
   deleteButton: {
     flex: 1,

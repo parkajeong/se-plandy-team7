@@ -28,6 +28,7 @@ import {
 } from "firebase/firestore";
 
 import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
+import { COLORS } from "@/constants/theme";
 
 type Mode = "group" | "available" | "recommend";
 type DateTimeTarget = "availableStart" | "availableEnd";
@@ -1946,7 +1947,7 @@ const styles = StyleSheet.create({
   },
 
   activeTabButton: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
   },
 
   tabButtonText: {
@@ -1987,7 +1988,7 @@ const styles = StyleSheet.create({
   },
 
   button: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
@@ -1996,14 +1997,14 @@ const styles = StyleSheet.create({
   },
 
   buttonText: {
-    color: "#fff",
+    color: COLORS.buttonText,
     fontSize: 17,
     fontWeight: "bold",
   },
 
   outlineButton: {
     borderWidth: 1,
-    borderColor: "#ff6a92",
+    borderColor: COLORS.primary,
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
@@ -2011,7 +2012,7 @@ const styles = StyleSheet.create({
   },
 
   outlineButtonText: {
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontSize: 17,
     fontWeight: "bold",
   },
@@ -2046,7 +2047,7 @@ const styles = StyleSheet.create({
   },
 
   selectedCard: {
-    borderColor: "#ff6a92",
+    borderColor: COLORS.primary,
     backgroundColor: "#F8F8FA",
   },
 
@@ -2064,7 +2065,7 @@ const styles = StyleSheet.create({
 
   hostText: {
     marginTop: 8,
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontWeight: "bold",
   },
 
@@ -2125,7 +2126,7 @@ const styles = StyleSheet.create({
 
   groupModalSelectedText: {
     fontSize: 13,
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontWeight: "bold",
   },
 
@@ -2150,13 +2151,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#ff6a92",
+    borderColor: COLORS.primary,
   },
 
   recommendTitle: {
     fontSize: 17,
     fontWeight: "bold",
-    color: "#ff6a92",
+    color: COLORS.primary,
     marginBottom: 6,
   },
 
@@ -2169,7 +2170,7 @@ const styles = StyleSheet.create({
   smallOutlineButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ff6a92",
+    borderColor: COLORS.primary,
     borderRadius: 8,
     padding: 10,
     alignItems: "center",
@@ -2177,16 +2178,16 @@ const styles = StyleSheet.create({
   },
 
   smallOutlineButtonText: {
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontWeight: "bold",
   },
 
   smallEditButton: {
-    borderColor: "#F2C75C",
+    borderColor: COLORS.primary,
   },
 
   smallEditButtonText: {
-    color: "#F2C75C",
+    color: COLORS.primary,
   },
 
   smallDangerButton: {
@@ -2268,7 +2269,7 @@ const styles = StyleSheet.create({
   },
 
   selectedDayBox: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
   },
 
   dayText: {
@@ -2308,14 +2309,14 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ff6a92",
+    borderColor: COLORS.primary,
     borderRadius: 8,
     padding: 8,
     alignItems: "center",
   },
 
   timeButtonText: {
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontSize: 18,
     fontWeight: "bold",
   },
@@ -2328,7 +2329,7 @@ const styles = StyleSheet.create({
 
   closeButton: {
     marginTop: 20,
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     padding: 12,
     borderRadius: 10,
     alignItems: "center",
