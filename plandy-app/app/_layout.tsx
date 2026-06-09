@@ -85,9 +85,36 @@ export default function RootLayout() {
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="quiz" options={{ headerShown: true, title: "Quiz" }} />
-        <Stack.Screen name="incorrect-note" options={{ headerShown: true, title: "오답노트" }} />
-        <Stack.Screen name="subject-notes" options={{ headerShown: true, title: "과목 노트" }} />
+        <Stack.Screen
+          name="quiz"
+          options={{
+            headerShown: true,
+            title: "Quiz",
+            headerStyle: { backgroundColor: '#F8FAFC' },
+            headerTintColor: '#1E293B',
+            headerTitleStyle: { color: '#1E293B', fontWeight: '600' },
+          }}
+        />
+        <Stack.Screen
+          name="incorrect-note"
+          options={{
+            headerShown: true,
+            title: "오답노트",
+            headerStyle: { backgroundColor: '#F8FAFC' },
+            headerTintColor: '#1E293B',
+            headerTitleStyle: { color: '#1E293B', fontWeight: '600' },
+          }}
+        />
+        <Stack.Screen
+          name="subject-notes"
+          options={{
+            headerShown: true,
+            title: "과목 노트",
+            headerStyle: { backgroundColor: '#F8FAFC' },
+            headerTintColor: '#1E293B',
+            headerTitleStyle: { color: '#1E293B', fontWeight: '600' },
+          }}
+        />
         <Stack.Screen name="note-detail" options={{ headerShown: false }} />
         <Stack.Screen name="kakao-auth" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />

@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 
+import { LinearGradient } from "expo-linear-gradient";
 import { COLORS } from "@/constants/theme";
 import { getCurrentAppUserIdOrNull } from "@/src/appSession";
 import { functions } from "@/src/firebase";
@@ -450,7 +451,12 @@ export default function RecommendationScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={['#FFFFFF', '#EDF2F7']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.container}
+    >
       <View style={styles.titleRow}>
         <Ionicons name="bulb-outline" size={28} color="#2B2B2B" />
         <Text style={styles.pageTitle}> 오늘의 학습 추천</Text>
@@ -504,7 +510,7 @@ export default function RecommendationScreen() {
           contentContainerStyle={recommendations.length === 0 ? styles.flatListEmpty : undefined}
         />
       )}
-    </View>
+    </LinearGradient>
   );
 }
 

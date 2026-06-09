@@ -18,6 +18,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import {
   completeTodo,
@@ -505,7 +506,12 @@ export default function TodoScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <LinearGradient
+      colors={['#FFFFFF', '#EDF2F7']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.container}
+    >
       <View style={styles.header}>
         <View>
           <Text style={styles.screenTitle}>TodoList</Text>
@@ -873,7 +879,7 @@ export default function TodoScreen() {
           )}
         </KeyboardAvoidingView>
       </Modal>
-    </SafeAreaView>
+    </LinearGradient>
   );
 }
 

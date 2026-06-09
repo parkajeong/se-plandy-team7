@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 
+import { LinearGradient } from "expo-linear-gradient";
 import SubjectDropdown from "@/components/SubjectDropdown";
 import { COLORS } from "@/constants/theme";
 import {
@@ -276,7 +277,12 @@ export default function QuizScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={['#FFFFFF', '#EDF2F7']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.container}
+    >
       <View style={styles.header}>
         <View>
           <Text style={styles.screenTitle}>퀴즈</Text>
@@ -515,7 +521,7 @@ export default function QuizScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </LinearGradient>
   );
 }
 

@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 
 import { COLORS } from "@/constants/theme";
@@ -196,7 +197,12 @@ export default function SubjectsScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={['#FFFFFF', '#EDF2F7']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.container}
+    >
       <View style={styles.header}>
         <View>
           <Text style={styles.screenTitle}>과목</Text>
@@ -231,7 +237,6 @@ export default function SubjectsScreen() {
                 })
               }
             >
-              <View style={styles.cardTopLine} />
               <View style={styles.cardContent}>
                 <View style={styles.cardTitleRow}>
                   <Text style={styles.subjectTitle}>{item.title}</Text>
@@ -362,7 +367,7 @@ export default function SubjectsScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -503,22 +508,17 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: '#F8FFF0',
     borderRadius: 16,
     marginBottom: 14,
     overflow: 'hidden',
-    shadowColor: COLORS.primary,
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 2,
     borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  cardTopLine: {
-    height: 4,
-    backgroundColor: COLORS.secondary,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderColor: '#D4EDAA',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
   },
   cardContent: {
     flex: 1,

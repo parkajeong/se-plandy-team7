@@ -148,7 +148,7 @@ export default function UserHeaderRight() {
         onPress={handleLogout}
       >
         {isLoggingOut ? (
-          <ActivityIndicator size="small" color="#6B7280" />
+          <ActivityIndicator size="small" color={COLORS.subText} />
         ) : (
           <Text style={styles.logoutButtonText}>로그아웃</Text>
         )}
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarInitial: {
-    color: "#ffffff",
+    color: COLORS.buttonText,
     fontSize: 15,
     fontWeight: "700",
   },
@@ -184,12 +184,12 @@ const styles = StyleSheet.create({
     maxWidth: 130,
   },
   nickname: {
-    color: "#2B2B2B",
+    color: COLORS.text,
     fontSize: 13,
     fontWeight: "700",
   },
   loginId: {
-    color: "#6B7280",
+    color: COLORS.subText,
     fontSize: 11,
     marginTop: 1,
   },
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
   logoutButtonText: {
-    color: "#6B7280",
+    color: COLORS.subText,
     fontSize: 12,
     fontWeight: "700",
   },
