@@ -22,7 +22,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '@/constants/theme';
 import {
   completeTodo,
   createTodo,
