@@ -15,6 +15,7 @@ import {
 } from "react-native";
 
 import SubjectDropdown from "@/components/SubjectDropdown";
+import { COLORS } from "@/constants/theme";
 import {
   getCurrentAppUserIdOrNull,
   subscribeAppUserChange,
@@ -28,6 +29,7 @@ import {
   getQuizResultsByUser,
 } from "@/src/quizService";
 import { getSubjects } from "@/src/subjectService";
+const [selectedTab, setSelectedTab] = useState<"list" | "incorrect">("list");
 
 type Subject = {
   id: string;
@@ -298,11 +300,29 @@ export default function QuizScreen() {
   }, [quizResults]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.titleRow}>
-        <Ionicons name="newspaper-outline" size={28} color="#2B2B2B" />
-        <Text style={styles.pageTitle}> 퀴즈 관리</Text>
+  <View style={styles.container}>
+    <View style={styles.header}>
+      <View style={styles.headerLeft}>
+        <Ionicons name="newspaper-outline" size={24} color={COLORS.text} />
+        <Text style={styles.screenTitle}>퀴즈</Text>
       </View>
+      {selectedTab === "list" && (
+        <TouchableOpacity
+          style={[
+            styles.addButton,
+            (!userId || !selectedSubject || isNavigating) && styles.disabledButton,
+          ]}
+          onPress={handleOpenNoteModal}
+          disabled={!userId || !selectedSubject || isNavigating}
+        >
+          {isNavigating ? (
+            <ActivityIndicator color={COLORS.buttonText} size="small" />
+          ) : (
+            <Text style={styles.addButtonText}>+ 퀴즈 생성</Text>
+          )}
+        </TouchableOpacity>
+      )}
+    </View>
 
       {!userId && (
         <Text style={styles.notice}>로그인 후 퀴즈를 생성하고 조회할 수 있습니다.</Text>
@@ -355,24 +375,6 @@ export default function QuizScreen() {
         <Text style={styles.notice}>먼저 과목을 등록하세요.</Text>
       )}
 
-      <TouchableOpacity
-        style={[
-          styles.generateButton,
-          (!userId || !selectedSubject || isNavigating) && styles.disabledButton,
-        ]}
-        onPress={handleOpenNoteModal}
-        disabled={!userId || !selectedSubject || isNavigating}
-      >
-        {isNavigating ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <>
-            <Ionicons name="sparkles-outline" size={16} color="#fff" />
-            <Text style={styles.generateButtonText}> AI 퀴즈 생성</Text>
-          </>
-        )}
-      </TouchableOpacity>
-
       {isLoading ? (
         <ActivityIndicator style={styles.loader} color="#ff6a92" />
       ) : (
@@ -385,7 +387,7 @@ export default function QuizScreen() {
               {quizLoadError
                 ? quizLoadError
                 : selectedSubject
-                  ? "이 과목에 생성된 퀴즈가 없습니다."
+                  ? "아직 생성된 퀴즈가 없어요. 노트로 퀴즈를 만들어보세요!"
                   : "과목을 선택하세요."}
             </Text>
           }
@@ -500,15 +502,37 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: "#F8F8FA",
   },
-  titleRow: {
+  header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 20,
   },
-  pageTitle: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#2B2B2B",
+  headerLeft: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  },
+  screenTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: COLORS.text,
+  },
+  screenSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: COLORS.subText,
+  },
+  addButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  addButtonText: {
+    color: COLORS.buttonText,
+    fontSize: 14,
+    fontWeight: "600",
   },
   statsCard: {
     backgroundColor: "#fff",
@@ -561,20 +585,6 @@ const styles = StyleSheet.create({
   notice: {
     color: "#9a3412",
     marginBottom: 12,
-  },
-  generateButton: {
-    backgroundColor: "#ff6a92",
-    borderRadius: 10,
-    padding: 14,
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  generateButtonText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "700",
   },
   disabledButton: {
     backgroundColor: "#9CA3AF",
