@@ -1,5 +1,3 @@
-const { jest } = require('@jest/globals');
-
 jest.mock('firebase/firestore', () => ({
   collection: jest.fn(() => ({})),
   doc: jest.fn(() => ({})),
@@ -46,16 +44,23 @@ describe('quizService', () => {
   });
 
   test('fetchQuizResultsBySubject filters by quiz_id', async () => {
-    // mock fetchQuizzesBySubject and getQuizResultsByUser via module spies
+    // mock underlying getDocs calls: first for quizzes, then for quiz_results
     const quizzes = [{ id: 'q1' }, { id: 'q2' }];
-    jest.spyOn(service, 'fetchQuizzesBySubject').mockResolvedValue(quizzes);
-    jest.spyOn(service, 'getQuizResultsByUser').mockResolvedValue([
+    const quizDocs = quizzes.map((q) => ({ id: q.id, data: () => q }));
+
+    const results = [
       { id: 'r1', quiz_id: 'q1' },
       { id: 'r2', quiz_id: 'other' },
-    ]);
+    ];
+    const resultDocs = results.map((r) => ({ id: r.id, data: () => r }));
 
-    const results = await service.fetchQuizResultsBySubject('u1', 's1');
-    expect(results).toEqual([{ id: 'r1', quiz_id: 'q1' }]);
+    // fetchQuizzesBySubject -> getDocs resolves to quizDocs
+    firestore.getDocs.mockResolvedValueOnce({ docs: quizDocs });
+    // getQuizResultsByUser -> getDocs resolves to resultDocs
+    firestore.getDocs.mockResolvedValueOnce({ docs: resultDocs });
+
+    const out = await service.fetchQuizResultsBySubject('u1', 's1');
+    expect(out).toEqual([{ id: 'r1', quiz_id: 'q1' }]);
   });
 
   test('getIncorrectNoteGroupsByUser maps quiz questions and handles missing questions', async () => {

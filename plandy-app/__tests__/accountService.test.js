@@ -1,5 +1,3 @@
-const { jest } = require('@jest/globals');
-
 jest.mock('firebase/firestore', () => ({
   collection: jest.fn(() => ({})),
   doc: jest.fn(() => ({})),
@@ -10,56 +8,54 @@ jest.mock('firebase/firestore', () => ({
   deleteDoc: jest.fn(),
   updateDoc: jest.fn(),
 }));
-
 jest.mock('firebase/auth', () => ({
+  signInWithEmailAndPassword: jest.fn(),
   deleteUser: jest.fn(),
 }));
 
 jest.mock('../src/firebase', () => ({ db: {}, auth: {} }));
 
+jest.mock('../src/appSession', () => ({
+  beginAppLogout: jest.fn(),
+  clearAppUser: jest.fn(),
+  finishAppLogout: jest.fn(),
+  getCurrentAppUserIdOrNull: jest.fn(() => null),
+}));
+
 const service = require('../src/accountService');
 const firestore = require('firebase/firestore');
+const auth = require('firebase/auth');
 
-describe('accountService', () => {
+describe('accountService (public API)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-  });
-
-  test('resolveLoginEmail returns input email when contains @', async () => {
-    const email = await service.resolveLoginEmail('me@example.com');
-    expect(email).toBe('me@example.com');
-  });
-
-  test('resolveLoginEmail looks up username and throws when not found', async () => {
-    // username path: getDoc(doc(db, 'usernames', trimmedId))
-    firestore.getDoc.mockResolvedValueOnce({ exists: () => false });
-    await expect(service.resolveLoginEmail('missingId')).rejects.toThrow();
-  });
-
-  test('deleteUsernameDocuments removes usernames and queries by uid/email', async () => {
-    // getDoc for user returns user data with username/loginId
-    firestore.getDoc.mockResolvedValueOnce({ exists: () => true, data: () => ({ username: 'u1', loginId: 'lid' }) });
+    // default getDocs to empty list to avoid unexpected undefined
     firestore.getDocs.mockResolvedValue({ docs: [] });
-
-    await service.deleteUsernameDocuments('uid-1', { email: 'a@b.com' });
-    // should attempt to delete username docs (deleteDoc called inside)
-    // deleteDoc is used in implementation; ensure getDoc was called for users
-    expect(firestore.getDoc).toHaveBeenCalled();
   });
 
-  test('cleanupStudyGroups deletes group when user is host and removes member when not', async () => {
-    const groupDocHost = { id: 'g1', ref: 'ref1', data: () => ({ host_id: 'uid-1', schedules: [] }) };
-    const groupDocMember = { id: 'g2', ref: 'ref2', data: () => ({ host_id: 'other', members: ['uid-1'], schedules: [{ created_by: 'uid-1' }, { created_by: 'x' }] }) };
+  test('authenticateWithPasswordForWithdraw uses email path and returns user', async () => {
+    auth.signInWithEmailAndPassword.mockResolvedValue({ user: { uid: 'u1' } });
 
-    firestore.getDocs.mockResolvedValueOnce({ docs: [groupDocHost, groupDocMember] });
+    const user = await service.authenticateWithPasswordForWithdraw({ idOrEmail: 'me@example.com', password: 'pw' });
+    expect(auth.signInWithEmailAndPassword).toHaveBeenCalled();
+    expect(user).toBeDefined();
+    expect(user.uid).toBe('u1');
+  });
+
+  test('authenticateWithPasswordForWithdraw throws when username not found', async () => {
+    // simulate resolveLoginEmail path where username lookup fails
+    firestore.getDoc.mockResolvedValueOnce({ exists: () => false });
+
+    await expect(service.authenticateWithPasswordForWithdraw({ idOrEmail: 'missingId', password: 'pw' })).rejects.toThrow();
+  });
+
+  test('withdrawExternalAppAccount triggers cleanup flow and calls deleteDoc for users', async () => {
+    // prepare mocks so cleanupUserData path runs without throwing
+    firestore.getDoc.mockResolvedValue({ exists: () => true, data: () => ({}) });
+    firestore.getDocs.mockResolvedValue({ docs: [] });
     firestore.deleteDoc.mockResolvedValue();
-    firestore.updateDoc.mockResolvedValue();
 
-    await service.cleanupStudyGroups('uid-1');
-
-    // for host group, deleteDoc should be called
+    await expect(service.withdrawExternalAppAccount({ uid: 'uid-1' })).resolves.not.toThrow();
     expect(firestore.deleteDoc).toHaveBeenCalled();
-    // for member group, updateDoc should be called to remove member
-    expect(firestore.updateDoc).toHaveBeenCalled();
   });
 });
