@@ -29,9 +29,9 @@ import {
   signUpWithEmail,
 } from "../src/authService";
 import { beginAppLogout } from "../src/appSession";
+import { COLORS } from "@/constants/theme";
 
 const MAIN_ROUTE = "/(tabs)/subjects";
-const MAIN_PINK = "#ff6a92";
 const DANGER_RED = "#EF4444";
 
 export default function HomeScreen() {
@@ -569,7 +569,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: MAIN_PINK,
+    backgroundColor: COLORS.primary,
     borderRadius: 10,
     justifyContent: "center",
     minHeight: 48,
@@ -596,7 +596,7 @@ const styles = StyleSheet.create({
   },
   gridPrimaryButton: {
     alignItems: "center",
-    backgroundColor: MAIN_PINK,
+    backgroundColor: COLORS.primary,
     borderRadius: 10,
     flexBasis: 0,
     flexGrow: 1,

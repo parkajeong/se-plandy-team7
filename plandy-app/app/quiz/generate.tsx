@@ -11,6 +11,7 @@ import {
 
 import { getCurrentAppUserIdOrNull } from "@/src/appSession";
 import { generateQuizFromNote } from "@/src/quizService";
+import { COLORS } from "@/constants/theme";
 
 const ALLOWED_QUESTION_COUNTS = [5, 10, 15, 20, 25, 30];
 const DEFAULT_QUESTION_COUNT = 5;
@@ -87,7 +88,7 @@ export default function GenerateQuizScreen() {
     <View style={styles.container}>
       {isGenerating ? (
         <View style={styles.centerBox}>
-          <ActivityIndicator color="#ff6a92" size="large" />
+          <ActivityIndicator color={COLORS.primary} size="large" />
           <Text style={styles.title}>AI 퀴즈를 생성하고 있습니다.</Text>
           <Text style={styles.description}>
             퀴즈 생성에 시간이 조금 걸릴 수 있습니다.
@@ -133,7 +134,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   countText: {
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontSize: 14,
     fontWeight: "700",
     marginTop: 12,
@@ -146,7 +147,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   backButton: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     borderRadius: 10,
     marginTop: 22,
     paddingHorizontal: 18,

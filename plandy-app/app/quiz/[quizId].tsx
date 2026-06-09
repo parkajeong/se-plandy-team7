@@ -19,6 +19,7 @@ import {
   getQuizErrorMessage,
   submitQuizResult,
 } from "@/src/quizService";
+import { COLORS } from "@/constants/theme";
 
 type Question = {
   question?: string;
@@ -215,7 +216,7 @@ export default function QuizDetailScreen() {
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator color="#ff6a92" size="large" />
+        <ActivityIndicator color={COLORS.primary} size="large" />
         <Text style={styles.loadingText}>퀴즈를 불러오는 중...</Text>
       </View>
     );
@@ -413,7 +414,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   questionLabel: {
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontSize: 13,
     fontWeight: "800",
     marginBottom: 8,
@@ -449,7 +450,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   optionTextSelected: {
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontWeight: "700",
   },
   optionTextCorrect: {
@@ -461,8 +462,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   optionSelected: {
-    backgroundColor: "#FFF0F4",
-    borderColor: "#ff6a92",
+    backgroundColor: '#F1F5F9',
+    borderColor: COLORS.primary,
   },
   optionCorrect: {
     backgroundColor: "#F0FDF4",
@@ -498,21 +499,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8F8FA",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#ff6a92",
+    borderColor: COLORS.primary,
     marginBottom: 16,
     padding: 14,
   },
   resultBannerText: {
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontSize: 16,
     fontWeight: "800",
   },
   resultBannerSubText: {
-    color: "#ff6a92",
+    color: COLORS.primary,
     marginTop: 4,
   },
   submitButton: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",
@@ -563,7 +564,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   backButton: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     borderRadius: 10,
     marginTop: 20,
     paddingHorizontal: 18,

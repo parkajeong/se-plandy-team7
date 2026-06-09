@@ -12,6 +12,7 @@ import {
 
 import { getCurrentAppUserIdOrNull } from "@/src/appSession";
 import { getIncorrectNoteGroupsByUser } from "@/src/quizService";
+import { COLORS } from "@/constants/theme";
 
 type IncorrectNoteItem = {
   question_index: number;
@@ -103,7 +104,7 @@ export default function IncorrectNoteDetailScreen() {
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator color="#ff6a92" size="large" />
+        <ActivityIndicator color={COLORS.primary} size="large" />
         <Text style={styles.loadingText}>오답노트를 불러오는 중...</Text>
       </View>
     );
@@ -217,7 +218,7 @@ const styles = StyleSheet.create({
   },
 
   backButton: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     borderRadius: 10,
     marginTop: 20,
     paddingHorizontal: 24,
@@ -263,7 +264,7 @@ const styles = StyleSheet.create({
   },
 
   questionLabel: {
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontSize: 15,
     fontWeight: "800",
   },

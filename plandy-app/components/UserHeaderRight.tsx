@@ -18,6 +18,7 @@ import {
 } from "@/src/appSession";
 import { logoutExternalProviders } from "@/src/authService";
 import { auth } from "@/src/firebase";
+import { COLORS } from "@/constants/theme";
 import {
   getCurrentUserProfile,
   normalizeUserProfile,
@@ -171,7 +172,7 @@ const styles = StyleSheet.create({
   },
   avatarFallback: {
     alignItems: "center",
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     justifyContent: "center",
   },
   avatarInitial: {
