@@ -29,6 +29,7 @@ import {
   getQuizErrorMessage,
 } from "@/src/quizService";
 import { getSubjects } from "@/src/subjectService";
+
 type Subject = {
   id: string;
   title: string;
@@ -208,6 +209,13 @@ export default function QuizScreen() {
     await loadSubjectData(subject);
   };
 
+  const handleSelectTab = (tab: "list" | "incorrect") => {
+    setSelectedTab(tab);
+    if (tab === "incorrect") {
+      fetchIncorrectNoteGroups();
+    }
+  };
+
   const handleOpenNoteModal = async () => {
     if (!userId) {
       Alert.alert("로그인 필요", "로그인 후 퀴즈를 생성할 수 있습니다.");
@@ -295,32 +303,6 @@ export default function QuizScreen() {
       {!userId && (
         <Text style={styles.notice}>로그인 후 퀴즈를 생성하고 조회할 수 있습니다.</Text>
       )}
-    </View>
-
-    <View style={styles.tabRow}>
-      <TouchableOpacity
-        style={[styles.tabButton, selectedTab === "list" && styles.selectedTab]}
-        onPress={() => handleSelectTab("list")}
-      >
-        <Text style={selectedTab === "list" ? styles.selectedTabText : styles.unselectedTabText}>
-          퀴즈 목록
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.tabButton, selectedTab === "incorrect" && styles.selectedTab]}
-        onPress={() => handleSelectTab("incorrect")}
-      >
-        <Text style={selectedTab === "incorrect" ? styles.selectedTabText : styles.unselectedTabText}>
-          오답노트
-        </Text>
-      </TouchableOpacity>
-    </View>
-
-    {selectedTab === "list" && (
-      <>
-        {!userId && (
-          <Text style={styles.notice}>로그인 후 퀴즈를 생성하고 조회할 수 있습니다.</Text>
-        )}
 
       <View style={styles.tabRow}>
         <TouchableOpacity
@@ -533,47 +515,6 @@ export default function QuizScreen() {
           </View>
         </View>
       </Modal>
-      </>
-    )}
-
-    {selectedTab === "incorrect" && (
-      <FlatList
-        data={quizResults}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>아직 오답 기록이 없습니다.</Text>
-        }
-        renderItem={({ item }) => {
-          const rate =
-            typeof item.correct_rate === "number"
-              ? item.correct_rate
-              : Math.round((item.score / Math.max(1, item.total_count)) * 100);
-          const solvedAt =
-            item.solved_at?.toDate?.()?.toLocaleDateString?.("ko-KR", {
-              year: "numeric",
-              month: "2-digit",
-              day: "2-digit",
-            }) || "-";
-
-          return (
-            <Pressable
-              style={styles.card}
-              onPress={() =>
-                router.push({
-                  pathname: "/incorrect-note/[resultId]",
-                  params: { resultId: item.id },
-                })
-              }
-            >
-              <Text style={styles.quizTitle}>{item.quiz_title || "퀴즈 결과"}</Text>
-              <Text style={styles.metaText}>정답률 {rate}%</Text>
-              <Text style={styles.metaText}>{solvedAt}</Text>
-            </Pressable>
-          );
-        }}
-      />
-    )}
     </View>
   );
 }
@@ -589,11 +530,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: 20,
-  },
-  headerLeft: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 8,
   },
   screenTitle: {
     fontSize: 26,
@@ -793,29 +729,5 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: "#6B7280",
     fontWeight: "700",
-  },
-  tabRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    marginBottom: 16,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  selectedTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: COLORS.primary,
-  },
-  selectedTabText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.primary,
-  },
-  unselectedTabText: {
-    fontSize: 14,
-    color: COLORS.subText,
   },
 });

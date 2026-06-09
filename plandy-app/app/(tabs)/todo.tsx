@@ -19,6 +19,7 @@ import {
   View,
 } from 'react-native';
 
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 import {
   completeTodo,
@@ -64,7 +65,6 @@ type TodoForm = {
 };
 
 type FilterType = 'all' | 'completed' | 'incomplete';
-type SortType = 'default' | 'deadline';
 
 const getDdayText = (deadline: string | null) => {
   if (!deadline) return null;
@@ -180,7 +180,6 @@ export default function TodoScreen() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const [filter, setFilter] = useState<FilterType>('all');
-  const [sort, setSort] = useState<SortType>('default');
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -202,15 +201,8 @@ export default function TodoScreen() {
     let result = [...todos];
     if (filter === 'completed') result = result.filter(t => t.is_completed);
     if (filter === 'incomplete') result = result.filter(t => !t.is_completed);
-    if (sort === 'deadline') {
-      result.sort((a, b) => {
-        if (!a.deadline) return 1;
-        if (!b.deadline) return -1;
-        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-      });
-    }
     return result;
-  }, [todos, filter, sort]);
+  }, [todos, filter]);
 
   const validateForm = (): Record<string, string> => {
     const errors: Record<string, string> = {};
@@ -469,7 +461,6 @@ export default function TodoScreen() {
       <Pressable
         style={styles.card}
         onPress={() => openEditModal(item)}
-        onLongPress={() => handleDeleteTodo(item)}
       >
         <Pressable
           style={[styles.checkBox, item.is_completed && styles.checkBoxCompleted]}
@@ -506,6 +497,13 @@ export default function TodoScreen() {
             <Text style={styles.deadlineBadge}>{item.deadline || ''}</Text>
           </View>
         </View>
+
+        <TouchableOpacity
+          onPress={() => handleDeleteTodo(item)}
+          hitSlop={8}
+        >
+          <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
+        </TouchableOpacity>
       </Pressable>
     );
   };
@@ -558,14 +556,6 @@ export default function TodoScreen() {
                 </Text>
               </TouchableOpacity>
             ))}
-            <TouchableOpacity
-              style={[styles.filterButton, sort === 'deadline' && styles.filterButtonActive]}
-              onPress={() => setSort(sort === 'deadline' ? 'default' : 'deadline')}
-            >
-              <Text style={sort === 'deadline' ? styles.filterTextActive : styles.filterText}>
-                마감임박순
-              </Text>
-            </TouchableOpacity>
           </View>
         }
         ListEmptyComponent={
