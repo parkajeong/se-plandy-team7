@@ -6,6 +6,7 @@ import React, { useEffect, useState } from "react";
 import UserHeaderRight from "@/components/UserHeaderRight";
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { COLORS } from "@/constants/theme";
 import {
   getAppUser,
   hasActiveSession,
@@ -16,7 +17,6 @@ import {
 import { auth } from "@/src/firebase";
 
 const AUTH_CHECK_TIMEOUT_MS = 2000;
-const MAIN_PINK = "#ff6a92";
 const INACTIVE_GRAY = "#9CA3AF";
 
 export default function TabLayout() {
@@ -76,7 +76,7 @@ export default function TabLayout() {
     <Tabs
       initialRouteName="subjects"
       screenOptions={{
-        tabBarActiveTintColor: MAIN_PINK,
+        tabBarActiveTintColor: COLORS.secondary,
         tabBarInactiveTintColor: INACTIVE_GRAY,
         tabBarStyle: {
           backgroundColor: "#FFFFFF",

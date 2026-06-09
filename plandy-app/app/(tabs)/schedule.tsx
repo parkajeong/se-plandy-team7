@@ -1363,16 +1363,16 @@ const styles = StyleSheet.create({
   },
 
   addButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 8,
+    backgroundColor: COLORS.secondary,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
 
   addButtonText: {
-    color: COLORS.buttonText,
+    color: "#1E293B",
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
   },
 
   loginNotice: { color: "#EF4444", marginBottom: 15, fontSize: 15 },
@@ -1390,14 +1390,14 @@ const styles = StyleSheet.create({
   placeholderText: { fontSize: 16, color: "#9CA3AF" },
 
   button: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.secondary,
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
     marginBottom: 15,
   },
 
-  buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
+  buttonText: { color: "#1E293B", fontSize: 18, fontWeight: "bold" },
   listTitle: { fontSize: 22, fontWeight: "bold", marginBottom: 15 },
   listContent: { paddingBottom: 100 },
   emptyText: { color: "#6B7280", marginTop: 10 },
@@ -1435,14 +1435,14 @@ const styles = StyleSheet.create({
   editButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#F2C75C",
+    borderColor: COLORS.secondary,
     borderRadius: 8,
     padding: 10,
     alignItems: "center",
     backgroundColor: "#FFFFFF",
   },
 
-  editButtonText: { color: "#F2C75C", fontWeight: "bold" },
+  editButtonText: { color: COLORS.secondary, fontWeight: "bold" },
 
   deleteButton: {
     flex: 1,
@@ -1519,15 +1519,15 @@ const styles = StyleSheet.create({
   unitButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ff6a92",
+    borderColor: COLORS.primary,
     borderRadius: 8,
     padding: 10,
     alignItems: "center",
     backgroundColor: "#fff",
   },
 
-  selectedUnitButton: { backgroundColor: "#ff6a92" },
-  unitButtonText: { color: "#ff6a92", fontWeight: "bold" },
+  selectedUnitButton: { backgroundColor: COLORS.primary },
+  unitButtonText: { color: COLORS.primary, fontWeight: "bold" },
   selectedUnitButtonText: { color: "#fff" },
 
   customReminderGuide: { marginTop: 10, color: "#6B7280", fontSize: 13 },
@@ -1577,7 +1577,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
 
-  selectedDayBox: { backgroundColor: "#ff6a92" },
+  selectedDayBox: { backgroundColor: COLORS.primary },
   dayText: { fontSize: 16 },
   selectedDayText: { color: "#fff", fontWeight: "bold" },
 
@@ -1602,18 +1602,18 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ff6a92",
+    borderColor: COLORS.primary,
     borderRadius: 8,
     padding: 8,
     alignItems: "center",
   },
 
-  timeButtonText: { color: "#ff6a92", fontSize: 18, fontWeight: "bold" },
+  timeButtonText: { color: COLORS.primary, fontSize: 18, fontWeight: "bold" },
   timeValue: { fontSize: 18, fontWeight: "bold", marginVertical: 8 },
 
   closeButton: {
     marginTop: 20,
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     padding: 12,
     borderRadius: 10,
     alignItems: "center",

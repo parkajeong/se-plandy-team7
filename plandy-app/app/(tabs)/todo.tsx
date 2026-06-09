@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { router } from 'expo-router';
+import { COLORS } from '@/constants/theme';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
@@ -914,10 +915,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: '#ff6a92',
+    backgroundColor: COLORS.secondary,
   },
   addButtonText: {
-    color: '#ffffff',
+    color: '#1E293B',
     fontWeight: '700',
   },
   listContent: {
@@ -963,13 +964,13 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#ff6a92',
+    borderColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   checkBoxCompleted: {
-    backgroundColor: '#ff6a92',
+    backgroundColor: COLORS.secondary,
   },
   checkBoxText: {
     color: '#ffffff',
@@ -1015,7 +1016,7 @@ const styles = StyleSheet.create({
   deadlineText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#ff6a92',
+    color: COLORS.secondary,
   },
   todoStatus: {
     flexShrink: 0,
@@ -1116,8 +1117,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   chipButtonSelected: {
-    borderColor: '#ff6a92',
-    backgroundColor: '#ff6a92',
+    borderColor: COLORS.secondary,
+    backgroundColor: COLORS.secondary,
   },
   chipButtonText: {
     fontSize: 14,
@@ -1183,7 +1184,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F8FA',
   },
   saveButton: {
-    backgroundColor: '#ff6a92',
+    backgroundColor: COLORS.secondary,
   },
   disabledButton: {
     backgroundColor: '#9CA3AF',
@@ -1194,7 +1195,7 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     fontWeight: '800',
-    color: '#ffffff',
+    color: '#1E293B',
   },
   calendarModalBackground: {
     position: 'absolute',
@@ -1252,7 +1253,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   selectedDayBox: {
-    backgroundColor: '#ff6a92',
+    backgroundColor: COLORS.primary,
   },
   dayText: {
     fontSize: 16,
@@ -1264,7 +1265,7 @@ const styles = StyleSheet.create({
   },
   closeCalendarButton: {
     marginTop: 20,
-    backgroundColor: '#ff6a92',
+    backgroundColor: COLORS.primary,
     padding: 12,
     borderRadius: 10,
     alignItems: 'center',

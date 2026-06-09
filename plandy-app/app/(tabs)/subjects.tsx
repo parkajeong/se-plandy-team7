@@ -292,7 +292,7 @@ export default function SubjectsScreen() {
                         setEditGoal(item.goal || "");
                       }}
                     >
-                      <Ionicons name="pencil-outline" size={14} color="#F2C75C" />
+                      <Ionicons name="pencil-outline" size={14} color={COLORS.secondary} />
                       <Text style={styles.editButtonText}> 수정</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -378,15 +378,15 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   addSubjectButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 8,
+    backgroundColor: COLORS.secondary,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   addSubjectButtonText: {
-    color: COLORS.buttonText,
+    color: "#1E293B",
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   input: {
     borderWidth: 1.5,
@@ -418,14 +418,14 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   modalSubmitButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.secondary,
     padding: 14,
     borderRadius: 10,
     alignItems: "center",
     marginBottom: 10,
   },
   modalSubmitButtonText: {
-    color: COLORS.buttonText,
+    color: "#1E293B",
     fontSize: 16,
     fontWeight: "700",
   },
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
   todoSummaryValue: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#ff6a92",
+    color: COLORS.secondary,
   },
   subjectCount: {
     fontSize: 12,
@@ -493,14 +493,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 14,
     overflow: "hidden",
-    shadowColor: "#ff6a92",
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 2,
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
   cardAccent: {
-    width: 6,
-    backgroundColor: "#ff6a92",
+    width: 10,
+    backgroundColor: COLORS.secondary,
     borderTopLeftRadius: 16,
     borderBottomLeftRadius: 16,
   },
@@ -538,19 +538,19 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     fontSize: 13,
-    color: "#ff6a92",
+    color: COLORS.secondary,
     fontWeight: "600",
     marginBottom: 4,
   },
   progressBarBg: {
     height: 6,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: COLORS.border,
     borderRadius: 999,
     overflow: "hidden",
   },
   progressBarFill: {
     height: 6,
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.secondary,
     borderRadius: 999,
   },
   actions: {
@@ -562,13 +562,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#fff",
     borderWidth: 1.5,
-    borderColor: "#F2C75C",
+    borderColor: COLORS.secondary,
     borderRadius: 8,
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
   editButtonText: {
-    color: "#F2C75C",
+    color: COLORS.secondary,
     fontWeight: "600",
     fontSize: 13,
   },
@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   saveButton: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 14,
