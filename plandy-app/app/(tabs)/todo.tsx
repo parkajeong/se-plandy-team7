@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { router } from 'expo-router';
+import { COLORS } from '@/constants/theme';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
@@ -18,9 +19,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '@/constants/theme';
 import {
   completeTodo,
   createTodo,
@@ -518,7 +519,12 @@ export default function TodoScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <LinearGradient
+      colors={['#FFFFFF', '#EDF2F7']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.container}
+    >
       <View style={styles.header}>
         <View>
           <Text style={styles.screenTitle}>TodoList</Text>
@@ -901,7 +907,7 @@ export default function TodoScreen() {
           )}
         </KeyboardAvoidingView>
       </Modal>
-    </SafeAreaView>
+    </LinearGradient>
   );
 }
 
@@ -943,10 +949,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: '#ff6a92',
+    backgroundColor: COLORS.primary,
   },
   addButtonText: {
-    color: '#ffffff',
+    color: COLORS.buttonText,
     fontWeight: '700',
   },
   listContent: {
@@ -1035,12 +1041,12 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#ff6a92',
+    borderColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkBoxCompleted: {
-    backgroundColor: '#ff6a92',
+    backgroundColor: COLORS.secondary,
   },
   checkBoxText: {
     color: '#ffffff',
@@ -1148,8 +1154,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   chipButtonSelected: {
-    borderColor: '#ff6a92',
-    backgroundColor: '#ff6a92',
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
   },
   chipButtonText: {
     fontSize: 14,
@@ -1215,7 +1221,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F8FA',
   },
   saveButton: {
-    backgroundColor: '#ff6a92',
+    backgroundColor: COLORS.primary,
   },
   disabledButton: {
     backgroundColor: '#9CA3AF',
@@ -1226,7 +1232,7 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     fontWeight: '800',
-    color: '#ffffff',
+    color: COLORS.buttonText,
   },
   calendarModalBackground: {
     position: 'absolute',
@@ -1284,7 +1290,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   selectedDayBox: {
-    backgroundColor: '#ff6a92',
+    backgroundColor: COLORS.primary,
   },
   dayText: {
     fontSize: 16,
@@ -1296,7 +1302,7 @@ const styles = StyleSheet.create({
   },
   closeCalendarButton: {
     marginTop: 20,
-    backgroundColor: '#ff6a92',
+    backgroundColor: COLORS.primary,
     padding: 12,
     borderRadius: 10,
     alignItems: 'center',

@@ -10,8 +10,10 @@ import {
   Modal,
   Platform,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 import { useFocusEffect } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Notifications from "expo-notifications";
 
 import {
@@ -96,6 +98,7 @@ export default function ScheduleScreen() {
   const [isDeleteScheduleModalVisible, setIsDeleteScheduleModalVisible] =
     useState(false);
   const [deletingSchedule, setDeletingSchedule] = useState<any | null>(null);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   const getAppUserIdOrNull = useCallback(() => {
     const appUser = getAppUser();
@@ -824,7 +827,12 @@ export default function ScheduleScreen() {
     calendarTarget === "add" ? selectedMinute : editMinute;
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={['#FFFFFF', '#EDF2F7']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.container}
+    >
       <View style={styles.header}>
         <View>
           <Text style={styles.screenTitle}>일정</Text>
@@ -858,8 +866,43 @@ export default function ScheduleScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.scheduleTitle}>{item.title}</Text>
-              <Text style={styles.ddayText}>{getDdayText(item.start_time)}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.ddayText}>{getDdayText(item.start_time)}</Text>
+                <TouchableOpacity
+                  onPress={() => setMenuOpenId(menuOpenId === item.id ? null : item.id)}
+                  style={styles.menuButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="ellipsis-vertical" size={18} color={COLORS.subText} />
+                </TouchableOpacity>
+              </View>
             </View>
+
+            {menuOpenId === item.id && (
+              <View style={styles.menuDropdown}>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setMenuOpenId(null);
+                    handleOpenEditModal(item);
+                  }}
+                >
+                  <Ionicons name="pencil-outline" size={15} color={COLORS.primary} />
+                  <Text style={styles.menuItemText}>수정</Text>
+                </TouchableOpacity>
+                <View style={styles.menuDivider} />
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setMenuOpenId(null);
+                    handleDeleteSchedule(item);
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={15} color={COLORS.danger} />
+                  <Text style={[styles.menuItemText, { color: COLORS.danger }]}>삭제</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <Text style={styles.scheduleText}>
               날짜/시간: {formatScheduleDate(item.start_time)}
@@ -877,22 +920,6 @@ export default function ScheduleScreen() {
                 item.custom_reminder_unit || "minute"
               )}
             </Text>
-
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={() => handleOpenEditModal(item)}
-              >
-                <Text style={styles.editButtonText}>수정</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => handleDeleteSchedule(item)}
-              >
-                <Text style={styles.deleteButtonText}>삭제</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         )}
       />
@@ -1336,7 +1363,7 @@ export default function ScheduleScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -1364,7 +1391,7 @@ const styles = StyleSheet.create({
 
   addButton: {
     backgroundColor: COLORS.primary,
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
@@ -1372,7 +1399,7 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: COLORS.buttonText,
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
   },
 
   loginNotice: { color: "#EF4444", marginBottom: 15, fontSize: 15 },
@@ -1390,23 +1417,30 @@ const styles = StyleSheet.create({
   placeholderText: { fontSize: 16, color: "#9CA3AF" },
 
   button: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
     marginBottom: 15,
   },
 
-  buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
+  buttonText: { color: COLORS.buttonText, fontSize: 18, fontWeight: "bold" },
   listTitle: { fontSize: 22, fontWeight: "bold", marginBottom: 15 },
   listContent: { paddingBottom: 100 },
   emptyText: { color: "#6B7280", marginTop: 10 },
 
   card: {
-    backgroundColor: "#F8F8FA",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginBottom: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
 
   cardHeader: {
@@ -1430,31 +1464,41 @@ const styles = StyleSheet.create({
   },
 
   scheduleText: { fontSize: 16, marginTop: 2 },
-  actionRow: { flexDirection: "row", marginTop: 12, gap: 8 },
 
-  editButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#F2C75C",
-    borderRadius: 8,
-    padding: 10,
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
+  menuButton: {
+    padding: 4,
   },
-
-  editButtonText: { color: "#F2C75C", fontWeight: "bold" },
-
-  deleteButton: {
-    flex: 1,
+  menuDropdown: {
+    position: 'absolute',
+    right: 16,
+    top: 44,
+    backgroundColor: '#fff',
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#EF4444",
-    borderRadius: 8,
-    padding: 10,
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 100,
+    minWidth: 100,
   },
-
-  deleteButtonText: { color: "#EF4444", fontWeight: "bold" },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+  },
+  menuItemText: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: '500',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginHorizontal: 8,
+  },
 
   modalBackground: {
     flex: 1,
@@ -1519,15 +1563,15 @@ const styles = StyleSheet.create({
   unitButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ff6a92",
+    borderColor: COLORS.primary,
     borderRadius: 8,
     padding: 10,
     alignItems: "center",
     backgroundColor: "#fff",
   },
 
-  selectedUnitButton: { backgroundColor: "#ff6a92" },
-  unitButtonText: { color: "#ff6a92", fontWeight: "bold" },
+  selectedUnitButton: { backgroundColor: COLORS.primary },
+  unitButtonText: { color: COLORS.primary, fontWeight: "bold" },
   selectedUnitButtonText: { color: "#fff" },
 
   customReminderGuide: { marginTop: 10, color: "#6B7280", fontSize: 13 },
@@ -1577,7 +1621,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
 
-  selectedDayBox: { backgroundColor: "#ff6a92" },
+  selectedDayBox: { backgroundColor: COLORS.primary },
   dayText: { fontSize: 16 },
   selectedDayText: { color: "#fff", fontWeight: "bold" },
 
@@ -1602,18 +1646,18 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ff6a92",
+    borderColor: COLORS.primary,
     borderRadius: 8,
     padding: 8,
     alignItems: "center",
   },
 
-  timeButtonText: { color: "#ff6a92", fontSize: 18, fontWeight: "bold" },
+  timeButtonText: { color: COLORS.primary, fontSize: 18, fontWeight: "bold" },
   timeValue: { fontSize: 18, fontWeight: "bold", marginVertical: 8 },
 
   closeButton: {
     marginTop: 20,
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     padding: 12,
     borderRadius: 10,
     alignItems: "center",

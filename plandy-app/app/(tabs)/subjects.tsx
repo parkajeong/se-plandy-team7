@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 
 import { COLORS } from "@/constants/theme";
@@ -105,6 +106,7 @@ export default function SubjectsScreen() {
   const [subjectProgress, setSubjectProgress] = useState<SubjectProgress[]>([]);
   const [summary, setSummary] = useState<ProgressSummary>(emptySummary);
   const [isAddSubjectModalVisible, setIsAddSubjectModalVisible] = useState(false);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   const userId = getCurrentAppUserIdOrNull();
 
@@ -195,7 +197,12 @@ export default function SubjectsScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={['#FFFFFF', '#EDF2F7']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.container}
+    >
       <View style={styles.header}>
         <View>
           <Text style={styles.screenTitle}>과목</Text>
@@ -214,6 +221,7 @@ export default function SubjectsScreen() {
           <Text style={styles.subjectEmptyText}>등록된 과목이 없습니다.</Text>
         }
         contentContainerStyle={styles.listContent}
+        onScrollBeginDrag={() => setMenuOpenId(null)}
         renderItem={({ item }) => {
           const stats = progressBySubjectId.get(item.id);
           const completionRate = stats?.completionRate ?? item.progress ?? 0;
@@ -229,12 +237,46 @@ export default function SubjectsScreen() {
                 })
               }
             >
-              <View style={styles.cardAccent} />
               <View style={styles.cardContent}>
                 <View style={styles.cardTitleRow}>
                   <Text style={styles.subjectTitle}>{item.title}</Text>
-                  <Text style={styles.noteCountBadge}>📝 노트 {noteCount}개</Text>
+                  <TouchableOpacity
+                    onPress={() => setMenuOpenId(menuOpenId === item.id ? null : item.id)}
+                    style={styles.menuButton}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="ellipsis-vertical" size={18} color={COLORS.subText} />
+                  </TouchableOpacity>
                 </View>
+
+                {menuOpenId === item.id && (
+                  <View style={styles.menuDropdown}>
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={() => {
+                        setMenuOpenId(null);
+                        setEditingId(item.id);
+                        setEditGoal(item.goal || '');
+                      }}
+                    >
+                      <Ionicons name="pencil-outline" size={15} color={COLORS.primary} />
+                      <Text style={styles.menuItemText}>수정</Text>
+                    </TouchableOpacity>
+                    <View style={styles.menuDivider} />
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={() => {
+                        setMenuOpenId(null);
+                        handleDelete(item.id);
+                      }}
+                    >
+                      <Ionicons name="trash-outline" size={15} color={COLORS.danger} />
+                      <Text style={[styles.menuItemText, { color: COLORS.danger }]}>삭제</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                <Text style={styles.noteCountBadge}>📝 노트 {noteCount}개</Text>
 
                 {editingId === item.id ? (
                   <View style={styles.editRow}>
@@ -282,28 +324,6 @@ export default function SubjectsScreen() {
                     />
                   </View>
                 </View>
-
-                {editingId !== item.id && (
-                  <View style={styles.actions}>
-                    <TouchableOpacity
-                      style={styles.editButton}
-                      onPress={() => {
-                        setEditingId(item.id);
-                        setEditGoal(item.goal || "");
-                      }}
-                    >
-                      <Ionicons name="pencil-outline" size={14} color="#F2C75C" />
-                      <Text style={styles.editButtonText}> 수정</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() => handleDelete(item.id)}
-                    >
-                      <Ionicons name="trash-outline" size={14} color="#EF4444" />
-                      <Text style={styles.deleteButtonText}> 삭제</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
               </View>
             </Pressable>
           );
@@ -347,7 +367,7 @@ export default function SubjectsScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -379,14 +399,14 @@ const styles = StyleSheet.create({
   },
   addSubjectButton: {
     backgroundColor: COLORS.primary,
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   addSubjectButtonText: {
     color: COLORS.buttonText,
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   input: {
     borderWidth: 1.5,
@@ -467,7 +487,7 @@ const styles = StyleSheet.create({
   todoSummaryValue: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#ff6a92",
+    color: COLORS.primary,
   },
   subjectCount: {
     fontSize: 12,
@@ -488,21 +508,17 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
   card: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
+    backgroundColor: '#F8FFF0',
     borderRadius: 16,
     marginBottom: 14,
-    overflow: "hidden",
-    shadowColor: "#ff6a92",
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  cardAccent: {
-    width: 6,
-    backgroundColor: "#ff6a92",
-    borderTopLeftRadius: 16,
-    borderBottomLeftRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#D4EDAA',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
   },
   cardContent: {
     flex: 1,
@@ -538,54 +554,54 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     fontSize: 13,
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontWeight: "600",
     marginBottom: 4,
   },
   progressBarBg: {
     height: 6,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: COLORS.border,
     borderRadius: 999,
     overflow: "hidden",
   },
   progressBarFill: {
     height: 6,
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.secondary,
     borderRadius: 999,
   },
-  actions: {
-    flexDirection: "row",
+  menuButton: {
+    padding: 4,
+  },
+  menuDropdown: {
+    position: 'absolute',
+    right: 16,
+    top: 44,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 100,
+    minWidth: 100,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
+    padding: 12,
   },
-  editButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderWidth: 1.5,
-    borderColor: "#F2C75C",
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+  menuItemText: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: '500',
   },
-  editButtonText: {
-    color: "#F2C75C",
-    fontWeight: "600",
-    fontSize: 13,
-  },
-  deleteButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderWidth: 1.5,
-    borderColor: "#EF4444",
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  deleteButtonText: {
-    color: "#EF4444",
-    fontWeight: "600",
-    fontSize: 13,
+  menuDivider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginHorizontal: 8,
   },
   editRow: {
     flexDirection: "row",
@@ -598,7 +614,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   saveButton: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 14,

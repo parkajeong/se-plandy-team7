@@ -1,25 +1,22 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import { Platform } from 'react-native';
 
-// Unified Color Palette
-const tintColorLight = '#ff6a92'; // Main Pink
+const tintColorLight = '#475569';
 const tintColorDark = '#fff';
 
 export const COLORS = {
-  primary: '#ff6a92',      // Main Pink
-  secondary: '#F2C75C',    // Secondary Yellow
-  background: '#FFFFFF',   // Main Background
-  surface: '#F8F8FA',      // Secondary Background
-  text: '#2B2B2B',         // Main Text (Dark Gray)
-  subText: '#6B7280',      // Sub Text (Gray)
-  border: '#E5E7EB',       // Border (Light Gray)
-  buttonText: '#FFFFFF',   // Button Text (White)
-  danger: '#EF4444',       // Error/Danger Red
-  success: '#22C55E',      // Success Green
+  primary: '#475569',        // 메인 슬레이트
+  primaryLight: '#64748B',   // 라이트 슬레이트
+  secondary: '#84CC16',      // 라임 그린
+  secondaryLight: '#BEF264', // 라이트 라임
+  background: '#FFFFFF',
+  surface: '#F8FAFC',
+  text: '#1E293B',
+  subText: '#64748B',
+  border: '#E2E8F0',
+  buttonText: '#FFFFFF',
+  danger: '#EF4444',
+  success: '#22C55E',
+  warning: '#F59E0B',
 };
 
 export const Colors = {
@@ -43,13 +40,9 @@ export const Colors = {
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {

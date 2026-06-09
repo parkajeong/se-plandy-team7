@@ -12,6 +12,8 @@ import {
   useWindowDimensions,
 } from "react-native";
 
+import { LinearGradient } from "expo-linear-gradient";
+import { COLORS } from "@/constants/theme";
 import { getCurrentAppUserIdOrNull } from "@/src/appSession";
 import { functions } from "@/src/firebase";
 import { fetchProgressData } from "@/src/progressService";
@@ -321,13 +323,13 @@ function ProgressSection({
   return (
     <View style={styles.progressSection}>
       <View style={styles.sectionHeader}>
-        <Ionicons name="analytics-outline" size={22} color="#ff6a92" />
+        <Ionicons name="analytics-outline" size={22} color={COLORS.primary} />
         <Text style={styles.sectionTitle}>학습 진척도</Text>
       </View>
 
       {isLoading ? (
         <View style={styles.progressState}>
-          <ActivityIndicator color="#ff6a92" />
+          <ActivityIndicator color={COLORS.primary} />
           <Text style={styles.stateText}>학습 데이터를 불러오는 중입니다.</Text>
         </View>
       ) : error ? (
@@ -449,7 +451,12 @@ export default function RecommendationScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={['#FFFFFF', '#EDF2F7']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.container}
+    >
       <View style={styles.titleRow}>
         <Ionicons name="bulb-outline" size={28} color="#2B2B2B" />
         <Text style={styles.pageTitle}> 오늘의 학습 추천</Text>
@@ -479,7 +486,7 @@ export default function RecommendationScreen() {
 
       {loading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#ff6a92" />
+          <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>AI가 학습 데이터를 분석하고 있어요...</Text>
         </View>
       )}
@@ -503,7 +510,7 @@ export default function RecommendationScreen() {
           contentContainerStyle={recommendations.length === 0 ? styles.flatListEmpty : undefined}
         />
       )}
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -524,7 +531,7 @@ const styles = StyleSheet.create({
     color: "#2B2B2B",
   },
   refreshButton: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     paddingVertical: 13,
     paddingHorizontal: 20,
     borderRadius: 12,
@@ -532,8 +539,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
-    shadowColor: "#ff6a92",
-    shadowOpacity: 0.25,
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 3,
   },
@@ -541,7 +548,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   refreshButtonText: {
-    color: "#fff",
+    color: COLORS.buttonText,
     fontWeight: "700",
     fontSize: 15,
   },
@@ -598,14 +605,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 14,
     overflow: "hidden",
-    shadowColor: "#ff6a92",
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 2,
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
   cardAccent: {
-    width: 6,
-    backgroundColor: "#ff6a92",
+    width: 10,
+    backgroundColor: COLORS.secondary,
     borderTopLeftRadius: 16,
     borderBottomLeftRadius: 16,
   },
@@ -623,7 +630,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -648,7 +655,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 20,
-    shadowColor: "#ff6a92",
+    shadowColor: COLORS.primary,
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
@@ -679,7 +686,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   retryButton: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -721,14 +728,14 @@ const styles = StyleSheet.create({
   },
   barValue: {
     position: "absolute",
-    color: "#ff6a92",
+    color: COLORS.secondary,
     fontSize: 12,
     fontWeight: "700",
     textAlign: "center",
   },
   barFill: {
     position: "absolute",
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.secondary,
     borderRadius: 5,
   },
   barLabel: {
@@ -789,12 +796,12 @@ const styles = StyleSheet.create({
   },
   completionBarInner: {
     height: 12,
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.secondary,
     borderRadius: 999,
   },
   completionPercent: {
     width: 48,
-    color: "#ff6a92",
+    color: COLORS.secondary,
     fontSize: 13,
     fontWeight: "800",
     textAlign: "right",
@@ -827,7 +834,7 @@ const styles = StyleSheet.create({
   lineSegment: {
     position: "absolute",
     height: 3,
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.secondary,
     borderRadius: 999,
   },
   linePoint: {
@@ -836,7 +843,7 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: "#fff",
-    borderColor: "#ff6a92",
+    borderColor: COLORS.secondary,
     borderWidth: 2,
   },
   lineDateLabel: {

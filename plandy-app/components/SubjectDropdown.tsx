@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { COLORS } from "@/constants/theme";
 
 export type SubjectOption = {
   id: string;
@@ -179,7 +180,7 @@ const styles = StyleSheet.create({
   },
   subjectItemTextSelected: {
     fontWeight: "700",
-    color: "#ff6a92",
+    color: COLORS.primary,
   },
   emptyText: {
     color: "#6B7280",
@@ -187,7 +188,7 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     marginTop: 15,
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     padding: 12,
     borderRadius: 10,
     alignItems: "center",

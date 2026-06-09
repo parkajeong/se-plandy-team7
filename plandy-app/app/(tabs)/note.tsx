@@ -839,7 +839,7 @@ const styles = StyleSheet.create({
   },
 
   button: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
@@ -847,7 +847,7 @@ const styles = StyleSheet.create({
   },
 
   searchButton: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
@@ -887,8 +887,8 @@ const styles = StyleSheet.create({
   },
 
   activeSearchTabButton: {
-    backgroundColor: "#ff6a92",
-    borderColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
 
   activeSearchTabText: {
@@ -990,7 +990,7 @@ const styles = StyleSheet.create({
   editButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#F2C75C",
+    borderColor: COLORS.primary,
     borderRadius: 8,
     padding: 10,
     alignItems: "center",
@@ -998,7 +998,7 @@ const styles = StyleSheet.create({
   },
 
   editButtonText: {
-    color: "#F2C75C",
+    color: COLORS.primary,
     fontWeight: "bold",
   },
 
@@ -1080,7 +1080,7 @@ const styles = StyleSheet.create({
 
   closeButton: {
     marginTop: 15,
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     padding: 12,
     borderRadius: 10,
     alignItems: "center",

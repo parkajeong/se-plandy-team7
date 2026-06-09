@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 
+import { LinearGradient } from "expo-linear-gradient";
 import SubjectDropdown from "@/components/SubjectDropdown";
 import { COLORS } from "@/constants/theme";
 import {
@@ -276,7 +277,12 @@ export default function QuizScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={['#FFFFFF', '#EDF2F7']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.container}
+    >
       <View style={styles.header}>
         <View>
           <Text style={styles.screenTitle}>퀴즈</Text>
@@ -515,7 +521,7 @@ export default function QuizScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -543,14 +549,14 @@ const styles = StyleSheet.create({
   },
   addButton: {
     backgroundColor: COLORS.primary,
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   addButtonText: {
     color: COLORS.buttonText,
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   notice: {
     color: "#9a3412",
@@ -689,15 +695,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   questionCountButtonSelected: {
-    backgroundColor: "#ff6a92",
-    borderColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   questionCountText: {
     color: "#2B2B2B",
     fontWeight: "700",
   },
   questionCountTextSelected: {
-    color: "#fff",
+    color: COLORS.buttonText,
   },
   noteItem: {
     borderWidth: 1,

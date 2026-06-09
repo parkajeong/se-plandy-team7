@@ -11,6 +11,7 @@ import {
   Modal,
   Platform,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/src/firebase";
@@ -28,6 +29,7 @@ import {
 } from "firebase/firestore";
 
 import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
+import { COLORS } from "@/constants/theme";
 
 type Mode = "group" | "available" | "recommend";
 type DateTimeTarget = "availableStart" | "availableEnd";
@@ -89,6 +91,7 @@ export default function StudyGroupScreen() {
 
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [editingGroupName, setEditingGroupName] = useState("");
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   const [availableStartDate, setAvailableStartDate] = useState<Date | null>(
     null
@@ -1331,50 +1334,74 @@ export default function StudyGroupScreen() {
                 </>
               ) : (
                 <>
-                  <TouchableOpacity onPress={() => handleSelectGroup(item)}>
-                    <Text style={styles.groupName}>{item.name}</Text>
+                  <View style={styles.cardHeaderRow}>
+                    <TouchableOpacity style={{ flex: 1 }} onPress={() => handleSelectGroup(item)}>
+                      <Text style={styles.groupName}>{item.name}</Text>
 
-                    <Text style={styles.groupInfo}>
-                      초대코드: {item.invite_code}
-                    </Text>
+                      <Text style={styles.groupInfo}>
+                        초대코드: {item.invite_code}
+                      </Text>
 
-                    <Text style={styles.groupInfo}>
-                      참여 인원: {item.members.length}명
-                    </Text>
+                      <Text style={styles.groupInfo}>
+                        참여 인원: {item.members.length}명
+                      </Text>
 
-                    {isHost && <Text style={styles.hostText}>내가 만든 그룹</Text>}
+                      {isHost && <Text style={styles.hostText}>내가 만든 그룹</Text>}
 
-                    {isSelected && (
-                      <Text style={styles.selectedText}>현재 선택된 그룹</Text>
-                    )}
-                  </TouchableOpacity>
+                      {isSelected && (
+                        <Text style={styles.selectedText}>현재 선택된 그룹</Text>
+                      )}
+                    </TouchableOpacity>
 
-                  <View style={styles.actionRow}>
-                    {isHost ? (
-                      <>
-                        <TouchableOpacity
-                          style={[styles.smallOutlineButton, styles.smallEditButton]}
-                          onPress={() => handleStartEditGroup(item)}
-                        >
-                          <Text style={[styles.smallOutlineButtonText, styles.smallEditButtonText]}>수정</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={styles.smallDangerButton}
-                          onPress={() => handleDeleteGroup(item)}
-                        >
-                          <Text style={styles.smallDangerButtonText}>삭제</Text>
-                        </TouchableOpacity>
-                      </>
-                    ) : (
-                      <TouchableOpacity
-                        style={styles.smallDangerButton}
-                        onPress={() => handleLeaveGroup(item)}
-                      >
-                        <Text style={styles.smallDangerButtonText}>탈퇴</Text>
-                      </TouchableOpacity>
-                    )}
+                    <TouchableOpacity
+                      onPress={() => setMenuOpenId(menuOpenId === item.id ? null : item.id)}
+                      style={styles.menuButton}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="ellipsis-vertical" size={18} color={COLORS.subText} />
+                    </TouchableOpacity>
                   </View>
+
+                  {menuOpenId === item.id && (
+                    <View style={styles.menuDropdown}>
+                      {isHost ? (
+                        <>
+                          <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
+                              setMenuOpenId(null);
+                              handleStartEditGroup(item);
+                            }}
+                          >
+                            <Ionicons name="pencil-outline" size={15} color={COLORS.primary} />
+                            <Text style={styles.menuItemText}>수정</Text>
+                          </TouchableOpacity>
+                          <View style={styles.menuDivider} />
+                          <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
+                              setMenuOpenId(null);
+                              handleDeleteGroup(item);
+                            }}
+                          >
+                            <Ionicons name="trash-outline" size={15} color={COLORS.danger} />
+                            <Text style={[styles.menuItemText, { color: COLORS.danger }]}>삭제</Text>
+                          </TouchableOpacity>
+                        </>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.menuItem}
+                          onPress={() => {
+                            setMenuOpenId(null);
+                            handleLeaveGroup(item);
+                          }}
+                        >
+                          <Ionicons name="exit-outline" size={15} color={COLORS.danger} />
+                          <Text style={[styles.menuItemText, { color: COLORS.danger }]}>탈퇴</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
                 </>
               )}
             </View>
@@ -1462,30 +1489,52 @@ export default function StudyGroupScreen() {
             ) : (
               availableTimeList.map((time) => (
                 <View key={time.id} style={styles.scheduleCard}>
-                  <Text style={styles.scheduleTitle}>{time.user_name}</Text>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.scheduleTitle}>{time.user_name}</Text>
 
-                  <Text style={styles.groupInfo}>
-                    시작: {formatDateTime(time.start_time)}
-                  </Text>
+                      <Text style={styles.groupInfo}>
+                        시작: {formatDateTime(time.start_time)}
+                      </Text>
 
-                  <Text style={styles.groupInfo}>
-                    종료: {formatDateTime(time.end_time)}
-                  </Text>
+                      <Text style={styles.groupInfo}>
+                        종료: {formatDateTime(time.end_time)}
+                      </Text>
+                    </View>
 
-                  {time.user_id === userId && (
-                    <View style={styles.actionRow}>
+                    {time.user_id === userId && (
                       <TouchableOpacity
-                        style={[styles.smallOutlineButton, styles.smallEditButton]}
-                        onPress={() => handleStartEditAvailableTime(time)}
+                        onPress={() => setMenuOpenId(menuOpenId === `avail-${time.id}` ? null : `avail-${time.id}`)}
+                        style={styles.menuButton}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
-                        <Text style={[styles.smallOutlineButtonText, styles.smallEditButtonText]}>수정</Text>
+                        <Ionicons name="ellipsis-vertical" size={18} color={COLORS.subText} />
                       </TouchableOpacity>
+                    )}
+                  </View>
 
+                  {menuOpenId === `avail-${time.id}` && (
+                    <View style={styles.menuDropdown}>
                       <TouchableOpacity
-                        style={styles.smallDangerButton}
-                        onPress={() => handleDeleteAvailableTime(time)}
+                        style={styles.menuItem}
+                        onPress={() => {
+                          setMenuOpenId(null);
+                          handleStartEditAvailableTime(time);
+                        }}
                       >
-                        <Text style={styles.smallDangerButtonText}>삭제</Text>
+                        <Ionicons name="pencil-outline" size={15} color={COLORS.primary} />
+                        <Text style={styles.menuItemText}>수정</Text>
+                      </TouchableOpacity>
+                      <View style={styles.menuDivider} />
+                      <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => {
+                          setMenuOpenId(null);
+                          handleDeleteAvailableTime(time);
+                        }}
+                      >
+                        <Ionicons name="trash-outline" size={15} color={COLORS.danger} />
+                        <Text style={[styles.menuItemText, { color: COLORS.danger }]}>삭제</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -1594,7 +1643,45 @@ export default function StudyGroupScreen() {
                     </>
                   ) : (
                     <>
-                      <Text style={styles.scheduleTitle}>{schedule.title}</Text>
+                      <View style={styles.cardHeaderRow}>
+                        <Text style={[styles.scheduleTitle, { flex: 1 }]}>{schedule.title}</Text>
+
+                        {schedule.created_by === userId && (
+                          <TouchableOpacity
+                            onPress={() => setMenuOpenId(menuOpenId === `sched-${schedule.id}` ? null : `sched-${schedule.id}`)}
+                            style={styles.menuButton}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Ionicons name="ellipsis-vertical" size={18} color={COLORS.subText} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      {menuOpenId === `sched-${schedule.id}` && (
+                        <View style={styles.menuDropdown}>
+                          <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
+                              setMenuOpenId(null);
+                              handleStartEditSchedule(schedule);
+                            }}
+                          >
+                            <Ionicons name="pencil-outline" size={15} color={COLORS.primary} />
+                            <Text style={styles.menuItemText}>수정</Text>
+                          </TouchableOpacity>
+                          <View style={styles.menuDivider} />
+                          <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
+                              setMenuOpenId(null);
+                              handleDeleteSchedule(schedule);
+                            }}
+                          >
+                            <Ionicons name="trash-outline" size={15} color={COLORS.danger} />
+                            <Text style={[styles.menuItemText, { color: COLORS.danger }]}>삭제</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
 
                       <Text style={styles.groupInfo}>
                         등록자: {schedule.created_by_name || "알 수 없음"}
@@ -1612,24 +1699,6 @@ export default function StudyGroupScreen() {
                         <Text style={styles.groupInfo}>
                           추천 가능 인원: {schedule.participant_count}명
                         </Text>
-                      )}
-
-                      {schedule.created_by === userId && (
-                        <View style={styles.actionRow}>
-                          <TouchableOpacity
-                            style={[styles.smallOutlineButton, styles.smallEditButton]}
-                            onPress={() => handleStartEditSchedule(schedule)}
-                          >
-                            <Text style={[styles.smallOutlineButtonText, styles.smallEditButtonText]}>수정</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={styles.smallDangerButton}
-                            onPress={() => handleDeleteSchedule(schedule)}
-                          >
-                            <Text style={styles.smallDangerButtonText}>삭제</Text>
-                          </TouchableOpacity>
-                        </View>
                       )}
                     </>
                   )}
@@ -1933,30 +2002,30 @@ const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: "row",
     marginBottom: 20,
-    backgroundColor: "#F8F8FA",
-    borderRadius: 10,
-    padding: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
 
   tabButton: {
     flex: 1,
-    padding: 10,
-    borderRadius: 8,
+    paddingVertical: 10,
     alignItems: "center",
   },
 
   activeTabButton: {
-    backgroundColor: "#ff6a92",
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.primary,
   },
 
   tabButtonText: {
     fontSize: 14,
-    fontWeight: "bold",
-    color: "#6B7280",
+    fontWeight: "500",
+    color: COLORS.subText,
   },
 
   activeTabButtonText: {
-    color: "#fff",
+    color: COLORS.primary,
+    fontWeight: "700",
   },
 
   sectionTitle: {
@@ -1987,7 +2056,7 @@ const styles = StyleSheet.create({
   },
 
   button: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
@@ -1996,14 +2065,14 @@ const styles = StyleSheet.create({
   },
 
   buttonText: {
-    color: "#fff",
+    color: COLORS.buttonText,
     fontSize: 17,
     fontWeight: "bold",
   },
 
   outlineButton: {
     borderWidth: 1,
-    borderColor: "#ff6a92",
+    borderColor: COLORS.primary,
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
@@ -2011,7 +2080,7 @@ const styles = StyleSheet.create({
   },
 
   outlineButtonText: {
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontSize: 17,
     fontWeight: "bold",
   },
@@ -2037,17 +2106,22 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: "#F8F8FA",
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    borderRadius: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#F8F8FA",
+    borderColor: COLORS.border,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
 
   selectedCard: {
-    borderColor: "#ff6a92",
-    backgroundColor: "#F8F8FA",
+    borderColor: COLORS.primary,
+    borderWidth: 2,
   },
 
   groupName: {
@@ -2064,7 +2138,7 @@ const styles = StyleSheet.create({
 
   hostText: {
     marginTop: 8,
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontWeight: "bold",
   },
 
@@ -2125,17 +2199,22 @@ const styles = StyleSheet.create({
 
   groupModalSelectedText: {
     fontSize: 13,
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontWeight: "bold",
   },
 
   scheduleCard: {
-    backgroundColor: "#F8F8FA",
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    borderRadius: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: COLORS.border,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
 
   scheduleTitle: {
@@ -2145,18 +2224,23 @@ const styles = StyleSheet.create({
   },
 
   recommendCard: {
-    backgroundColor: "#F8F8FA",
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    borderRadius: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#ff6a92",
+    borderColor: COLORS.border,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
 
   recommendTitle: {
     fontSize: 17,
     fontWeight: "bold",
-    color: "#ff6a92",
+    color: COLORS.primary,
     marginBottom: 6,
   },
 
@@ -2169,7 +2253,7 @@ const styles = StyleSheet.create({
   smallOutlineButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ff6a92",
+    borderColor: COLORS.primary,
     borderRadius: 8,
     padding: 10,
     alignItems: "center",
@@ -2177,16 +2261,53 @@ const styles = StyleSheet.create({
   },
 
   smallOutlineButtonText: {
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontWeight: "bold",
   },
 
-  smallEditButton: {
-    borderColor: "#F2C75C",
+  cardHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
   },
 
-  smallEditButtonText: {
-    color: "#F2C75C",
+  menuButton: {
+    padding: 4,
+  },
+
+  menuDropdown: {
+    position: "absolute",
+    right: 16,
+    top: 44,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: "#000000",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 100,
+    minWidth: 100,
+  },
+
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+  },
+
+  menuItemText: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: "500",
+  },
+
+  menuDivider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginHorizontal: 8,
   },
 
   smallDangerButton: {
@@ -2268,7 +2389,7 @@ const styles = StyleSheet.create({
   },
 
   selectedDayBox: {
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
   },
 
   dayText: {
@@ -2308,14 +2429,14 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ff6a92",
+    borderColor: COLORS.primary,
     borderRadius: 8,
     padding: 8,
     alignItems: "center",
   },
 
   timeButtonText: {
-    color: "#ff6a92",
+    color: COLORS.primary,
     fontSize: 18,
     fontWeight: "bold",
   },
@@ -2328,7 +2449,7 @@ const styles = StyleSheet.create({
 
   closeButton: {
     marginTop: 20,
-    backgroundColor: "#ff6a92",
+    backgroundColor: COLORS.primary,
     padding: 12,
     borderRadius: 10,
     alignItems: "center",
