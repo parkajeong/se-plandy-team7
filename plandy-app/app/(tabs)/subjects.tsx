@@ -1,18 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
+  Modal,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 
+import { COLORS } from "@/constants/theme";
 import { getCurrentAppUserIdOrNull } from "@/src/appSession";
 import {
   addSubject,
@@ -37,17 +38,6 @@ type SubjectProgress = {
   completedTodoCount: number;
   studyAmount: number;
   completionRate: number;
-};
-
-type TrendPoint = {
-  date: string;
-  count: number;
-};
-
-type StudyAmountChartItem = {
-  subjectId: string;
-  subjectTitle: string;
-  value: number;
 };
 
 type ProgressSummary = {
@@ -77,403 +67,30 @@ const showAlert = (message: string) => {
   }
 };
 
-const shortenLabel = (label: string, maxLength = 8) =>
-  label.length > maxLength ? `${label.slice(0, maxLength)}...` : label;
-
-const getLineSegment = (
-  from: { x: number; y: number },
-  to: { x: number; y: number }
-) => {
-  const deltaX = to.x - from.x;
-  const deltaY = to.y - from.y;
-  const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-  const angle = `${Math.atan2(deltaY, deltaX)}rad`;
-
-  return {
-    width: length,
-    left: (from.x + to.x) / 2 - length / 2,
-    top: (from.y + to.y) / 2 - 1.5,
-    transform: [{ rotate: angle }],
-  };
-};
-
-function SummaryCard({ summary }: { summary: ProgressSummary }) {
-  const items = [
-    { label: "전체 과목 수", value: summary.totalSubjectCount },
-    { label: "전체 할 일 수", value: summary.totalTodoCount },
-    { label: "완료된 할 일 수", value: summary.completedTodoCount },
-    { label: "전체 평균 완료율", value: `${summary.averageCompletionRate}%` },
-  ];
-
-  return (
-    <View style={styles.summaryGrid}>
-      {items.map((item) => (
-        <View key={item.label} style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{item.value}</Text>
-          <Text style={styles.summaryLabel}>{item.label}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function BarChart({
-  title,
-  data,
-}: {
-  title: string;
-  data: StudyAmountChartItem[];
-}) {
-  const { width } = useWindowDimensions();
-  const chartWidth = Math.max(width - 32, 280);
-  const chartHeight = 240;
-  const leftPadding = 34;
-  const rightPadding = 14;
-  const topPadding = 22;
-  const bottomPadding = 46;
-  const plotWidth = chartWidth - leftPadding - rightPadding;
-  const plotHeight = chartHeight - topPadding - bottomPadding;
-  const visibleData = data.slice(0, 8);
-  const maxValue = Math.max(...visibleData.map((item) => item.value), 1);
-  const slotWidth = visibleData.length > 0 ? plotWidth / visibleData.length : plotWidth;
-  const barWidth = Math.max(Math.min(slotWidth * 0.56, 44), 22);
-
-  return (
-    <View style={styles.chartBlock}>
-      <Text style={styles.chartTitle}>{title}</Text>
-      {visibleData.length === 0 ? (
-        <Text style={styles.chartEmptyText}>
-          과목, 할 일, 노트를 추가하면 학습량 그래프를 확인할 수 있습니다.
-        </Text>
-      ) : (
-        <View style={[styles.barChart, { width: chartWidth, height: chartHeight }]}>
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-            const y = topPadding + plotHeight - plotHeight * ratio;
-            const label = Math.round(maxValue * ratio);
-            return (
-              <View key={ratio} style={[styles.gridLine, { top: y }]}>
-                <Text style={styles.yAxisLabel}>{label}</Text>
-                <View style={styles.gridRule} />
-              </View>
-            );
-          })}
-
-          <View
-            style={[
-              styles.yAxisLine,
-              { left: leftPadding, top: topPadding, height: plotHeight },
-            ]}
-          />
-          <View
-            style={[
-              styles.xAxisLine,
-              {
-                left: leftPadding,
-                right: rightPadding,
-                top: topPadding + plotHeight,
-              },
-            ]}
-          />
-
-          {visibleData.map((item, index) => {
-            const barHeight =
-              item.value === 0 ? 0 : Math.max((item.value / maxValue) * plotHeight, 8);
-            const left = leftPadding + slotWidth * index + (slotWidth - barWidth) / 2;
-            return (
-              <View key={item.subjectId}>
-                <Text
-                  style={[
-                    styles.barValue,
-                    {
-                      left: left - 8,
-                      top: topPadding + plotHeight - barHeight - 20,
-                      width: barWidth + 16,
-                    },
-                  ]}
-                >
-                  {item.value}
-                </Text>
-                <View
-                  style={[
-                    styles.barFill,
-                    {
-                      left,
-                      top: topPadding + plotHeight - barHeight,
-                      width: barWidth,
-                      height: barHeight,
-                    },
-                  ]}
-                />
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.barLabel,
-                    {
-                      left: left - 14,
-                      top: topPadding + plotHeight + 10,
-                      width: barWidth + 28,
-                    },
-                  ]}
-                >
-                  {shortenLabel(item.subjectTitle)}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-      )}
-    </View>
-  );
-}
-
-function SubjectCompletionBars({
-  title,
-  data,
-}: {
-  title: string;
-  data: SubjectProgress[];
-}) {
-  const hasTodos = data.some((item) => item.todoCount > 0);
-
-  return (
-    <View style={styles.chartBlock}>
-      <Text style={styles.chartTitle}>{title}</Text>
-      {!hasTodos ? (
-        <Text style={styles.chartEmptyText}>
-          아직 등록된 할 일이 없어 완료율을 표시할 수 없습니다.
-        </Text>
-      ) : (
-        <View style={styles.completionList}>
-          {data.map((item) => {
-            const completionRate = Math.min(
-              Math.max(Math.round(item.completionRate), 0),
-              100
-            );
-            return (
-              <View key={item.subjectId} style={styles.completionRow}>
-                <Text
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                  style={styles.completionSubject}
-                >
-                  {item.subjectTitle}
-                </Text>
-                <View style={styles.completionBarOuter}>
-                  <View
-                    style={[
-                      styles.completionBarInner,
-                      { width: `${completionRate}%` as `${number}%` },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.completionPercent}>{completionRate}%</Text>
-              </View>
-            );
-          })}
-        </View>
-      )}
-    </View>
-  );
-}
-
-function LineChart({ title, data }: { title: string; data: TrendPoint[] }) {
-  const { width } = useWindowDimensions();
-  const chartWidth = Math.max(width - 32, 280);
-  const chartHeight = 230;
-  const maxValue = Math.max(...data.map((item) => item.count), 1);
-  const leftPadding = 34;
-  const rightPadding = 16;
-  const topPadding = 22;
-  const bottomPadding = 44;
-  const plotWidth = chartWidth - leftPadding - rightPadding;
-  const plotHeight = chartHeight - topPadding - bottomPadding;
-
-  const points = data.map((item, index) => {
-    const x =
-      leftPadding +
-      (data.length === 1 ? plotWidth / 2 : (plotWidth / (data.length - 1)) * index);
-    const y = topPadding + plotHeight - (item.count / maxValue) * plotHeight;
-    return { ...item, x, y };
-  });
-
-  return (
-    <View style={styles.chartBlock}>
-      <Text style={styles.chartTitle}>{title}</Text>
-      {data.length <= 1 ? (
-        <Text style={styles.chartEmptyText}>
-          완료된 할 일이 생기면 학습 진척도 변화를 확인할 수 있습니다.
-        </Text>
-      ) : (
-        <View style={[styles.lineChart, { width: chartWidth, height: chartHeight }]}>
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-            const y = topPadding + plotHeight - plotHeight * ratio;
-            return (
-              <View key={ratio} style={[styles.lineGridLine, { top: y }]}>
-                <Text style={styles.yAxisLabel}>{Math.round(maxValue * ratio)}</Text>
-                <View
-                  style={[
-                    styles.lineGridRule,
-                    ratio === 0 && styles.lineBaseRule,
-                  ]}
-                />
-              </View>
-            );
-          })}
-          <View
-            style={[
-              styles.yAxisLine,
-              { left: leftPadding, top: topPadding, height: plotHeight },
-            ]}
-          />
-          {points.slice(1).map((point, index) => (
-            <View
-              key={`${point.date}-${index}`}
-              style={[styles.lineSegment, getLineSegment(points[index], point)]}
-            />
-          ))}
-          {points.map((point) => (
-            <View
-              key={point.date}
-              style={[
-                styles.linePoint,
-                {
-                  left: point.x - 4,
-                  top: point.y - 4,
-                },
-              ]}
-            />
-          ))}
-          <Text style={[styles.lineDateLabel, { left: leftPadding }]}>
-            {data[0]?.date.slice(5).replace("-", "/")}
-          </Text>
-          <Text style={[styles.lineDateLabel, { right: rightPadding }]}>
-            {data[data.length - 1]?.date.slice(5).replace("-", "/")}
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-}
-
-function ProgressSection({
-  isLoading,
-  error,
-  subjectProgress,
-  studyAmountChartData,
-  trend,
-  summary,
-  onRetry,
-}: {
-  isLoading: boolean;
-  error: string | null;
-  subjectProgress: SubjectProgress[];
-  studyAmountChartData: StudyAmountChartItem[];
-  trend: TrendPoint[];
-  summary: ProgressSummary;
-  onRetry: () => void;
-}) {
-  const hasSubjects = subjectProgress.length > 0;
-
-  return (
-    <View style={styles.progressSection}>
-      <View style={styles.sectionHeader}>
-        <Ionicons name="analytics-outline" size={22} color="#ff6a92" />
-        <Text style={styles.sectionTitle}>학습 진척도</Text>
-      </View>
-
-      {isLoading ? (
-        <View style={styles.progressState}>
-          <ActivityIndicator color="#ff6a92" />
-          <Text style={styles.stateText}>학습 데이터를 불러오는 중입니다.</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.progressState}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
-            <Text style={styles.retryButtonText}>다시 시도</Text>
-          </TouchableOpacity>
-        </View>
-      ) : !hasSubjects ? (
-        <View style={styles.progressState}>
-          <Text style={styles.emptyTitle}>아직 등록된 과목이 없습니다.</Text>
-        </View>
-      ) : (
-        <>
-          <SummaryCard summary={summary} />
-          <BarChart title="과목별 학습량" data={studyAmountChartData} />
-          <SubjectCompletionBars title="과목별 완료율" data={subjectProgress} />
-          <LineChart title="전체 학습 진척도" data={trend} />
-        </>
-      )}
-    </View>
-  );
-}
-
 function SubjectListHeader({
-  title,
-  goal,
-  isProgressLoading,
-  progressError,
-  subjectProgress,
-  studyAmountChartData,
-  trend,
+  subjectCount,
   summary,
-  onTitleChange,
-  onGoalChange,
-  onAdd,
-  onProgressRetry,
 }: {
-  title: string;
-  goal: string;
-  isProgressLoading: boolean;
-  progressError: string | null;
-  subjectProgress: SubjectProgress[];
-  studyAmountChartData: StudyAmountChartItem[];
-  trend: TrendPoint[];
+  subjectCount: number;
   summary: ProgressSummary;
-  onTitleChange: (value: string) => void;
-  onGoalChange: (value: string) => void;
-  onAdd: () => void;
-  onProgressRetry: () => void;
 }) {
   return (
     <>
-      <View style={styles.titleRow}>
-        <Ionicons name="book" size={28} color="#2B2B2B" />
-        <Text style={styles.pageTitle}>과목 관리</Text>
+      <View style={styles.todoSummaryCard}>
+        <View style={styles.todoSummaryItem}>
+          <Text style={styles.todoSummaryLabel}>할일</Text>
+          <Text style={styles.todoSummaryValue}>
+            {summary.completedTodoCount} / {summary.totalTodoCount}
+          </Text>
+        </View>
+        <View style={styles.todoSummaryDivider} />
+        <View style={styles.todoSummaryItem}>
+          <Text style={styles.todoSummaryLabel}>평균 완료율</Text>
+          <Text style={styles.todoSummaryValue}>{summary.averageCompletionRate}%</Text>
+        </View>
       </View>
 
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="과목명"
-          placeholderTextColor="#D1D5DB"
-          value={title}
-          onChangeText={onTitleChange}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="학습 목표 (선택)"
-          placeholderTextColor="#D1D5DB"
-          value={goal}
-          onChangeText={onGoalChange}
-        />
-        <TouchableOpacity style={styles.addButton} onPress={onAdd}>
-          <Ionicons name="add-circle-outline" size={16} color="#fff" />
-          <Text style={styles.addButtonText}> 과목 추가</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ProgressSection
-        isLoading={isProgressLoading}
-        error={progressError}
-        subjectProgress={subjectProgress}
-        studyAmountChartData={studyAmountChartData}
-        trend={trend}
-        summary={summary}
-        onRetry={onProgressRetry}
-      />
-
+      <Text style={styles.subjectCount}>과목 {subjectCount}개</Text>
       <Text style={styles.listTitle}>과목 목록</Text>
     </>
   );
@@ -485,14 +102,9 @@ export default function SubjectsScreen() {
   const [goal, setGoal] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editGoal, setEditGoal] = useState("");
-  const [isProgressLoading, setIsProgressLoading] = useState(false);
-  const [progressError, setProgressError] = useState<string | null>(null);
   const [subjectProgress, setSubjectProgress] = useState<SubjectProgress[]>([]);
-  const [studyAmountChartData, setStudyAmountChartData] = useState<
-    StudyAmountChartItem[]
-  >([]);
-  const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [summary, setSummary] = useState<ProgressSummary>(emptySummary);
+  const [isAddSubjectModalVisible, setIsAddSubjectModalVisible] = useState(false);
 
   const userId = getCurrentAppUserIdOrNull();
 
@@ -509,25 +121,16 @@ export default function SubjectsScreen() {
   const loadProgress = useCallback(async () => {
     if (!userId) {
       setSubjectProgress([]);
-      setStudyAmountChartData([]);
-      setTrend([]);
       setSummary(emptySummary);
       return;
     }
 
     try {
-      setIsProgressLoading(true);
-      setProgressError(null);
       const data = await fetchProgressData(userId);
       setSubjectProgress(data.subjectProgress as SubjectProgress[]);
-      setStudyAmountChartData(data.studyAmountChartData as StudyAmountChartItem[]);
-      setTrend(data.trend as TrendPoint[]);
       setSummary(data.summary as ProgressSummary);
     } catch (error) {
       void error;
-      setProgressError("학습 진척도 데이터를 불러오지 못했습니다.");
-    } finally {
-      setIsProgressLoading(false);
     }
   }, [userId]);
 
@@ -549,6 +152,16 @@ export default function SubjectsScreen() {
     return new Map(subjectProgress.map((item) => [item.subjectId, item]));
   }, [subjectProgress]);
 
+  const openAddSubjectModal = () => {
+    if (!userId) {
+      showAlert("로그인 후 과목을 추가할 수 있습니다.");
+      return;
+    }
+    setTitle("");
+    setGoal("");
+    setIsAddSubjectModalVisible(true);
+  };
+
   const handleAdd = async () => {
     if (!title.trim()) {
       showAlert("과목명을 입력해주세요.");
@@ -559,6 +172,7 @@ export default function SubjectsScreen() {
     await addSubject(userId, title.trim(), goal.trim());
     setTitle("");
     setGoal("");
+    setIsAddSubjectModalVisible(false);
     refreshScreen();
   };
 
@@ -577,24 +191,21 @@ export default function SubjectsScreen() {
   };
 
   const listHeader = (
-    <SubjectListHeader
-      title={title}
-      goal={goal}
-      isProgressLoading={isProgressLoading}
-      progressError={progressError}
-      subjectProgress={subjectProgress}
-      studyAmountChartData={studyAmountChartData}
-      trend={trend}
-      summary={summary}
-      onTitleChange={setTitle}
-      onGoalChange={setGoal}
-      onAdd={handleAdd}
-      onProgressRetry={loadProgress}
-    />
+    <SubjectListHeader subjectCount={subjects.length} summary={summary} />
   );
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.screenTitle}>과목</Text>
+          <Text style={styles.screenSubtitle}>등록한 과목과 노트를 확인하세요</Text>
+        </View>
+        <TouchableOpacity style={styles.addSubjectButton} onPress={openAddSubjectModal}>
+          <Text style={styles.addSubjectButtonText}>+ 과목 추가</Text>
+        </TouchableOpacity>
+      </View>
+
       <FlatList
         data={subjects}
         keyExtractor={(item) => item.id}
@@ -606,12 +217,24 @@ export default function SubjectsScreen() {
         renderItem={({ item }) => {
           const stats = progressBySubjectId.get(item.id);
           const completionRate = stats?.completionRate ?? item.progress ?? 0;
+          const noteCount = stats?.noteCount ?? 0;
 
           return (
-            <View style={styles.card}>
+            <Pressable
+              style={styles.card}
+              onPress={() =>
+                router.push({
+                  pathname: "/subject-notes",
+                  params: { subjectId: item.id, subjectTitle: item.title },
+                })
+              }
+            >
               <View style={styles.cardAccent} />
               <View style={styles.cardContent}>
-                <Text style={styles.subjectTitle}>{item.title}</Text>
+                <View style={styles.cardTitleRow}>
+                  <Text style={styles.subjectTitle}>{item.title}</Text>
+                  <Text style={styles.noteCountBadge}>📝 노트 {noteCount}개</Text>
+                </View>
 
                 {editingId === item.id ? (
                   <View style={styles.editRow}>
@@ -682,10 +305,48 @@ export default function SubjectsScreen() {
                   </View>
                 )}
               </View>
-            </View>
+            </Pressable>
           );
         }}
       />
+
+      <Modal
+        visible={isAddSubjectModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsAddSubjectModalVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>과목 추가</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="과목명"
+              placeholderTextColor="#D1D5DB"
+              value={title}
+              onChangeText={setTitle}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="학습 목표 (선택)"
+              placeholderTextColor="#D1D5DB"
+              value={goal}
+              onChangeText={setGoal}
+            />
+
+            <TouchableOpacity style={styles.modalSubmitButton} onPress={handleAdd}>
+              <Text style={styles.modalSubmitButtonText}>추가하기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalCancelButton}
+              onPress={() => setIsAddSubjectModalVisible(false)}
+            >
+              <Text style={styles.modalCancelButtonText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -699,26 +360,33 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingBottom: 40,
   },
-  titleRow: {
+  header: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 20,
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingHorizontal: 24,
+    paddingTop: 24,
   },
-  pageTitle: {
+  screenTitle: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#2B2B2B",
+    color: COLORS.text,
   },
-  form: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 18,
-    shadowColor: "#ff6a92",
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+  screenSubtitle: {
+    fontSize: 14,
+    color: COLORS.subText,
+    marginTop: 4,
+  },
+  addSubjectButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  addSubjectButtonText: {
+    color: COLORS.buttonText,
+    fontSize: 14,
+    fontWeight: "600",
   },
   input: {
     borderWidth: 1.5,
@@ -730,250 +398,82 @@ const styles = StyleSheet.create({
     color: "#2B2B2B",
     backgroundColor: "#F8F8FA",
   },
-  addButton: {
-    backgroundColor: "#ff6a92",
-    padding: 13,
-    borderRadius: 10,
-    alignItems: "center",
-    flexDirection: "row",
+  modalBackground: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
     justifyContent: "center",
-  },
-  addButtonText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 15,
-  },
-  progressSection: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    shadowColor: "#ff6a92",
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  sectionHeader: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 14,
+    padding: 20,
   },
-  sectionTitle: {
-    fontSize: 19,
+  modalContainer: {
+    width: "100%",
+    backgroundColor: COLORS.background,
+    borderRadius: 15,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 22,
     fontWeight: "800",
-    color: "#2B2B2B",
+    color: COLORS.text,
+    marginBottom: 15,
   },
-  progressState: {
-    alignItems: "center",
-    paddingVertical: 22,
-    gap: 8,
-  },
-  stateText: {
-    color: "#6B7280",
-    fontSize: 14,
-  },
-  errorText: {
-    color: "#EF4444",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  retryButton: {
-    backgroundColor: "#ff6a92",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  retryButtonText: {
-    color: "#fff",
-    fontWeight: "700",
-  },
-  emptyTitle: {
-    color: "#2B2B2B",
-    fontSize: 15,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  emptyDescription: {
-    color: "#6B7280",
-    fontSize: 13,
-    textAlign: "center",
-  },
-  summaryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 16,
-  },
-  summaryItem: {
-    flexGrow: 1,
-    flexBasis: "45%",
-    backgroundColor: "#F8F8FA",
-    borderColor: "#E5E7EB",
+  modalSubmitButton: {
+    backgroundColor: COLORS.primary,
+    padding: 14,
     borderRadius: 10,
-    borderWidth: 1,
-    padding: 12,
-  },
-  summaryValue: {
-    color: "#ff6a92",
-    fontSize: 20,
-    fontWeight: "800",
-  },
-  summaryLabel: {
-    color: "#6B7280",
-    fontSize: 12,
-    marginTop: 2,
-  },
-  chartBlock: {
-    borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
-    paddingTop: 14,
-    marginTop: 12,
-  },
-  chartTitle: {
-    color: "#2B2B2B",
-    fontSize: 16,
-    fontWeight: "800",
+    alignItems: "center",
     marginBottom: 10,
   },
-  chartEmptyText: {
-    color: "#D1D5DB",
-    fontSize: 13,
-    paddingVertical: 10,
-  },
-  barChart: {
-    alignSelf: "center",
-    backgroundColor: "#F8F8FA",
-    borderColor: "#E5E7EB",
-    borderRadius: 10,
-    borderWidth: 1,
-    position: "relative",
-  },
-  barValue: {
-    position: "absolute",
-    color: "#ff6a92",
-    fontSize: 12,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  barFill: {
-    position: "absolute",
-    backgroundColor: "#ff6a92",
-    borderRadius: 5,
-  },
-  barLabel: {
-    position: "absolute",
-    color: "#6B7280",
-    fontSize: 11,
-    textAlign: "center",
-  },
-  gridLine: {
-    position: "absolute",
-    left: 0,
-    right: 14,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  yAxisLabel: {
-    width: 28,
-    color: "#D1D5DB",
-    fontSize: 10,
-    textAlign: "right",
-    marginRight: 6,
-  },
-  gridRule: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#E5E7EB",
-  },
-  yAxisLine: {
-    position: "absolute",
-    width: 1.5,
-    backgroundColor: "#D1D5DB",
-  },
-  xAxisLine: {
-    position: "absolute",
-    height: 1.5,
-    backgroundColor: "#D1D5DB",
-  },
-  completionList: {
-    gap: 12,
-  },
-  completionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  completionSubject: {
-    width: 92,
-    color: "#2B2B2B",
-    fontSize: 13,
+  modalSubmitButtonText: {
+    color: COLORS.buttonText,
+    fontSize: 16,
     fontWeight: "700",
   },
-  completionBarOuter: {
-    flex: 1,
-    height: 12,
-    backgroundColor: "#E5E7EB",
-    borderRadius: 999,
-    overflow: "hidden",
-  },
-  completionBarInner: {
-    height: 12,
-    backgroundColor: "#ff6a92",
-    borderRadius: 999,
-  },
-  completionPercent: {
-    width: 48,
-    color: "#ff6a92",
-    fontSize: 13,
-    fontWeight: "800",
-    textAlign: "right",
-  },
-  lineChart: {
-    alignSelf: "center",
-    backgroundColor: "#F8F8FA",
-    borderColor: "#E5E7EB",
+  modalCancelButton: {
+    backgroundColor: COLORS.surface,
+    padding: 14,
     borderRadius: 10,
-    borderWidth: 1,
-    position: "relative",
-    overflow: "hidden",
-  },
-  lineGridLine: {
-    position: "absolute",
-    left: 0,
-    right: 16,
-    flexDirection: "row",
     alignItems: "center",
   },
-  lineGridRule: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#E5E7EB",
+  modalCancelButtonText: {
+    color: COLORS.subText,
+    fontSize: 16,
+    fontWeight: "700",
   },
-  lineBaseRule: {
-    backgroundColor: "#D1D5DB",
-    height: 1.5,
-  },
-  lineSegment: {
-    position: "absolute",
-    height: 3,
-    backgroundColor: "#ff6a92",
-    borderRadius: 999,
-  },
-  linePoint: {
-    position: "absolute",
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  todoSummaryCard: {
+    flexDirection: "row",
     backgroundColor: "#fff",
-    borderColor: "#ff6a92",
-    borderWidth: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 14,
+    marginBottom: 16,
+    alignItems: "center",
   },
-  lineDateLabel: {
-    position: "absolute",
-    bottom: 12,
+  todoSummaryItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  todoSummaryDivider: {
+    width: 1,
+    height: 36,
+    backgroundColor: "#E5E7EB",
+  },
+  todoSummaryLabel: {
+    fontSize: 12,
     color: "#6B7280",
-    fontSize: 11,
+    marginBottom: 4,
+  },
+  todoSummaryValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#ff6a92",
+  },
+  subjectCount: {
+    fontSize: 12,
+    color: COLORS.subText,
+    marginBottom: 8,
+    marginLeft: 4,
   },
   listTitle: {
     color: "#2B2B2B",
@@ -1008,11 +508,21 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  cardTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
   subjectTitle: {
     fontSize: 18,
     fontWeight: "800",
     color: "#2B2B2B",
-    marginBottom: 6,
+  },
+  noteCountBadge: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.subText,
   },
   goalRow: {
     flexDirection: "row",

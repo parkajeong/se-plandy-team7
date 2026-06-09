@@ -25,8 +25,8 @@ import {
   deleteQuiz,
   fetchNotesBySubject,
   fetchQuizzesBySubject,
+  getIncorrectNoteGroupsByUser,
   getQuizErrorMessage,
-  getQuizResultsByUser,
 } from "@/src/quizService";
 import { getSubjects } from "@/src/subjectService";
 type Subject = {
@@ -46,6 +46,20 @@ type Quiz = {
   questions?: unknown[];
   question_count?: number;
   created_at?: any;
+};
+
+type IncorrectNoteItem = {
+  question_index: number;
+  is_review_needed: boolean;
+};
+
+type IncorrectNoteGroup = {
+  result_id?: string;
+  quiz_id: string;
+  quiz_title: string;
+  solved_at: string;
+  incorrect_count: number;
+  items: IncorrectNoteItem[];
 };
 
 const QUESTION_COUNT_OPTIONS = [5, 10, 15, 20, 25, 30];
@@ -68,7 +82,6 @@ export default function QuizScreen() {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [quizResults, setQuizResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [isNoteModalVisible, setIsNoteModalVisible] = useState(false);
@@ -76,10 +89,8 @@ export default function QuizScreen() {
   const [noteLoadError, setNoteLoadError] = useState<string | null>(null);
   const [quizLoadError, setQuizLoadError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<"list" | "incorrect">("list");
-
-  const handleSelectTab = (tab: "list" | "incorrect") => {
-    setSelectedTab(tab);
-  };
+  const [incorrectNoteGroups, setIncorrectNoteGroups] = useState<IncorrectNoteGroup[]>([]);
+  const [isLoadingIncorrectNotes, setIsLoadingIncorrectNotes] = useState(false);
 
   const syncUserId = useCallback(() => {
     const currentUserId = getCurrentAppUserIdOrNull();
@@ -148,23 +159,22 @@ export default function QuizScreen() {
     [selectedSubject, userId]
   );
 
-  const loadQuizResults = useCallback(async () => {
+  const fetchIncorrectNoteGroups = useCallback(async () => {
     if (!userId) {
-      setQuizResults([]);
+      Alert.alert("오류", "로그인 후 오답노트를 조회할 수 있습니다.");
       return;
     }
 
     try {
-      const results = await getQuizResultsByUser(userId);
-      const sortedResults = [...results].sort((a, b) => {
-        const aTime = a.solved_at?.toDate?.()?.getTime?.() || 0;
-        const bTime = b.solved_at?.toDate?.()?.getTime?.() || 0;
-        return bTime - aTime;
-      });
-      setQuizResults(sortedResults);
+      setIsLoadingIncorrectNotes(true);
+      const groups = (await getIncorrectNoteGroupsByUser(userId)) as IncorrectNoteGroup[];
+      setIncorrectNoteGroups(groups);
     } catch (error) {
       void error;
-      setQuizResults([]);
+      Alert.alert("오류", "오답노트 조회 실패");
+      setIncorrectNoteGroups([]);
+    } finally {
+      setIsLoadingIncorrectNotes(false);
     }
   }, [userId]);
 
@@ -182,8 +192,7 @@ export default function QuizScreen() {
 
   useEffect(() => {
     loadSubjects();
-    loadQuizResults();
-  }, [loadSubjects, loadQuizResults]);
+  }, [loadSubjects]);
 
   useFocusEffect(
     useCallback(() => {
@@ -191,8 +200,7 @@ export default function QuizScreen() {
       syncUserId();
       loadSubjects();
       loadSubjectData();
-      loadQuizResults();
-    }, [loadSubjectData, loadSubjects, loadQuizResults, syncUserId])
+    }, [loadSubjectData, loadSubjects, syncUserId])
   );
 
   const handleSelectSubject = async (subject: Subject) => {
@@ -259,71 +267,33 @@ export default function QuizScreen() {
     }
   };
 
-  const quizResultStats = React.useMemo(() => {
-    if (!quizResults.length) {
-      return null;
-    }
-
-    const rates = quizResults.map((item) => {
-      if (typeof item.correct_rate === "number") return item.correct_rate;
-      if (
-        typeof item.score === "number" &&
-        typeof item.total_count === "number" &&
-        item.total_count > 0
-      ) {
-        return Math.round((item.score / item.total_count) * 100);
-      }
-      return 0;
-    });
-
-    const averageRate = Math.round(
-      rates.reduce((sum, rate) => sum + rate, 0) / rates.length
-    );
-
-    return {
-      totalCount: quizResults.length,
-      averageRate,
-      recentRate: rates[0] ?? 0,
-      recentResults: quizResults.slice(0, 3).map((item) => ({
-        id: item.id,
-        correct_rate:
-          typeof item.correct_rate === "number"
-            ? item.correct_rate
-            : Math.round(
-                (item.score / Math.max(1, item.total_count)) * 100
-              ),
-        solvedAt:
-          item.solved_at?.toDate?.()?.toLocaleDateString?.("ko-KR", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-          }) || "-",
-      })),
-    };
-  }, [quizResults]);
-
   return (
-  <View style={styles.container}>
-    <View style={styles.header}>
-      <View style={styles.headerLeft}>
-        <Ionicons name="newspaper-outline" size={24} color={COLORS.text} />
-        <Text style={styles.screenTitle}>퀴즈</Text>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.screenTitle}>퀴즈</Text>
+          <Text style={styles.screenSubtitle}>과목별로 생성된 퀴즈를 확인하세요</Text>
+        </View>
+        {selectedTab === "list" && (
+          <TouchableOpacity
+            style={[
+              styles.addButton,
+              (!userId || !selectedSubject || isNavigating) && styles.disabledButton,
+            ]}
+            onPress={handleOpenNoteModal}
+            disabled={!userId || !selectedSubject || isNavigating}
+          >
+            {isNavigating ? (
+              <ActivityIndicator color={COLORS.buttonText} size="small" />
+            ) : (
+              <Text style={styles.addButtonText}>+ 퀴즈 생성</Text>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
-      {selectedTab === "list" && (
-        <TouchableOpacity
-          style={[
-            styles.addButton,
-            (!userId || !selectedSubject || isNavigating) && styles.disabledButton,
-          ]}
-          onPress={handleOpenNoteModal}
-          disabled={!userId || !selectedSubject || isNavigating}
-        >
-          {isNavigating ? (
-            <ActivityIndicator color={COLORS.buttonText} size="small" />
-          ) : (
-            <Text style={styles.addButtonText}>+ 퀴즈 생성</Text>
-          )}
-        </TouchableOpacity>
+
+      {!userId && (
+        <Text style={styles.notice}>로그인 후 퀴즈를 생성하고 조회할 수 있습니다.</Text>
       )}
     </View>
 
@@ -352,92 +322,139 @@ export default function QuizScreen() {
           <Text style={styles.notice}>로그인 후 퀴즈를 생성하고 조회할 수 있습니다.</Text>
         )}
 
-      <SubjectDropdown
-        subjects={subjects}
-        selectedSubjectId={selectedSubject?.id}
-        placeholder="과목 선택"
-        disabled={!userId || subjects.length === 0}
-        onOpen={loadSubjects}
-        onSelect={(subject) => handleSelectSubject(subject as Subject)}
-      />
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          style={[styles.tabButton, selectedTab === "list" && styles.selectedTab]}
+          onPress={() => handleSelectTab("list")}
+        >
+          <Text style={selectedTab === "list" ? styles.selectedTabText : styles.unselectedTabText}>
+            퀴즈 목록
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, selectedTab === "incorrect" && styles.selectedTab]}
+          onPress={() => handleSelectTab("incorrect")}
+        >
+          <Text style={selectedTab === "incorrect" ? styles.selectedTabText : styles.unselectedTabText}>
+            오답노트
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-      {userId && (
-        <View style={styles.statsCard}>
-          <Text style={styles.statsTitle}>내 퀴즈 풀이 통계</Text>
-          {quizResultStats ? (
-            <>
-              <View style={styles.statsRow}>
-                <Text style={styles.statsLabel}>총 풀이 횟수</Text>
-                <Text style={styles.statsValue}>{quizResultStats.totalCount}회</Text>
-              </View>
-              <View style={styles.statsRow}>
-                <Text style={styles.statsLabel}>평균 정답률</Text>
-                <Text style={styles.statsValue}>{quizResultStats.averageRate}%</Text>
-              </View>
-              <View style={styles.statsRow}>
-                <Text style={styles.statsLabel}>최근 정답률</Text>
-                <Text style={styles.statsValue}>{quizResultStats.recentRate}%</Text>
-              </View>
-              {quizResultStats.recentResults.length > 0 && (
-                <View style={styles.recentList}>
-                  {quizResultStats.recentResults.map((item) => (
-                    <View key={item.id} style={styles.recentItem}>
-                      <Text style={styles.recentText}>{item.solvedAt}</Text>
-                      <Text style={styles.recentRateText}>{item.correct_rate}%</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </>
+      {selectedTab === "list" ? (
+        <>
+          <SubjectDropdown
+            subjects={subjects}
+            selectedSubjectId={selectedSubject?.id}
+            placeholder="과목 선택"
+            disabled={!userId || subjects.length === 0}
+            onOpen={loadSubjects}
+            onSelect={(subject) => handleSelectSubject(subject as Subject)}
+          />
+
+          {userId && subjects.length === 0 && (
+            <Text style={styles.notice}>먼저 과목을 등록하세요.</Text>
+          )}
+
+          {isLoading ? (
+            <ActivityIndicator style={styles.loader} color={COLORS.primary} />
           ) : (
-            <Text style={styles.emptyText}>아직 풀이 기록이 없습니다.</Text>
-          )}
-        </View>
-      )}
-
-      {userId && subjects.length === 0 && (
-        <Text style={styles.notice}>먼저 과목을 등록하세요.</Text>
-      )}
-
-      {isLoading ? (
-        <ActivityIndicator style={styles.loader} color="#ff6a92" />
-      ) : (
-        <FlatList
-          data={quizzes}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              {quizLoadError
-                ? quizLoadError
-                : selectedSubject
-                  ? "아직 생성된 퀴즈가 없어요. 노트로 퀴즈를 만들어보세요!"
-                  : "과목을 선택하세요."}
-            </Text>
-          }
-          renderItem={({ item }) => (
-            <Pressable
-              style={styles.card}
-              onPress={() =>
-                router.push({
-                  pathname: "/quiz/[quizId]",
-                  params: { quizId: item.id },
-                })
+            <FlatList
+              data={quizzes}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>
+                  {quizLoadError
+                    ? quizLoadError
+                    : selectedSubject
+                      ? "아직 생성된 퀴즈가 없어요. 노트로 퀴즈를 만들어보세요!"
+                      : "과목을 선택하세요."}
+                </Text>
               }
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.quizTitle}>{item.title || "AI 노트 퀴즈"}</Text>
-                <TouchableOpacity onPress={() => handleDeleteQuiz(item.id)}>
-                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.metaText}>
-                문제 {item.question_count || (Array.isArray(item.questions) ? item.questions.length : 0)}개
-              </Text>
-              <Text style={styles.metaText}>생성일 {formatDate(item.created_at)}</Text>
-            </Pressable>
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.card}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/quiz/[quizId]",
+                      params: { quizId: item.id },
+                    })
+                  }
+                >
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.quizTitle}>{item.title || "AI 노트 퀴즈"}</Text>
+                    <TouchableOpacity onPress={() => handleDeleteQuiz(item.id)}>
+                      <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.metaText}>
+                    문제 {item.question_count || (Array.isArray(item.questions) ? item.questions.length : 0)}개
+                  </Text>
+                  <Text style={styles.metaText}>생성일 {formatDate(item.created_at)}</Text>
+                </Pressable>
+              )}
+            />
           )}
-        />
+        </>
+      ) : (
+        <View style={styles.incorrectContainer}>
+          <TouchableOpacity
+            style={[styles.refreshButton, !userId && styles.disabledButton]}
+            onPress={fetchIncorrectNoteGroups}
+            disabled={!userId}
+          >
+            <Text style={styles.refreshButtonText}>
+              {isLoadingIncorrectNotes ? "로딩 중..." : "새로고침"}
+            </Text>
+          </TouchableOpacity>
+
+          <FlatList
+            data={incorrectNoteGroups}
+            keyExtractor={(group, index) =>
+              `${group.result_id || group.quiz_id}-${group.solved_at || index}`
+            }
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              isLoadingIncorrectNotes ? (
+                <Text style={styles.emptyText}>오답노트를 불러오는 중...</Text>
+              ) : (
+                <Text style={styles.emptyText}>
+                  아직 오답노트가 없어요. 퀴즈를 풀면 틀린 문제가 저장돼요!
+                </Text>
+              )
+            }
+            renderItem={({ item }) => {
+              const hasReviewNeeded = item.items.some(
+                (incorrect) => incorrect.is_review_needed === true
+              );
+
+              return (
+                <Pressable
+                  style={styles.card}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/incorrect-note/[resultId]",
+                      params: { resultId: item.result_id || item.quiz_id },
+                    })
+                  }
+                >
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.quizTitle}>📝 {item.quiz_title}</Text>
+                    {hasReviewNeeded && (
+                      <View style={styles.reviewBadge}>
+                        <Text style={styles.reviewBadgeText}>복습 필요</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.metaText}>
+                    오답 {item.incorrect_count}개 · {item.solved_at}
+                  </Text>
+                </Pressable>
+              );
+            }}
+          />
+        </View>
       )}
 
       <Modal
@@ -569,8 +586,8 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 20,
   },
   headerLeft: {
@@ -579,14 +596,14 @@ const styles = StyleSheet.create({
   gap: 8,
   },
   screenTitle: {
-    fontSize: 28,
-    fontWeight: "700",
+    fontSize: 26,
+    fontWeight: "800",
     color: COLORS.text,
   },
   screenSubtitle: {
-    marginTop: 4,
-    fontSize: 13,
+    fontSize: 14,
     color: COLORS.subText,
+    marginTop: 4,
   },
   addButton: {
     backgroundColor: COLORS.primary,
@@ -599,57 +616,61 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
-  statsCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    padding: 16,
-    marginBottom: 16,
-  },
-  statsTitle: {
-    color: "#2B2B2B",
-    fontSize: 15,
-    fontWeight: "800",
-    marginBottom: 10,
-  },
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 6,
-  },
-  statsLabel: {
-    color: "#6B7280",
-    fontSize: 13,
-  },
-  statsValue: {
-    color: "#2B2B2B",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  recentList: {
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
-    paddingTop: 10,
-  },
-  recentItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  recentText: {
-    color: "#6B7280",
-    fontSize: 13,
-  },
-  recentRateText: {
-    color: "#ff6a92",
-    fontSize: 13,
-    fontWeight: "700",
-  },
   notice: {
     color: "#9a3412",
     marginBottom: 12,
+  },
+  tabRow: {
+    flexDirection: "row",
+    marginBottom: 16,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  selectedTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.primary,
+  },
+  selectedTabText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.primary,
+  },
+  unselectedTabText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.subText,
+  },
+  incorrectContainer: {
+    flex: 1,
+  },
+  refreshButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    padding: 14,
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  refreshButtonText: {
+    color: COLORS.buttonText,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  reviewBadge: {
+    backgroundColor: "#FFF7ED",
+    borderColor: "#F97316",
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  reviewBadgeText: {
+    fontSize: 12,
+    color: "#F97316",
   },
   disabledButton: {
     backgroundColor: "#9CA3AF",
