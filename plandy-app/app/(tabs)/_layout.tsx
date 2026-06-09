@@ -151,7 +151,7 @@ export default function TabLayout() {
         options={{
           title: "Quiz",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="help-circle-outline" size={size ?? 28} color={color} />
+            <Ionicons name="newspaper-outline" size={size ?? 28} color={color} />
           ),
         }}
       />
