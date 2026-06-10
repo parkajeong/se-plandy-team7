@@ -54,7 +54,8 @@ type ReminderUnit = "minute" | "hour" | "day";
 export default function ScheduleScreen() {
   const [userId, setUserId] = useState<string | null>(null);
 
-  const [isAddScheduleModalVisible, setIsAddScheduleModalVisible] = useState(false);
+  const [isAddScheduleModalVisible, setIsAddScheduleModalVisible] =
+    useState(false);
 
   const [title, setTitle] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -67,6 +68,13 @@ export default function ScheduleScreen() {
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [calendarTarget, setCalendarTarget] = useState<"add" | "edit">("add");
+
+  const [isDateRequiredModalVisible, setIsDateRequiredModalVisible] =
+    useState(false);
+  const [dateRequiredTarget, setDateRequiredTarget] =
+    useState<"add" | "edit">("add");
+  const [isCalendarDateErrorVisible, setIsCalendarDateErrorVisible] =
+    useState(false);
 
   const [isReminderModalVisible, setIsReminderModalVisible] = useState(false);
   const [reminderTarget, setReminderTarget] = useState<"add" | "edit">("add");
@@ -212,15 +220,18 @@ export default function ScheduleScreen() {
     return `${formatDate(date)} ${formatTime(date.getHours(), date.getMinutes())}`;
   };
 
-  const getTimeValue = useCallback((value: any) => {
-    const date = toDateObject(value);
+  const getTimeValue = useCallback(
+    (value: any) => {
+      const date = toDateObject(value);
 
-    if (!date) {
-      return 0;
-    }
+      if (!date) {
+        return 0;
+      }
 
-    return date.getTime();
-  }, [toDateObject]);
+      return date.getTime();
+    },
+    [toDateObject]
+  );
 
   const getDdayText = (value: any) => {
     const targetDate = toDateObject(value);
@@ -505,6 +516,8 @@ export default function ScheduleScreen() {
     } else {
       setEditDate(date);
     }
+
+    setIsCalendarDateErrorVisible(false);
   };
 
   const increaseHour = () => {
@@ -543,11 +556,24 @@ export default function ScheduleScreen() {
     const targetDate = calendarTarget === "add" ? selectedDate : editDate;
 
     if (!targetDate) {
-      Alert.alert("오류", "날짜를 선택해주세요.");
+      setIsCalendarDateErrorVisible(true);
       return;
     }
 
+    setIsCalendarDateErrorVisible(false);
     setIsCalendarVisible(false);
+  };
+
+  const openDateRequiredModal = (target: "add" | "edit") => {
+    setDateRequiredTarget(target);
+    setIsDateRequiredModalVisible(true);
+  };
+
+  const handleConfirmDateRequired = () => {
+    setIsDateRequiredModalVisible(false);
+    setCalendarTarget(dateRequiredTarget);
+    setIsCalendarDateErrorVisible(false);
+    setIsCalendarVisible(true);
   };
 
   const fetchSchedules = useCallback(async () => {
@@ -614,7 +640,12 @@ export default function ScheduleScreen() {
       return;
     }
 
-    if (!title || !selectedDate || !type) {
+    if (!selectedDate) {
+      openDateRequiredModal("add");
+      return;
+    }
+
+    if (!title || !type) {
       Alert.alert("오류", "모든 항목을 입력해주세요.");
       return;
     }
@@ -687,6 +718,7 @@ export default function ScheduleScreen() {
     setReminderType("none");
     setCustomReminderValue("1");
     setCustomReminderUnit("minute");
+    setIsCalendarDateErrorVisible(false);
     setIsAddScheduleModalVisible(true);
   };
 
@@ -710,6 +742,7 @@ export default function ScheduleScreen() {
     );
     setEditCustomReminderUnit(schedule.custom_reminder_unit || "minute");
 
+    setIsCalendarDateErrorVisible(false);
     setIsEditModalVisible(true);
   };
 
@@ -719,7 +752,12 @@ export default function ScheduleScreen() {
       return;
     }
 
-    if (!editingScheduleId || !editTitle || !editDate || !editType) {
+    if (!editDate) {
+      openDateRequiredModal("edit");
+      return;
+    }
+
+    if (!editingScheduleId || !editTitle || !editType) {
       Alert.alert("오류", "모든 항목을 입력해주세요.");
       return;
     }
@@ -828,7 +866,7 @@ export default function ScheduleScreen() {
 
   return (
     <LinearGradient
-      colors={['#FFFFFF', '#EDF2F7']}
+      colors={["#FFFFFF", "#EDF2F7"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
       style={styles.container}
@@ -866,14 +904,20 @@ export default function ScheduleScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.scheduleTitle}>{item.title}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <Text style={styles.ddayText}>{getDdayText(item.start_time)}</Text>
                 <TouchableOpacity
-                  onPress={() => setMenuOpenId(menuOpenId === item.id ? null : item.id)}
+                  onPress={() =>
+                    setMenuOpenId(menuOpenId === item.id ? null : item.id)
+                  }
                   style={styles.menuButton}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Ionicons name="ellipsis-vertical" size={18} color={COLORS.subText} />
+                  <Ionicons
+                    name="ellipsis-vertical"
+                    size={18}
+                    color={COLORS.subText}
+                  />
                 </TouchableOpacity>
               </View>
             </View>
@@ -887,7 +931,11 @@ export default function ScheduleScreen() {
                     handleOpenEditModal(item);
                   }}
                 >
-                  <Ionicons name="pencil-outline" size={15} color={COLORS.primary} />
+                  <Ionicons
+                    name="pencil-outline"
+                    size={15}
+                    color={COLORS.primary}
+                  />
                   <Text style={styles.menuItemText}>수정</Text>
                 </TouchableOpacity>
                 <View style={styles.menuDivider} />
@@ -898,8 +946,14 @@ export default function ScheduleScreen() {
                     handleDeleteSchedule(item);
                   }}
                 >
-                  <Ionicons name="trash-outline" size={15} color={COLORS.danger} />
-                  <Text style={[styles.menuItemText, { color: COLORS.danger }]}>삭제</Text>
+                  <Ionicons
+                    name="trash-outline"
+                    size={15}
+                    color={COLORS.danger}
+                  />
+                  <Text style={[styles.menuItemText, { color: COLORS.danger }]}>
+                    삭제
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -946,6 +1000,7 @@ export default function ScheduleScreen() {
               style={styles.input}
               onPress={() => {
                 setCalendarTarget("add");
+                setIsCalendarDateErrorVisible(false);
                 setIsCalendarVisible(true);
               }}
             >
@@ -1019,6 +1074,7 @@ export default function ScheduleScreen() {
               style={styles.input}
               onPress={() => {
                 setCalendarTarget("edit");
+                setIsCalendarDateErrorVisible(false);
                 setIsCalendarVisible(true);
               }}
             >
@@ -1053,10 +1109,7 @@ export default function ScheduleScreen() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.button}
-              onPress={handleUpdateSchedule}
-            >
+            <TouchableOpacity style={styles.button} onPress={handleUpdateSchedule}>
               <Text style={styles.buttonText}>수정 완료</Text>
             </TouchableOpacity>
 
@@ -1065,6 +1118,40 @@ export default function ScheduleScreen() {
               onPress={() => setIsEditModalVisible(false)}
             >
               <Text style={styles.cancelButtonText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 날짜 미선택 안내 모달: 등록/수정 화면에서 날짜 없이 저장 시도할 때 표시 */}
+      <Modal
+        visible={isDateRequiredModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsDateRequiredModalVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.dateRequiredModalContainer}>
+            <Text style={styles.modalTitle}>날짜 설정 필요</Text>
+
+            <Text style={styles.dateRequiredText}>
+              일정을 등록하려면 날짜 및 시간을 먼저 선택해야 합니다.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.dateRequiredConfirmButton}
+              onPress={handleConfirmDateRequired}
+            >
+              <Text style={styles.dateRequiredConfirmButtonText}>
+                날짜 선택하기
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setIsDateRequiredModalVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>닫기</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1201,7 +1288,10 @@ export default function ScheduleScreen() {
         visible={isCalendarVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setIsCalendarVisible(false)}
+        onRequestClose={() => {
+          setIsCalendarDateErrorVisible(false);
+          setIsCalendarVisible(false);
+        }}
       >
         <View style={styles.modalBackground}>
           <View style={styles.calendarContainer}>
@@ -1264,15 +1354,21 @@ export default function ScheduleScreen() {
               ))}
             </View>
 
+            {isCalendarDateErrorVisible && (
+              <View style={styles.calendarErrorBox}>
+                <Text style={styles.calendarErrorTitle}>날짜 설정 필요</Text>
+                <Text style={styles.calendarErrorText}>
+                  날짜를 선택한 뒤 확인 버튼을 눌러주세요.
+                </Text>
+              </View>
+            )}
+
             <View style={styles.timeSelector}>
               <Text style={styles.timeSelectorTitle}>시간 선택</Text>
 
               <View style={styles.timeRow}>
                 <View style={styles.timeControl}>
-                  <TouchableOpacity
-                    style={styles.timeButton}
-                    onPress={increaseHour}
-                  >
+                  <TouchableOpacity style={styles.timeButton} onPress={increaseHour}>
                     <Text style={styles.timeButtonText}>＋</Text>
                   </TouchableOpacity>
 
@@ -1280,10 +1376,7 @@ export default function ScheduleScreen() {
                     {String(currentSelectedHour).padStart(2, "0")}시
                   </Text>
 
-                  <TouchableOpacity
-                    style={styles.timeButton}
-                    onPress={decreaseHour}
-                  >
+                  <TouchableOpacity style={styles.timeButton} onPress={decreaseHour}>
                     <Text style={styles.timeButtonText}>－</Text>
                   </TouchableOpacity>
                 </View>
@@ -1310,10 +1403,7 @@ export default function ScheduleScreen() {
               </View>
             </View>
 
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={handleConfirmCalendar}
-            >
+            <TouchableOpacity style={styles.closeButton} onPress={handleConfirmCalendar}>
               <Text style={styles.closeButtonText}>확인</Text>
             </TouchableOpacity>
           </View>
@@ -1334,9 +1424,7 @@ export default function ScheduleScreen() {
           <View style={styles.deleteModalContainer}>
             <Text style={styles.modalTitle}>일정 삭제</Text>
 
-            <Text style={styles.deleteModalText}>
-              이 일정을 삭제하시겠습니까?
-            </Text>
+            <Text style={styles.deleteModalText}>이 일정을 삭제하시겠습니까?</Text>
 
             <View style={styles.deleteModalButtonRow}>
               <TouchableOpacity
@@ -1430,13 +1518,13 @@ const styles = StyleSheet.create({
   emptyText: { color: "#6B7280", marginTop: 10 },
 
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 16,
     marginBottom: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000000',
+    borderColor: "#E2E8F0",
+    shadowColor: "#000000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -1468,35 +1556,39 @@ const styles = StyleSheet.create({
   menuButton: {
     padding: 4,
   },
+
   menuDropdown: {
-    position: 'absolute',
+    position: "absolute",
     right: 16,
     top: 44,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
+    borderColor: "#E2E8F0",
+    shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
     zIndex: 100,
     minWidth: 100,
   },
+
   menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     padding: 12,
   },
+
   menuItemText: {
     fontSize: 14,
     color: COLORS.primary,
-    fontWeight: '500',
+    fontWeight: "500",
   },
+
   menuDivider: {
     height: 1,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: "#E2E8F0",
     marginHorizontal: 8,
   },
 
@@ -1520,6 +1612,56 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 15,
     padding: 20,
+  },
+
+  dateRequiredModalContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    padding: 20,
+  },
+
+  dateRequiredText: {
+    fontSize: 16,
+    color: "#2B2B2B",
+    lineHeight: 24,
+    marginBottom: 20,
+  },
+
+  dateRequiredConfirmButton: {
+    backgroundColor: COLORS.primary,
+    padding: 15,
+    borderRadius: 10,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  dateRequiredConfirmButtonText: {
+    color: COLORS.buttonText,
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  calendarErrorBox: {
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+  },
+
+  calendarErrorTitle: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: "#DC2626",
+    marginBottom: 4,
+  },
+
+  calendarErrorText: {
+    fontSize: 14,
+    color: "#B91C1C",
+    lineHeight: 20,
   },
 
   reminderModalContainer: {
