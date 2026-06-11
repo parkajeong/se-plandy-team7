@@ -205,7 +205,10 @@ export default function SubjectsScreen() {
     >
       <View style={styles.header}>
         <View>
-          <Text style={styles.screenTitle}>과목</Text>
+          <View style={styles.titleRow}>
+            <Ionicons name="book-outline" size={28} color={COLORS.primary} />
+            <Text style={styles.screenTitle}>과목</Text>
+          </View>
           <Text style={styles.screenSubtitle}>등록한 과목과 노트를 확인하세요</Text>
         </View>
         <TouchableOpacity style={styles.addSubjectButton} onPress={openAddSubjectModal}>
@@ -276,7 +279,10 @@ export default function SubjectsScreen() {
                   </View>
                 )}
 
-                <Text style={styles.noteCountBadge}>📝 노트 {noteCount}개</Text>
+                <View style={styles.noteCountRow}>
+                  <Ionicons name="document-text-outline" size={14} color={COLORS.subText} />
+                  <Text style={styles.noteCountBadge}>노트 {noteCount}개</Text>
+                </View>
 
                 {editingId === item.id ? (
                   <View style={styles.editRow}>
@@ -387,10 +393,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 24,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
   screenTitle: {
     fontSize: 26,
     fontWeight: "800",
     color: COLORS.text,
+    lineHeight: 32,
   },
   screenSubtitle: {
     fontSize: 14,
@@ -534,6 +547,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     color: "#2B2B2B",
+  },
+  noteCountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   noteCountBadge: {
     fontSize: 13,

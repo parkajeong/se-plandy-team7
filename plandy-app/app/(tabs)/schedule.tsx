@@ -873,7 +873,10 @@ export default function ScheduleScreen() {
     >
       <View style={styles.header}>
         <View>
-          <Text style={styles.screenTitle}>일정</Text>
+          <View style={styles.titleRow}>
+            <Ionicons name="calendar-outline" size={28} color={COLORS.primary} />
+            <Text style={styles.screenTitle}>일정</Text>
+          </View>
           <Text style={styles.screenSubtitle}>등록된 일정을 확인하세요</Text>
         </View>
         <TouchableOpacity style={styles.addButton} onPress={openAddScheduleModal}>
@@ -1465,10 +1468,17 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 4,
+  },
   screenTitle: {
-    fontSize: 28,
-    fontWeight: "700",
+    fontSize: 26,
+    fontWeight: "800",
     color: COLORS.text,
+    lineHeight: 32,
   },
 
   screenSubtitle: {

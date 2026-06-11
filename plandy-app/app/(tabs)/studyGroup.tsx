@@ -1722,7 +1722,10 @@ export default function StudyGroupScreen() {
   return (
     <View style={styles.root}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>스터디 그룹</Text>
+        <View style={styles.titleRow}>
+          <Ionicons name="people-outline" size={28} color={COLORS.primary} />
+          <Text style={styles.screenTitle}>스터디 그룹</Text>
+        </View>
 
         {!userId && (
           <Text style={styles.loginNotice}>
@@ -1987,10 +1990,18 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
 
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     marginBottom: 20,
+  },
+
+  screenTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: COLORS.text,
+    lineHeight: 32,
   },
 
   loginNotice: {

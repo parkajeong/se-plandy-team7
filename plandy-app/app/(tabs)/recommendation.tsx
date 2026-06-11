@@ -73,7 +73,7 @@ function BarChart({
   data: StudyAmountChartItem[];
 }) {
   const { width } = useWindowDimensions();
-  const chartWidth = Math.max(width - 32, 280);
+  const chartWidth = width - 120;
   const chartHeight = 240;
   const leftPadding = 34;
   const rightPadding = 14;
@@ -226,7 +226,7 @@ function SubjectCompletionBars({
 
 function LineChart({ title, data }: { title: string; data: TrendPoint[] }) {
   const { width } = useWindowDimensions();
-  const chartWidth = Math.max(width - 32, 280);
+  const chartWidth = width - 120;
   const chartHeight = 230;
   const maxValue = Math.max(...data.map((item) => item.count), 1);
   const leftPadding = 34;
@@ -458,8 +458,8 @@ export default function RecommendationScreen() {
       style={styles.container}
     >
       <View style={styles.titleRow}>
-        <Ionicons name="bulb-outline" size={28} color="#2B2B2B" />
-        <Text style={styles.pageTitle}> 오늘의 학습 추천</Text>
+        <Ionicons name="bulb-outline" size={28} color={COLORS.primary} />
+        <Text style={styles.screenTitle}>오늘의 학습 추천</Text>
       </View>
 
       <TouchableOpacity
@@ -523,12 +523,14 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 10,
     marginBottom: 20,
   },
-  pageTitle: {
+  screenTitle: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#2B2B2B",
+    color: COLORS.text,
+    lineHeight: 32,
   },
   refreshButton: {
     backgroundColor: COLORS.primary,
@@ -706,6 +708,7 @@ const styles = StyleSheet.create({
     borderTopColor: "#E5E7EB",
     paddingTop: 14,
     marginTop: 12,
+    paddingHorizontal: 8,
   },
   chartTitle: {
     color: "#2B2B2B",

@@ -285,7 +285,10 @@ export default function QuizScreen() {
     >
       <View style={styles.header}>
         <View>
-          <Text style={styles.screenTitle}>퀴즈</Text>
+          <View style={styles.titleRow}>
+            <Ionicons name="newspaper-outline" size={28} color={COLORS.primary} />
+            <Text style={styles.screenTitle}>퀴즈</Text>
+          </View>
           <Text style={styles.screenSubtitle}>과목별로 생성된 퀴즈를 확인하세요</Text>
         </View>
         {selectedTab === "list" && (
@@ -428,7 +431,7 @@ export default function QuizScreen() {
                   }
                 >
                   <View style={styles.cardHeader}>
-                    <Text style={styles.quizTitle}>📝 {item.quiz_title}</Text>
+                    <Text style={styles.quizTitle}>{item.quiz_title}</Text>
                     {hasReviewNeeded && (
                       <View style={styles.reviewBadge}>
                         <Text style={styles.reviewBadgeText}>복습 필요</Text>
@@ -537,10 +540,17 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 20,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
   screenTitle: {
     fontSize: 26,
     fontWeight: "800",
     color: COLORS.text,
+    lineHeight: 32,
   },
   screenSubtitle: {
     fontSize: 14,

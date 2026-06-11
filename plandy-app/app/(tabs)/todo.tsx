@@ -467,7 +467,9 @@ export default function TodoScreen() {
           style={[styles.checkBox, item.is_completed && styles.checkBoxCompleted]}
           onPress={() => handleToggleComplete(item)}
         >
-          <Text style={styles.checkBoxText}>{item.is_completed ? '✓' : ''}</Text>
+          {item.is_completed && (
+            <Ionicons name="checkmark" size={16} color="#ffffff" />
+          )}
         </Pressable>
 
         <View style={styles.cardContent}>
@@ -527,7 +529,10 @@ export default function TodoScreen() {
     >
       <View style={styles.header}>
         <View>
-          <Text style={styles.screenTitle}>TodoList</Text>
+          <View style={styles.titleRow}>
+            <Ionicons name="checkbox-outline" size={28} color={COLORS.primary} />
+            <Text style={styles.screenTitle}>TodoList</Text>
+          </View>
           <Text style={styles.screenSubtitle}>
             과목별 학습 할 일을 관리하세요
           </Text>
@@ -935,10 +940,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
   screenTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#2B2B2B',
+    fontSize: 26,
+    fontWeight: '800',
+    color: COLORS.text,
+    lineHeight: 32,
   },
   screenSubtitle: {
     marginTop: 4,
@@ -1047,10 +1059,6 @@ const styles = StyleSheet.create({
   },
   checkBoxCompleted: {
     backgroundColor: COLORS.secondary,
-  },
-  checkBoxText: {
-    color: '#ffffff',
-    fontWeight: '800',
   },
   completedText: {
     color: '#9CA3AF',
