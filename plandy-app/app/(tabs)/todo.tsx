@@ -32,6 +32,7 @@ import {
   updateTodo,
 } from '../../src/todoService';
 import SubjectDropdown from '../../components/SubjectDropdown';
+import DeleteConfirmModal from '../../components/common/DeleteConfirmModal';
 
 type TodoCategory = '시험' | '과제' | '복습' | '기타';
 
@@ -162,14 +163,6 @@ function getErrorMessage(error: unknown) {
   return '알 수 없는 오류가 발생했습니다.';
 }
 
-function confirmOnWeb(message: string) {
-  if (Platform.OS !== 'web') {
-    return false;
-  }
-
-  return window.confirm(message);
-}
-
 export default function TodoScreen() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -186,6 +179,7 @@ export default function TodoScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const subjectTitleMap = useMemo(() => {
     return subjects.reduce<Record<string, string>>((acc, subject) => {
@@ -424,28 +418,15 @@ export default function TodoScreen() {
   };
 
   const handleDeleteTodo = (todo: Todo) => {
-    const todoId = todo.id;
+    setDeleteTargetId(todo.id);
+  };
 
-    if (Platform.OS === 'web') {
-      if (confirmOnWeb('이 할 일을 삭제할까요?')) {
-        void performDeleteTodo(todoId);
-      }
-      return;
-    }
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return;
 
-    Alert.alert('할 일 삭제', '이 할 일을 삭제할까요?', [
-      {
-        text: '취소',
-        style: 'cancel',
-      },
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: async () => {
-          await performDeleteTodo(todoId);
-        },
-      },
-    ]);
+    const todoId = deleteTargetId;
+    setDeleteTargetId(null);
+    await performDeleteTodo(todoId);
   };
 
   const handleGoToSubjects = () => {
@@ -912,6 +893,14 @@ export default function TodoScreen() {
           )}
         </KeyboardAvoidingView>
       </Modal>
+
+      <DeleteConfirmModal
+        visible={!!deleteTargetId}
+        title="할 일 삭제"
+        message="이 할 일을 삭제할까요?"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </LinearGradient>
   );
 }

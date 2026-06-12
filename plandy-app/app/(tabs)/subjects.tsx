@@ -23,6 +23,7 @@ import {
   updateSubjectGoal,
 } from "@/src/subjectService";
 import { fetchProgressData } from "@/src/progressService";
+import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
 
 type Subject = {
   id: string;
@@ -53,13 +54,6 @@ const emptySummary: ProgressSummary = {
   totalTodoCount: 0,
   completedTodoCount: 0,
   averageCompletionRate: 0,
-};
-
-const webConfirm = (message: string) => {
-  if (Platform.OS === "web") {
-    return window.confirm(message);
-  }
-  return true;
 };
 
 const showAlert = (message: string) => {
@@ -107,6 +101,7 @@ export default function SubjectsScreen() {
   const [summary, setSummary] = useState<ProgressSummary>(emptySummary);
   const [isAddSubjectModalVisible, setIsAddSubjectModalVisible] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const userId = getCurrentAppUserIdOrNull();
 
@@ -184,11 +179,15 @@ export default function SubjectsScreen() {
     refreshScreen();
   };
 
-  const handleDelete = async (id: string) => {
-    const confirmed = webConfirm("과목을 삭제하시겠습니까?");
-    if (!confirmed) return;
+  const handleDelete = (id: string) => {
+    setDeleteTargetId(id);
+  };
 
-    await deleteSubject(id);
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return;
+
+    await deleteSubject(deleteTargetId);
+    setDeleteTargetId(null);
     refreshScreen();
   };
 
@@ -373,6 +372,14 @@ export default function SubjectsScreen() {
           </View>
         </View>
       </Modal>
+
+      <DeleteConfirmModal
+        visible={!!deleteTargetId}
+        title="과목 삭제"
+        message="이 과목을 삭제하시겠습니까?"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </LinearGradient>
   );
 }

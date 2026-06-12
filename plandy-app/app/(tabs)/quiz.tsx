@@ -30,6 +30,7 @@ import {
   getQuizErrorMessage,
 } from "@/src/quizService";
 import { getSubjects } from "@/src/subjectService";
+import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
 
 type Subject = {
   id: string;
@@ -93,6 +94,7 @@ export default function QuizScreen() {
   const [selectedTab, setSelectedTab] = useState<"list" | "incorrect">("list");
   const [incorrectNoteGroups, setIncorrectNoteGroups] = useState<IncorrectNoteGroup[]>([]);
   const [isLoadingIncorrectNotes, setIsLoadingIncorrectNotes] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const syncUserId = useCallback(() => {
     const currentUserId = getCurrentAppUserIdOrNull();
@@ -266,7 +268,16 @@ export default function QuizScreen() {
     });
   };
 
-  const handleDeleteQuiz = async (quizId: string) => {
+  const handleDeleteQuiz = (quizId: string) => {
+    setDeleteTargetId(quizId);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return;
+
+    const quizId = deleteTargetId;
+    setDeleteTargetId(null);
+
     try {
       await deleteQuiz(quizId);
       setQuizzes((prev) => prev.filter((quiz) => quiz.id !== quizId));
@@ -524,6 +535,14 @@ export default function QuizScreen() {
           </View>
         </View>
       </Modal>
+
+      <DeleteConfirmModal
+        visible={!!deleteTargetId}
+        title="퀴즈 삭제"
+        message="이 퀴즈를 삭제하시겠습니까?"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </LinearGradient>
   );
 }

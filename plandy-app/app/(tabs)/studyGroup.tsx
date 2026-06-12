@@ -9,7 +9,6 @@ import {
   Alert,
   ScrollView,
   Modal,
-  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -30,6 +29,7 @@ import {
 
 import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
 import { COLORS } from "@/constants/theme";
+import DeleteConfirmModal from "../../components/common/DeleteConfirmModal";
 
 type Mode = "group" | "available" | "recommend";
 type DateTimeTarget = "availableStart" | "availableEnd";
@@ -118,22 +118,15 @@ export default function StudyGroupScreen() {
   const [tempSelectedHour, setTempSelectedHour] = useState(9);
   const [tempSelectedMinute, setTempSelectedMinute] = useState(0);
 
+  const [deleteGroupTarget, setDeleteGroupTarget] = useState<StudyGroup | null>(null);
+  const [deleteTimeTarget, setDeleteTimeTarget] = useState<AvailableTime | null>(null);
+  const [deleteScheduleTarget, setDeleteScheduleTarget] = useState<StudySchedule | null>(null);
+
   const confirmAction = (
     title: string,
     message: string,
     onConfirm: () => void
   ) => {
-    if (Platform.OS === "web") {
-      const confirmed =
-        typeof window !== "undefined" ? window.confirm(message) : false;
-
-      if (confirmed) {
-        onConfirm();
-      }
-
-      return;
-    }
-
     Alert.alert(title, message, [
       { text: "취소", style: "cancel" },
       {
@@ -676,11 +669,15 @@ export default function StudyGroupScreen() {
       return;
     }
 
-    confirmAction(
-      "삭제 확인",
-      "스터디 그룹을 삭제하면 그룹의 가능 시간, 추천 일정, 일정 탭의 스터디 일정이 함께 삭제됩니다. 삭제할까요?",
-      () => deleteGroup(group)
-    );
+    setDeleteGroupTarget(group);
+  };
+
+  const confirmDeleteGroup = async () => {
+    if (!deleteGroupTarget) return;
+
+    const target = deleteGroupTarget;
+    setDeleteGroupTarget(null);
+    await deleteGroup(target);
   };
 
   const leaveGroup = async (group: StudyGroup) => {
@@ -1025,9 +1022,15 @@ export default function StudyGroupScreen() {
       return;
     }
 
-    confirmAction("삭제 확인", "이 가능 시간을 삭제할까요?", () =>
-      deleteAvailableTime(time)
-    );
+    setDeleteTimeTarget(time);
+  };
+
+  const confirmDeleteAvailableTime = async () => {
+    if (!deleteTimeTarget) return;
+
+    const target = deleteTimeTarget;
+    setDeleteTimeTarget(null);
+    await deleteAvailableTime(target);
   };
 
   const handleRegisterRecommendedSchedule = async (
@@ -1232,9 +1235,15 @@ export default function StudyGroupScreen() {
       return;
     }
 
-    confirmAction("삭제 확인", "이 스터디 일정을 삭제할까요?", () =>
-      deleteSchedule(schedule)
-    );
+    setDeleteScheduleTarget(schedule);
+  };
+
+  const confirmDeleteSchedule = async () => {
+    if (!deleteScheduleTarget) return;
+
+    const target = deleteScheduleTarget;
+    setDeleteScheduleTarget(null);
+    await deleteSchedule(target);
   };
 
   const renderGroupSelector = () => {
@@ -1970,6 +1979,30 @@ export default function StudyGroupScreen() {
           </View>
         </View>
       </Modal>
+
+      <DeleteConfirmModal
+        visible={!!deleteGroupTarget}
+        title="그룹 삭제"
+        message="스터디 그룹을 삭제하면 그룹의 가능 시간, 추천 일정, 일정 탭의 스터디 일정이 함께 삭제됩니다. 삭제할까요?"
+        onConfirm={confirmDeleteGroup}
+        onCancel={() => setDeleteGroupTarget(null)}
+      />
+
+      <DeleteConfirmModal
+        visible={!!deleteTimeTarget}
+        title="삭제 확인"
+        message="이 가능 시간을 삭제할까요?"
+        onConfirm={confirmDeleteAvailableTime}
+        onCancel={() => setDeleteTimeTarget(null)}
+      />
+
+      <DeleteConfirmModal
+        visible={!!deleteScheduleTarget}
+        title="삭제 확인"
+        message="이 스터디 일정을 삭제할까요?"
+        onConfirm={confirmDeleteSchedule}
+        onCancel={() => setDeleteScheduleTarget(null)}
+      />
     </View>
   );
 }
