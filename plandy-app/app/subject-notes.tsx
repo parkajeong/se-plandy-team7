@@ -6,6 +6,9 @@ import {
   getDocs,
   query,
   where,
+  doc,
+  updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import {
   ActivityIndicator,
@@ -19,6 +22,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 import { COLORS } from "@/constants/theme";
 import { getCurrentAppUserIdOrNull } from "@/src/appSession";
@@ -56,6 +60,13 @@ export default function SubjectNotesScreen() {
   const [isWriteModalVisible, setIsWriteModalVisible] = useState(false);
   const [noteTitle, setNoteTitle] = useState("");
   const [content, setContent] = useState("");
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ y: number } | null>(null);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const fetchNotes = useCallback(async () => {
     const userId = getCurrentAppUserIdOrNull();
@@ -142,6 +153,44 @@ export default function SubjectNotesScreen() {
     }
   };
 
+  const handleDeleteNote = (noteId: string) => {
+    setDeleteTargetId(noteId);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return;
+    try {
+      await deleteDoc(doc(db, "notes", deleteTargetId));
+      setDeleteTargetId(null);
+      fetchNotes();
+    } catch (error) {
+      void error;
+      Alert.alert("오류", "노트 삭제 실패");
+    }
+  };
+
+  const handleEditNote = async () => {
+    if (!editingNote) return;
+    if (!editTitle.trim() || !editContent.trim()) {
+      Alert.alert("오류", "제목과 내용을 모두 입력해주세요.");
+      return;
+    }
+    try {
+      await updateDoc(doc(db, "notes", editingNote.id), {
+        title: editTitle,
+        content: editContent,
+        updated_at: new Date(),
+      });
+      Alert.alert("완료", "노트가 수정되었습니다.");
+      setIsEditModalVisible(false);
+      setEditingNote(null);
+      fetchNotes();
+    } catch (error) {
+      void error;
+      Alert.alert("오류", "노트 수정 실패");
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -167,7 +216,9 @@ export default function SubjectNotesScreen() {
           renderItem={({ item }) => (
             <Pressable
               style={styles.card}
-              onPress={() =>
+              onPress={() => {
+                setMenuOpenId(null);
+                setMenuPosition(null);
                 router.push({
                   pathname: "/note-detail",
                   params: {
@@ -176,14 +227,85 @@ export default function SubjectNotesScreen() {
                     noteContent: item.content ?? "",
                     updatedAt: item.updated_at?.toDate?.().toLocaleDateString("ko-KR") ?? "",
                   },
-                })
-              }
+                });
+              }}
             >
-              <Text style={styles.noteTitle}>{item.title || "제목 없음"}</Text>
+              <View style={styles.cardTopRow}>
+                <Text style={styles.noteTitle}>{item.title || "제목 없음"}</Text>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    const { pageY } = e.nativeEvent;
+                    setMenuPosition({ y: pageY });
+                    setMenuOpenId(menuOpenId === item.id ? null : item.id);
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="ellipsis-vertical" size={18} color={COLORS.subText} />
+                </TouchableOpacity>
+              </View>
               <Text style={styles.noteDate}>{formatDate(item.updated_at)}</Text>
             </Pressable>
           )}
         />
+      )}
+
+      {menuOpenId && (
+        <Modal
+          visible={!!menuOpenId}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            setMenuOpenId(null);
+            setMenuPosition(null);
+          }}
+        >
+          <Pressable
+            style={styles.menuOverlay}
+            onPress={() => {
+              setMenuOpenId(null);
+              setMenuPosition(null);
+            }}
+          >
+            <View
+              style={[
+                styles.menuDropdown,
+                { position: "absolute", top: menuPosition?.y ?? 100, right: 24 },
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  const note = notes.find((n) => n.id === menuOpenId);
+                  if (note) {
+                    setMenuOpenId(null);
+                    setMenuPosition(null);
+                    setEditingNote(note);
+                    setEditTitle(note.title ?? "");
+                    setEditContent(note.content ?? "");
+                    setIsEditModalVisible(true);
+                  }
+                }}
+              >
+                <Ionicons name="pencil-outline" size={15} color={COLORS.primary} />
+                <Text style={styles.menuItemText}>수정</Text>
+              </TouchableOpacity>
+              <View style={styles.menuDivider} />
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  const id = menuOpenId;
+                  setMenuOpenId(null);
+                  setMenuPosition(null);
+                  handleDeleteNote(id);
+                }}
+              >
+                <Ionicons name="trash-outline" size={15} color={COLORS.danger} />
+                <Text style={[styles.menuItemText, { color: COLORS.danger }]}>삭제</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Modal>
       )}
 
       <Modal
@@ -222,6 +344,73 @@ export default function SubjectNotesScreen() {
             >
               <Text style={styles.cancelButtonText}>취소</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={isEditModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsEditModalVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>노트 수정</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="노트 제목"
+              placeholderTextColor={COLORS.subText}
+              value={editTitle}
+              onChangeText={setEditTitle}
+            />
+            <TextInput
+              style={styles.noteInput}
+              placeholder="노트 내용"
+              placeholderTextColor={COLORS.subText}
+              value={editContent}
+              onChangeText={setEditContent}
+              multiline
+            />
+            <TouchableOpacity style={styles.submitButton} onPress={handleEditNote}>
+              <Text style={styles.submitButtonText}>수정 완료</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setIsEditModalVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={!!deleteTargetId}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteTargetId(null)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>노트 삭제</Text>
+            <Text style={{ color: COLORS.subText, marginBottom: 24, fontSize: 14 }}>
+              이 노트를 삭제하시겠습니까?
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                style={[styles.cancelButton, { flex: 1, marginBottom: 0 }]}
+                onPress={() => setDeleteTargetId(null)}
+              >
+                <Text style={styles.cancelButtonText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.submitButton, { flex: 1, marginBottom: 0, backgroundColor: COLORS.danger }]}
+                onPress={confirmDelete}
+              >
+                <Text style={styles.submitButtonText}>삭제</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -282,15 +471,56 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
   },
+  cardTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
   noteTitle: {
+    flex: 1,
     fontSize: 16,
     fontWeight: "700",
     color: COLORS.text,
-    marginBottom: 6,
+    marginRight: 8,
   },
   noteDate: {
     fontSize: 13,
     color: COLORS.subText,
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    alignItems: "flex-end",
+    paddingRight: 24,
+  },
+  menuDropdown: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    minWidth: 100,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+  },
+  menuItemText: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: "500",
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginHorizontal: 8,
   },
   modalBackground: {
     flex: 1,
