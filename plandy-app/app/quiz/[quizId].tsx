@@ -5,8 +5,8 @@ import React, { useCallback, useEffect, useLayoutEffect, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -256,12 +256,8 @@ export default function QuizDetailScreen() {
         </View>
       )}
 
-      <FlatList
-        data={questions}
-        keyExtractor={(_, index) => `${quiz.id}-${index}`}
-        style={styles.questionList}
-        contentContainerStyle={styles.listContent}
-        renderItem={({ item, index }) => {
+      <ScrollView style={styles.questionList} contentContainerStyle={styles.listContent}>
+        {questions.map((item, index) => {
           const selectedIndex = selectedAnswers[index];
           const answerIndex =
             typeof item.answer === "number" ? item.answer : Number(item.answer);
@@ -270,6 +266,7 @@ export default function QuizDetailScreen() {
 
           return (
             <View
+              key={`${quiz.id}-${index}`}
               style={[
                 styles.questionCard,
                 submitted && isCorrect && styles.questionCardCorrect,
@@ -340,10 +337,25 @@ export default function QuizDetailScreen() {
               )}
             </View>
           );
-        }}
-      />
+        })}
 
-      {!submitted ? (
+        {submitted && (
+          <View style={styles.reviewSection}>
+            <Text style={styles.reviewTitle}>오답 노트</Text>
+            {resultSummary.incorrectItems.length === 0 ? (
+              <Text style={styles.emptyText}>모든 문제를 맞혔습니다!</Text>
+            ) : (
+              resultSummary.incorrectItems.map((item) => (
+                <Text key={item.question_index} style={styles.reviewItemText}>
+                  {item.question_index + 1}번 문제 - 내 답 {item.user_answer + 1}번
+                </Text>
+              ))
+            )}
+          </View>
+        )}
+      </ScrollView>
+
+      {!submitted && (
         <TouchableOpacity
           style={[styles.submitButton, !allAnswered && styles.disabledButton]}
           onPress={handleSubmitAnswers}
@@ -353,19 +365,6 @@ export default function QuizDetailScreen() {
             {isSubmitting ? "제출 중..." : "제출하기"}
           </Text>
         </TouchableOpacity>
-      ) : (
-        <View style={styles.reviewSection}>
-          <Text style={styles.reviewTitle}>오답 노트</Text>
-          {resultSummary.incorrectItems.length === 0 ? (
-            <Text style={styles.emptyText}>모든 문제를 맞혔습니다!</Text>
-          ) : (
-            resultSummary.incorrectItems.map((item) => (
-              <Text key={item.question_index} style={styles.reviewItemText}>
-                {item.question_index + 1}번 문제 - 내 답 {item.user_answer + 1}번
-              </Text>
-            ))
-          )}
-        </View>
       )}
     </View>
   );
