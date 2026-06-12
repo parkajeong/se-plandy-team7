@@ -32,7 +32,7 @@ describe("recommendationUtils", () => {
   test("퀴즈 정답률이 threshold보다 낮은 과목만 약점 과목으로 반환한다", () => {
     const quizResults = [
       { subject_id: "subject-1", correct_rate: 80 },
-      { subject_id: "subject-2", correctRate: 40 },
+      { subject_id: "subject-2", correct_rate: 40 },
       { subject_id: "subject-3", correct_count: 2, total_count: 5 },
       { subject_id: "subject-4", correct_count: 0, total_count: 0 },
     ];

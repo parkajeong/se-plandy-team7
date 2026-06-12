@@ -23,22 +23,7 @@ function generateTodoRecommendationMessage(completionRate) {
 }
 
 function getResultCorrectRate(result) {
-  if (typeof result?.correct_rate === "number") {
-    return result.correct_rate;
-  }
-
-  if (typeof result?.correctRate === "number") {
-    return result.correctRate;
-  }
-
-  const correctCount = result?.correct_count ?? result?.correctCount;
-  const totalCount = result?.total_count ?? result?.totalCount;
-
-  if (typeof correctCount === "number" && typeof totalCount === "number" && totalCount > 0) {
-    return Math.round((correctCount / totalCount) * 100);
-  }
-
-  return 0;
+  return result?.correct_rate ?? 0;
 }
 
 function getWeakQuizSubjects(quizResults = [], threshold = 60) {
