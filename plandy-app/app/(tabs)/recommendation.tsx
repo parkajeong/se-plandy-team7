@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import React, { useCallback, useState } from "react";
 import {
@@ -15,8 +16,10 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { COLORS } from "@/constants/theme";
 import { getCurrentAppUserIdOrNull } from "@/src/appSession";
-import { functions } from "@/src/firebase";
+import { db, functions } from "@/src/firebase";
 import { fetchProgressData } from "@/src/progressService";
+import { getSubjects } from "@/src/subjectService";
+import { getWeakQuizSubjects } from "@/src/utils/recommendationUtils";
 
 type Recommendation = {
   priority: number;
@@ -44,6 +47,14 @@ type StudyAmountChartItem = {
   subjectTitle: string;
   value: number;
 };
+
+type WeakSubject = {
+  subjectId: string;
+  subjectTitle: string;
+  correctRate: number;
+};
+
+const WEAK_SUBJECT_THRESHOLD = 60;
 
 const shortenLabel = (label: string, maxLength = 8) =>
   label.length > maxLength ? `${label.slice(0, maxLength)}...` : label;
@@ -354,6 +365,71 @@ function ProgressSection({
   );
 }
 
+function WeakSubjectsSection({
+  isLoading,
+  error,
+  weakSubjects,
+  onRetry,
+}: {
+  isLoading: boolean;
+  error: string | null;
+  weakSubjects: WeakSubject[];
+  onRetry: () => void;
+}) {
+  return (
+    <View style={styles.progressSection}>
+      <View style={styles.sectionHeader}>
+        <Ionicons name="alert-circle-outline" size={22} color={COLORS.primary} />
+        <Text style={styles.sectionTitle}>약점 과목</Text>
+      </View>
+
+      {isLoading ? (
+        <View style={styles.progressState}>
+          <ActivityIndicator color={COLORS.primary} />
+          <Text style={styles.stateText}>퀴즈 결과를 불러오는 중입니다.</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.progressState}>
+          <Text style={styles.progressErrorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
+            <Text style={styles.retryButtonText}>다시 시도</Text>
+          </TouchableOpacity>
+        </View>
+      ) : weakSubjects.length === 0 ? (
+        <View style={styles.progressState}>
+          <Text style={styles.emptyTitle}>
+            정답률이 낮은 과목이 없습니다. 퀴즈를 풀어 약점을 확인해보세요.
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.completionList}>
+          {weakSubjects.map((item) => (
+            <View key={item.subjectId} style={styles.completionRow}>
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={styles.completionSubject}
+              >
+                {item.subjectTitle}
+              </Text>
+              <View style={styles.completionBarOuter}>
+                <View
+                  style={[
+                    styles.completionBarInner,
+                    styles.weakBarInner,
+                    { width: `${Math.min(Math.max(item.correctRate, 0), 100)}%` as `${number}%` },
+                  ]}
+                />
+              </View>
+              <Text style={styles.completionPercent}>{item.correctRate}%</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function RecommendationScreen() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -365,6 +441,10 @@ export default function RecommendationScreen() {
   const [subjectProgress, setSubjectProgress] = useState<SubjectProgress[]>([]);
   const [studyAmountChartData, setStudyAmountChartData] = useState<StudyAmountChartItem[]>([]);
   const [trend, setTrend] = useState<TrendPoint[]>([]);
+
+  const [isWeakSubjectsLoading, setIsWeakSubjectsLoading] = useState(false);
+  const [weakSubjectsError, setWeakSubjectsError] = useState<string | null>(null);
+  const [weakSubjects, setWeakSubjects] = useState<WeakSubject[]>([]);
 
   const userId = getCurrentAppUserIdOrNull();
 
@@ -391,10 +471,50 @@ export default function RecommendationScreen() {
     }
   }, [userId]);
 
+  const loadWeakSubjects = useCallback(async () => {
+    if (!userId) {
+      setWeakSubjects([]);
+      return;
+    }
+
+    try {
+      setIsWeakSubjectsLoading(true);
+      setWeakSubjectsError(null);
+
+      const quizResultsQuery = query(
+        collection(db, "quiz_results"),
+        where("user_id", "==", userId)
+      );
+      const quizResultsSnapshot = await getDocs(quizResultsQuery);
+      const quizResults = quizResultsSnapshot.docs.map((docSnapshot) => docSnapshot.data());
+
+      const weakResults = getWeakQuizSubjects(quizResults, WEAK_SUBJECT_THRESHOLD);
+
+      const subjects = await getSubjects(userId);
+      const subjectTitleById = new Map(
+        subjects.map((subject: any) => [subject.id, subject.title])
+      );
+
+      setWeakSubjects(
+        weakResults.map((result: any) => ({
+          subjectId: result.subject_id,
+          subjectTitle: subjectTitleById.get(result.subject_id) || result.subject_id,
+          correctRate: typeof result.correct_rate === "number" ? result.correct_rate : 0,
+        }))
+      );
+    } catch (error) {
+      void error;
+      setWeakSubjectsError("약점 과목 데이터를 불러오지 못했습니다.");
+    } finally {
+      setIsWeakSubjectsLoading(false);
+    }
+  }, [userId]);
+
   useFocusEffect(
     useCallback(() => {
       loadProgress();
-    }, [loadProgress])
+      loadWeakSubjects();
+    }, [loadProgress, loadWeakSubjects])
   );
 
   const handleFetchRecommendation = async () => {
@@ -497,14 +617,22 @@ export default function RecommendationScreen() {
           keyExtractor={(item) => String(item.priority)}
           renderItem={renderCard}
           ListHeaderComponent={
-            <ProgressSection
-              isLoading={isProgressLoading}
-              error={progressError}
-              subjectProgress={subjectProgress}
-              studyAmountChartData={studyAmountChartData}
-              trend={trend}
-              onRetry={loadProgress}
-            />
+            <>
+              <ProgressSection
+                isLoading={isProgressLoading}
+                error={progressError}
+                subjectProgress={subjectProgress}
+                studyAmountChartData={studyAmountChartData}
+                trend={trend}
+                onRetry={loadProgress}
+              />
+              <WeakSubjectsSection
+                isLoading={isWeakSubjectsLoading}
+                error={weakSubjectsError}
+                weakSubjects={weakSubjects}
+                onRetry={loadWeakSubjects}
+              />
+            </>
           }
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={recommendations.length === 0 ? styles.flatListEmpty : undefined}
@@ -808,6 +936,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800",
     textAlign: "right",
+  },
+  weakBarInner: {
+    backgroundColor: "#EF4444",
   },
   lineChart: {
     alignSelf: "center",
