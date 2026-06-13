@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Kakao Login Redirect</title>
+  </head>
+  <body>
+    <p>카카오 로그인 처리 중입니다...</p>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+
+      const code = params.get("code");
+      const error = params.get("error");
+      const errorDescription = params.get("error_description");
+      const message = {
+        source: "plandy-kakao-auth",
+        code,
+        error,
+        errorDescription,
+      };
+
+      const returnToApp = () => {
+        if (error) {
+          window.location.href =
+            "plandy://kakao-auth?error=" +
+            encodeURIComponent(error) +
+            "&error_description=" +
+            encodeURIComponent(errorDescription || "");
+        } else if (code) {
+          window.location.href =
+            "plandy://kakao-auth?code=" + encodeURIComponent(code);
+        } else {
+          document.body.innerText = "카카오 인가 코드가 없습니다.";
+        }
+      };
+
+      if (window.opener && !window.opener.closed) {
+        let postCount = 0;
+        const postResult = () => {
+          window.opener.postMessage(message, "*");
+          postCount += 1;
+
+          if (postCount >= 5) {
+            window.clearInterval(postInterval);
+            window.setTimeout(() => window.close(), 300);
+          }
+        };
+        const postInterval = window.setInterval(postResult, 150);
+
+        postResult();
+      } else {
+        returnToApp();
+      }
+    </script>
+  </body>
+</html>
