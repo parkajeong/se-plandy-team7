@@ -22,6 +22,54 @@ const stripJsonFence = (text) =>
     .replace(/```/g, "")
     .trim();
 
+const extractJsonValue = (text) => {
+  const clean = stripJsonFence(text);
+  const starts = [clean.indexOf("{"), clean.indexOf("[")].filter(
+    (index) => index >= 0
+  );
+
+  if (!starts.length) {
+    throw new Error("Gemini response does not contain JSON.");
+  }
+
+  const start = Math.min(...starts);
+  const stack = [];
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < clean.length; index += 1) {
+    const char = clean[index];
+
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+
+    if (char === '"') inString = true;
+    else if (char === "{" || char === "[") stack.push(char);
+    else if (char === "}" || char === "]") {
+      const expected = char === "}" ? "{" : "[";
+      if (stack.pop() !== expected) {
+        throw new Error("Gemini response contains malformed JSON.");
+      }
+      if (!stack.length) return clean.slice(start, index + 1);
+    }
+  }
+
+  throw new Error("Gemini response contains incomplete JSON.");
+};
+
+const extractJsonArray = (text) => {
+  const value = JSON.parse(extractJsonValue(text));
+
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.questions)) return value.questions;
+
+  throw new Error("Gemini response does not contain a questions array.");
+};
+
 const parseGeminiQuizJson = (text) => {
   const clean = stripJsonFence(text);
 
@@ -29,7 +77,8 @@ const parseGeminiQuizJson = (text) => {
     throw new Error("Gemini response is empty.");
   }
 
-  return JSON.parse(clean);
+  const value = JSON.parse(extractJsonValue(clean));
+  return Array.isArray(value) ? { questions: value } : value;
 };
 
 const validateQuestions = (questions) => {
@@ -144,6 +193,8 @@ module.exports = {
   assertNoteContent,
   buildQuizPrompt,
   DEFAULT_QUESTION_COUNT,
+  extractJsonArray,
+  extractJsonValue,
   parseGeminiQuizJson,
   parseQuestionCount,
   validateQuestions,

@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -17,6 +17,33 @@ const ALLOWED_QUESTION_COUNTS = [5, 10, 15, 20, 25, 30];
 const DEFAULT_QUESTION_COUNT = 5;
 const GENERATE_ERROR_MESSAGE =
   "AI 퀴즈 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.";
+
+const getGenerateErrorMessage = (error: unknown) => {
+  if (!error || typeof error !== "object") {
+    return GENERATE_ERROR_MESSAGE;
+  }
+
+  const details = "details" in error ? error.details : null;
+  if (
+    details &&
+    typeof details === "object" &&
+    "reason" in details &&
+    typeof details.reason === "string" &&
+    details.reason.trim()
+  ) {
+    return details.reason.trim();
+  }
+
+  if (
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message.trim()
+  ) {
+    return error.message.replace(/^Firebase:\s*/i, "").trim();
+  }
+
+  return GENERATE_ERROR_MESSAGE;
+};
 
 const getParam = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value;
@@ -74,8 +101,8 @@ export default function GenerateQuizScreen() {
           params: { quizId },
         });
       } catch (error) {
-        void error;
-        setErrorMessage(GENERATE_ERROR_MESSAGE);
+        console.error("Quiz generation failed", error);
+        setErrorMessage(getGenerateErrorMessage(error));
       } finally {
         setIsGenerating(false);
       }

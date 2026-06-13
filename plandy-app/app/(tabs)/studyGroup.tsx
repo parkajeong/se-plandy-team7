@@ -10,7 +10,7 @@ import {
   ScrollView,
   Modal,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/src/firebase";
