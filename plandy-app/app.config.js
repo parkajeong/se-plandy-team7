@@ -3,6 +3,9 @@ export default {
     name: "Plandy",
     slug: "plandy-app",
     scheme: "plandy",
+    web: {
+      output: "single",
+    },
 
     android: {
       package: "com.plandy.app",

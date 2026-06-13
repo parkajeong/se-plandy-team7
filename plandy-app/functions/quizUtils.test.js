@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
   assertNoteContent,
+  extractJsonArray,
   parseGeminiQuizJson,
   parseQuestionCount,
   validateQuizPayload,
@@ -27,6 +28,31 @@ test("parseGeminiQuizJson parses fenced JSON", () => {
 
   assert.equal(parsed.title, "테스트");
   assert.deepEqual(parsed.questions, []);
+});
+
+test("parseGeminiQuizJson extracts JSON from surrounding text", () => {
+  const parsed = parseGeminiQuizJson(
+    'Generated quiz:\n{"title":"Quiz","questions":[]}\nDone.'
+  );
+
+  assert.equal(parsed.title, "Quiz");
+  assert.deepEqual(parsed.questions, []);
+});
+
+test("parseGeminiQuizJson wraps a top-level questions array", () => {
+  const parsed = parseGeminiQuizJson(
+    '[{"question":"Q","options":["A","B","C","D"],"answer":0,"explanation":"E"}]'
+  );
+
+  assert.equal(parsed.questions.length, 1);
+});
+
+test("extractJsonArray returns questions from an object response", () => {
+  const questions = extractJsonArray(
+    '```json\n{"title":"Quiz","questions":[{"question":"Q"}]}\n```'
+  );
+
+  assert.deepEqual(questions, [{ question: "Q" }]);
 });
 
 test("parseQuestionCount defaults to 5 and accepts allowed values", () => {

@@ -1,4 +1,6 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
+import { useFonts } from "expo-font";
 import { router, Stack, usePathname, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { onAuthStateChanged } from "firebase/auth";
@@ -35,6 +37,9 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+  const [iconFontsLoaded] = useFonts({
+    ...Ionicons.font,
+  });
   const colorScheme = useColorScheme();
   const pathname = usePathname();
   const segments = useSegments();
@@ -79,6 +84,10 @@ export default function RootLayout() {
       unsubscribeLogout();
     };
   }, [pathname, firstSegment]);
+
+  if (!iconFontsLoaded) {
+    return null;
+  }
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>

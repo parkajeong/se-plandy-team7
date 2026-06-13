@@ -1,5 +1,6 @@
 const { HttpsError, onCall } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
+const logger = require("firebase-functions/logger");
 const { initializeApp } = require("firebase-admin/app");
 const { FieldValue, getFirestore } = require("firebase-admin/firestore");
 const {
@@ -14,8 +15,35 @@ initializeApp();
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_QUIZ_MODELS = [
+  GEMINI_MODEL,
+  process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash-lite",
+].filter((model, index, models) => model && models.indexOf(model) === index);
 const GEMINI_GENERATE_ERROR_MESSAGE =
   "AI 퀴즈 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.";
+const QUIZ_LOG_PREFIX = "generateQuizFromNote";
+
+const getErrorMessage = (error) =>
+  typeof error?.message === "string" && error.message.trim()
+    ? error.message.trim()
+    : String(error || "Unknown error");
+
+const logQuizStep = (step, details = {}) => {
+  logger.info(`${QUIZ_LOG_PREFIX}: ${step}`, details);
+};
+
+const logQuizError = (stage, error) => {
+  const details = {
+    stage,
+    message: getErrorMessage(error),
+    code: error?.code || null,
+    stack: error?.stack || null,
+    error,
+  };
+
+  console.error(`${QUIZ_LOG_PREFIX}: failed`, details);
+  logger.error(`${QUIZ_LOG_PREFIX}: failed`, details);
+};
 
 const getCallableUserId = (request) => {
   const requestedUserId =
@@ -34,10 +62,14 @@ const getCallableUserId = (request) => {
 
 const callGeminiGenerateContent = async (
   prompt,
-  { responseMimeType, userErrorMessage = "Gemini API 호출에 실패했습니다." } = {}
+  {
+    model = GEMINI_MODEL,
+    responseMimeType,
+    userErrorMessage = "Gemini API 호출에 실패했습니다.",
+  } = {}
 ) => {
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: "POST",
       headers: {
@@ -56,23 +88,57 @@ const callGeminiGenerateContent = async (
   const data = await response.json();
 
   if (!response.ok) {
-    throw new HttpsError("internal", userErrorMessage);
+    const apiMessage =
+      data?.error?.message || `Gemini API returned HTTP ${response.status}.`;
+    const error = new Error(apiMessage);
+    error.code = data?.error?.status || `HTTP_${response.status}`;
+    error.httpStatus = response.status;
+    error.model = model;
+    throw error;
   }
 
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
   if (!text) {
-    throw new HttpsError("internal", userErrorMessage);
+    throw new Error(
+      data?.promptFeedback?.blockReason
+        ? `Gemini blocked the prompt: ${data.promptFeedback.blockReason}.`
+        : `${userErrorMessage} Gemini response text is empty.`
+    );
   }
 
   return text;
 };
 
-const callGeminiForQuiz = (prompt) =>
-  callGeminiGenerateContent(prompt, {
-    responseMimeType: "application/json",
-    userErrorMessage: GEMINI_GENERATE_ERROR_MESSAGE,
-  });
+const callGeminiForQuiz = async (prompt) => {
+  let lastError;
+
+  for (const model of GEMINI_QUIZ_MODELS) {
+    try {
+      logQuizStep("gemini-model-attempt", { model });
+      const text = await callGeminiGenerateContent(prompt, {
+        model,
+        responseMimeType: "application/json",
+        userErrorMessage: GEMINI_GENERATE_ERROR_MESSAGE,
+      });
+      return { model, text };
+    } catch (error) {
+      lastError = error;
+      logger.warn(`${QUIZ_LOG_PREFIX}: gemini-model-failed`, {
+        model,
+        message: getErrorMessage(error),
+        code: error?.code || null,
+        httpStatus: error?.httpStatus || null,
+      });
+
+      if (error?.httpStatus !== 429) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
+};
 
 exports.getStudyRecommendation = onCall(
   { secrets: [GEMINI_API_KEY] },
@@ -212,7 +278,22 @@ ${JSON.stringify(subjectQuizSummary)}
 exports.generateQuizFromNote = onCall(
   { secrets: [GEMINI_API_KEY] },
   async (request) => {
+    let stage = "function-called";
+
     try {
+      logQuizStep(stage, {
+        authUid: request.auth?.uid || null,
+        hasAppCheck: Boolean(request.app),
+        requestData: {
+          noteId: request.data?.noteId || null,
+          subjectId: request.data?.subjectId || null,
+          questionCount: request.data?.questionCount || null,
+          requestedUserId: request.data?.userId || null,
+        },
+        model: GEMINI_MODEL,
+      });
+
+      stage = "validate-request";
       const userId = getCallableUserId(request);
       const noteId =
         typeof request.data?.noteId === "string"
@@ -245,6 +326,14 @@ exports.generateQuizFromNote = onCall(
         throw new HttpsError("invalid-argument", "subjectId가 필요합니다.");
       }
 
+      logQuizStep("request-validated", {
+        userId,
+        noteId,
+        subjectId,
+        questionCount,
+      });
+
+      stage = "fetch-note";
       const db = getFirestore();
       const noteSnap = await db.collection("notes").doc(noteId).get();
 
@@ -253,6 +342,12 @@ exports.generateQuizFromNote = onCall(
       }
 
       const note = noteSnap.data();
+      logQuizStep("note-fetched", {
+        noteId,
+        exists: true,
+        noteUserId: note.user_id || null,
+        noteSubjectId: note.subject_id || null,
+      });
 
       if (note.user_id !== userId) {
         throw new HttpsError(
@@ -268,15 +363,42 @@ exports.generateQuizFromNote = onCall(
         );
       }
 
+      stage = "validate-note-content";
       const noteContent = assertNoteContent(note.content);
+      logQuizStep("note-content-validated", {
+        noteId,
+        contentLength: noteContent.length,
+      });
+
       const prompt = buildQuizPrompt({
         noteTitle: note.title,
         noteContent,
         questionCount,
       });
-      const geminiText = await callGeminiForQuiz(prompt);
+
+      stage = "call-gemini";
+      logQuizStep("gemini-call-started", {
+        models: GEMINI_QUIZ_MODELS,
+        promptLength: prompt.length,
+      });
+      const { model: geminiModel, text: geminiText } =
+        await callGeminiForQuiz(prompt);
+
+      logQuizStep("gemini-call-succeeded", {
+        model: geminiModel,
+        responseLength: geminiText.length,
+        responsePreview: geminiText.slice(0, 500),
+      });
+
+      stage = "parse-gemini-response";
       const parsed = parseGeminiQuizJson(geminiText);
       const quizPayload = validateQuizPayload(parsed, { questionCount });
+      logQuizStep("gemini-response-parsed", {
+        title: quizPayload.title,
+        questionCount: quizPayload.questions.length,
+      });
+
+      stage = "save-quiz";
       const quizRef = db.collection("quizzes").doc();
 
       await quizRef.set({
@@ -290,6 +412,14 @@ exports.generateQuizFromNote = onCall(
         created_at: FieldValue.serverTimestamp(),
       });
 
+      logQuizStep("quiz-saved", {
+        quizId: quizRef.id,
+        userId,
+        subjectId,
+        noteId,
+        questionCount: quizPayload.questions.length,
+      });
+
       return {
         quizId: quizRef.id,
         id: quizRef.id,
@@ -297,6 +427,8 @@ exports.generateQuizFromNote = onCall(
         questionCount: quizPayload.questions.length,
       };
     } catch (error) {
+      logQuizError(stage, error);
+
       if (
         error instanceof HttpsError &&
         ["unauthenticated", "invalid-argument", "not-found", "permission-denied"].includes(
@@ -306,7 +438,19 @@ exports.generateQuizFromNote = onCall(
         throw error;
       }
 
-      throw new HttpsError("internal", GEMINI_GENERATE_ERROR_MESSAGE);
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+
+      const originalMessage = getErrorMessage(error);
+      throw new HttpsError(
+        "internal",
+        `${GEMINI_GENERATE_ERROR_MESSAGE} (${originalMessage})`,
+        {
+          stage,
+          reason: originalMessage,
+        }
+      );
     }
   }
 );

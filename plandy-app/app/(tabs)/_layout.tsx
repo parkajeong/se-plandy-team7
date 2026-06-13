@@ -5,7 +5,6 @@ import React, { useEffect, useState } from "react";
 
 import UserHeaderRight from "@/components/UserHeaderRight";
 import { HapticTab } from "@/components/haptic-tab";
-import { IconSymbol } from "@/components/ui/icon-symbol";
 import { COLORS } from "@/constants/theme";
 import {
   getAppUser,
@@ -111,7 +110,7 @@ export default function TabLayout() {
         options={{
           title: "과목",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="book.fill" color={color} />
+            <Ionicons size={28} name="book-outline" color={color} />
           ),
         }}
       />
