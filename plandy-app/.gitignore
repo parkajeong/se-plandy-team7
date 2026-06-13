@@ -38,7 +38,6 @@ yarn-error.*
 .env*.local
 
 # Firebase config
-google-services.json
 GoogleService-Info.plist
 
 # typescript

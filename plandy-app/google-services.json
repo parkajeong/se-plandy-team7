@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "116925888955",
+    "project_id": "se-plandy",
+    "storage_bucket": "se-plandy.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:116925888955:android:1bc740cb392d33220e2c9e",
+        "android_client_info": {
+          "package_name": "com.plandy.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "116925888955-ud7m1lsapp045tnjvd0egrgoaukbj0ut.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.plandy.app",
+            "certificate_hash": "830c6ca0cf1072f636512bbc186cad4ea7535603"
+          }
+        },
+        {
+          "client_id": "116925888955-o5mak3tjasjbb27np3l74b2kqhoint81.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCdwpPty7JCcAGBDfTTjBI3tYZm-T4IIig"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "116925888955-o5mak3tjasjbb27np3l74b2kqhoint81.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
