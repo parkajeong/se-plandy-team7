@@ -14,8 +14,7 @@
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.team7.plandy",
-      "googleServicesFile": "./google-services.json"
+      "package": "com.team7.plandy"
     },
     "web": {
       "favicon": "./assets/images/icon.png"
