@@ -19,7 +19,7 @@ export default {
         foregroundImage: "./assets/images/icon.png",
         backgroundColor: "#FFFFFF",
       },
-      package: "com.team7.plandy",
+      package: "com.plandy.app",
       googleServicesFile:
         process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
     },
