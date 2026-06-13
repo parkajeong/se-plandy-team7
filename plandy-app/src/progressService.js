@@ -18,6 +18,11 @@ const formatDateKey = (date) => {
   return `${year}-${month}-${day}`;
 };
 
+const getSubjectTitle = (subject) =>
+  typeof subject?.title === "string" && subject.title.trim()
+    ? subject.title.trim()
+    : "이름 없는 과목";
+
 const fetchCollectionByUser = async (collectionName, userId) => {
   const q = query(
     collection(db, collectionName),
@@ -71,7 +76,7 @@ export const calculateSubjectProgress = (subjects = [], todos = [], notes = []) 
 
     return {
       subjectId: subject.id,
-      subjectTitle: subject.title || "제목 없음",
+      subjectTitle: getSubjectTitle(subject),
       noteCount,
       todoCount: todoStats.todoCount,
       completedTodoCount: todoStats.completedTodoCount,

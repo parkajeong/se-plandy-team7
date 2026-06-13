@@ -167,6 +167,7 @@ export default function QuizDetailScreen() {
       await submitQuizResult({
         userId,
         quizId: quiz.id,
+        subjectId: quiz.subject_id,
         score: correctCount,
         total_count: totalCount,
         correct_count: correctCount,

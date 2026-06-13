@@ -18,8 +18,9 @@ import { COLORS } from "@/constants/theme";
 import { getCurrentAppUserIdOrNull } from "@/src/appSession";
 import { db, functions } from "@/src/firebase";
 import { fetchProgressData } from "@/src/progressService";
+import { fetchQuizzes } from "@/src/quizService";
 import { getSubjects } from "@/src/subjectService";
-import { getWeakQuizSubjects } from "@/src/utils/recommendationUtils";
+import { buildWeakSubjectItems } from "@/src/utils/recommendationUtils";
 
 type Recommendation = {
   priority: number;
@@ -49,6 +50,7 @@ type StudyAmountChartItem = {
 };
 
 type WeakSubject = {
+  itemKey: string;
   subjectId: string;
   subjectTitle: string;
   correctRate: number;
@@ -404,24 +406,26 @@ function WeakSubjectsSection({
       ) : (
         <View style={styles.completionList}>
           {weakSubjects.map((item) => (
-            <View key={item.subjectId} style={styles.completionRow}>
+            <View key={item.itemKey} style={styles.weakSubjectItem}>
               <Text
                 numberOfLines={1}
                 ellipsizeMode="tail"
-                style={styles.completionSubject}
+                style={styles.weakSubjectTitle}
               >
                 {item.subjectTitle}
               </Text>
-              <View style={styles.completionBarOuter}>
-                <View
-                  style={[
-                    styles.completionBarInner,
-                    styles.weakBarInner,
-                    { width: `${Math.min(Math.max(item.correctRate, 0), 100)}%` as `${number}%` },
-                  ]}
-                />
+              <View style={styles.weakSubjectProgressRow}>
+                <View style={styles.completionBarOuter}>
+                  <View
+                    style={[
+                      styles.completionBarInner,
+                      styles.weakBarInner,
+                      { width: `${Math.min(Math.max(item.correctRate, 0), 100)}%` as `${number}%` },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.completionPercent}>{item.correctRate}%</Text>
               </View>
-              <Text style={styles.completionPercent}>{item.correctRate}%</Text>
             </View>
           ))}
         </View>
@@ -485,22 +489,24 @@ export default function RecommendationScreen() {
         collection(db, "quiz_results"),
         where("user_id", "==", userId)
       );
-      const quizResultsSnapshot = await getDocs(quizResultsQuery);
-      const quizResults = quizResultsSnapshot.docs.map((docSnapshot) => docSnapshot.data());
-
-      const weakResults = getWeakQuizSubjects(quizResults, WEAK_SUBJECT_THRESHOLD);
-
-      const subjects = await getSubjects(userId);
-      const subjectTitleById = new Map(
-        subjects.map((subject: any) => [subject.id, subject.title])
-      );
+      const [quizResultsSnapshot, subjects, quizzes] = await Promise.all([
+        getDocs(quizResultsQuery),
+        getSubjects(userId),
+        fetchQuizzes(userId),
+      ]);
+      const quizResults = quizResultsSnapshot.docs.map((docSnapshot) => ({
+        ...docSnapshot.data(),
+        documentId: docSnapshot.id,
+        id: docSnapshot.id,
+      }));
 
       setWeakSubjects(
-        weakResults.map((result: any) => ({
-          subjectId: result.subject_id,
-          subjectTitle: subjectTitleById.get(result.subject_id) || result.subject_id,
-          correctRate: typeof result.correct_rate === "number" ? result.correct_rate : 0,
-        }))
+        buildWeakSubjectItems(
+          quizResults,
+          quizzes,
+          subjects,
+          WEAK_SUBJECT_THRESHOLD
+        ) as WeakSubject[]
       );
     } catch (error) {
       void error;
@@ -917,6 +923,19 @@ const styles = StyleSheet.create({
     color: "#2B2B2B",
     fontSize: 13,
     fontWeight: "700",
+  },
+  weakSubjectItem: {
+    gap: 7,
+  },
+  weakSubjectTitle: {
+    color: "#2B2B2B",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  weakSubjectProgressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   completionBarOuter: {
     flex: 1,

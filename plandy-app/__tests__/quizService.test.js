@@ -32,13 +32,14 @@ describe('quizService', () => {
     const setDoc = firestore.setDoc;
     setDoc.mockResolvedValue();
 
-    const resultId = await service.submitQuizResult({ userId: 'u/1', quizId: 'q/1', score: 10, total_count: 10, correct_count: 10, correct_rate: 100, incorrect_items: [{ question_index: 0, user_answer: 1 }] });
+    const resultId = await service.submitQuizResult({ userId: 'u/1', quizId: 'q/1', subjectId: 's1', score: 10, total_count: 10, correct_count: 10, correct_rate: 100, incorrect_items: [{ question_index: 0, user_answer: 1 }] });
 
     expect(typeof resultId).toBe('string');
     expect(setDoc).toHaveBeenCalled();
     const payload = setDoc.mock.calls[0][1];
     expect(payload.user_id).toBe('u/1');
     expect(payload.quiz_id).toBe('q/1');
+    expect(payload.subject_id).toBe('s1');
     expect(payload.incorrect_items).toBeInstanceOf(Array);
     expect(payload.solved_at).toBe('SERVER_TS');
   });
