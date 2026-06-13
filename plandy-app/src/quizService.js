@@ -17,6 +17,16 @@ const mapDoc = (snapshot) => ({
   id: snapshot.id,
 });
 
+const mapQuizDoc = (snapshot) => {
+  const data = snapshot.data();
+  return {
+    ...data,
+    dataId: data.id,
+    documentId: snapshot.id,
+    id: snapshot.id,
+  };
+};
+
 const getDateMillis = (value) => {
   const date = value?.toDate?.() || (value instanceof Date ? value : null);
   return date ? date.getTime() : 0;
@@ -51,7 +61,7 @@ export const fetchQuizzesBySubject = async (userId, subjectId) => {
   );
 
   const snapshot = await getDocs(q);
-  const quizzes = sortByCreatedAtDesc(snapshot.docs.map(mapDoc));
+  const quizzes = sortByCreatedAtDesc(snapshot.docs.map(mapQuizDoc));
 
   return quizzes;
 };
@@ -64,7 +74,7 @@ export const fetchQuizzes = async (userId) => {
   );
 
   const snapshot = await getDocs(q);
-  const quizzes = sortByCreatedAtDesc(snapshot.docs.map(mapDoc));
+  const quizzes = sortByCreatedAtDesc(snapshot.docs.map(mapQuizDoc));
 
   return quizzes;
 };
@@ -97,6 +107,7 @@ export const fetchNotesBySubject = async (userId, subjectId) => {
 export const submitQuizResult = async ({
   userId,
   quizId,
+  subjectId,
   score,
   total_count,
   correct_count,
@@ -118,6 +129,7 @@ export const submitQuizResult = async ({
   const payload = {
     user_id: userId,
     quiz_id: quizId,
+    subject_id: subjectId || null,
     score,
     total_count,
     correct_count,

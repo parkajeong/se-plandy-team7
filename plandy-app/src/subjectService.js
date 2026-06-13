@@ -27,7 +27,15 @@ export const addSubject = async (user_id, title, goal) => {
 export const getSubjects = async (user_id) => {
   const q = query(collection(db, "subjects"), where("user_id", "==", user_id));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      ...data,
+      dataId: data.id,
+      documentId: doc.id,
+      id: doc.id,
+    };
+  });
 };
 
 // 목표 수정 (FR-007, FR-008)
