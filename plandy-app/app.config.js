@@ -9,16 +9,17 @@ export default {
     userInterfaceStyle: "automatic",
     web: {
       output: "single",
-      favicon: "./assets/images/favicon.png",
+      favicon: "./assets/images/icon.png",
     },
 
     android: {
+      versionCode: 1,
+      icon: "./assets/images/icon.png",
       adaptiveIcon: {
-        foregroundImage: "./assets/images/android-icon-foreground.png",
-        monochromeImage: "./assets/images/android-icon-monochrome.png",
+        foregroundImage: "./assets/images/icon.png",
         backgroundColor: "#FFFFFF",
       },
-      package: "com.plandy.app",
+      package: "com.team7.plandy",
       googleServicesFile:
         process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
     },
