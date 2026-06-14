@@ -95,7 +95,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
-          name="quiz"
+          name="quiz/[quizId]"
           options={{
             headerShown: true,
             title: "Quiz",
@@ -105,7 +105,17 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
-          name="incorrect-note"
+          name="quiz/generate"
+          options={{
+            headerShown: true,
+            title: "Quiz",
+            headerStyle: { backgroundColor: '#F8FAFC' },
+            headerTintColor: '#1E293B',
+            headerTitleStyle: { color: '#1E293B', fontWeight: '600' },
+          }}
+        />
+        <Stack.Screen
+          name="incorrect-note/[resultId]"
           options={{
             headerShown: true,
             title: "오답노트",

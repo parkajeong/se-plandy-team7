@@ -8,10 +8,12 @@ import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithCredential,
+  signInWithCustomToken,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
 } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
 import {
   doc,
   getDoc,
@@ -21,7 +23,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { cancelAppLogout, setAppUser } from "./appSession";
-import { auth, db } from "./firebase";
+import { auth, db, functions } from "./firebase";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -37,6 +39,20 @@ const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 const LOGOUT_TASK_TIMEOUT_MS = 2000;
 
 let isGoogleSigninConfigured = false;
+
+const requireAuthenticatedFirebaseUser = async (user) => {
+  if (!user?.uid || auth.currentUser?.uid !== user.uid) {
+    throw new Error("Firebase 인증 상태를 확인할 수 없습니다. 다시 로그인해주세요.");
+  }
+
+  await user.getIdToken();
+
+  if (auth.currentUser?.uid !== user.uid) {
+    throw new Error("Firebase 인증 상태가 만료되었습니다. 다시 로그인해주세요.");
+  }
+
+  return user;
+};
 
 const withTimeout = (promise, ms = LOGOUT_TASK_TIMEOUT_MS) =>
   Promise.race([
@@ -90,20 +106,18 @@ export const signUpWithEmail = async ({ email, password, loginId, nickname }) =>
     throw new Error("아이디는 영문, 숫자, 밑줄(_) 포함 4~20자로 입력해주세요.");
   }
 
+  const userCredential = await createUserWithEmailAndPassword(
+    auth,
+    trimmedEmail,
+    password
+  );
+  const user = await requireAuthenticatedFirebaseUser(userCredential.user);
   const usernameRef = doc(db, "usernames", trimmedLoginId);
   const usernameSnap = await getDoc(usernameRef);
 
   if (usernameSnap.exists()) {
     throw new Error("이미 사용 중인 아이디입니다.");
   }
-
-  const userCredential = await createUserWithEmailAndPassword(
-    auth,
-    trimmedEmail,
-    password
-  );
-
-  const user = userCredential.user;
 
   await runTransaction(db, async (transaction) => {
     const usernameDoc = await transaction.get(usernameRef);
@@ -214,19 +228,20 @@ const createGoogleUserDocumentIfNeeded = async (user) => {
 
 };
 
-const createKakaoUserDocumentIfNeeded = async (user) => {
+const createKakaoUserDocumentIfNeeded = async (firebaseUser, kakaoProfile) => {
+  const user = await requireAuthenticatedFirebaseUser(firebaseUser);
   const userRef = doc(db, "users", user.uid);
   const userSnap = await getDoc(userRef);
 
   if (!userSnap.exists()) {
     await setDoc(userRef, {
       uid: user.uid,
-      email: user.email || "",
+      email: kakaoProfile.email || user.email || "",
       loginId: "",
-      nickname: user.nickname || "",
-      photoURL: user.photoURL || "",
+      nickname: kakaoProfile.nickname || user.displayName || "",
+      photoURL: kakaoProfile.photoURL || user.photoURL || "",
       provider: "kakao",
-      kakaoId: user.kakaoId,
+      kakaoId: kakaoProfile.kakaoId,
       created_at: serverTimestamp(),
     });
     return;
@@ -235,11 +250,12 @@ const createKakaoUserDocumentIfNeeded = async (user) => {
   await setDoc(
     userRef,
     {
-      email: user.email || "",
-      nickname: user.nickname || "",
-      photoURL: user.photoURL || "",
+      uid: user.uid,
+      email: kakaoProfile.email || user.email || "",
+      nickname: kakaoProfile.nickname || user.displayName || "",
+      photoURL: kakaoProfile.photoURL || user.photoURL || "",
       provider: "kakao",
-      kakaoId: user.kakaoId,
+      kakaoId: kakaoProfile.kakaoId,
       updated_at: serverTimestamp(),
     },
     { merge: true }
@@ -272,39 +288,6 @@ const exchangeKakaoCodeForToken = async ({ code, redirectUri }) => {
   }
 
   return tokenData.access_token;
-};
-
-const fetchKakaoUser = async (accessToken) => {
-  const response = await fetch("https://kapi.kakao.com/v2/user/me", {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
-    },
-  });
-
-  const profile = await response.json();
-
-  if (!response.ok) {
-    throw new Error(profile.msg || "카카오 사용자 정보를 가져오지 못했습니다.");
-  }
-
-  const kakaoAccount = profile.kakao_account || {};
-  const profileInfo = kakaoAccount.profile || {};
-  const kakaoId = String(profile.id);
-
-  return {
-    uid: `kakao:${kakaoId}`,
-    kakaoId,
-    email: kakaoAccount.email || "",
-    nickname: profileInfo.nickname || profile.properties?.nickname || "Kakao User",
-    photoURL:
-      profileInfo.profile_image_url ||
-      profileInfo.thumbnail_image_url ||
-      profile.properties?.profile_image ||
-      profile.properties?.thumbnail_image ||
-      "",
-    provider: "kakao",
-  };
 };
 
 const openKakaoAuthPopup = (authUrl) => {
@@ -467,9 +450,25 @@ export const signInWithKakaoOnly = async ({
   }
 
   const accessToken = await exchangeKakaoCodeForToken({ code, redirectUri });
-  const kakaoUser = await fetchKakaoUser(accessToken);
+  const authenticateWithKakao = httpsCallable(functions, "authenticateWithKakao");
+  const result = await authenticateWithKakao({ accessToken });
+  const customToken = result.data?.customToken;
+  const kakaoProfile = result.data?.user;
 
-  await createKakaoUserDocumentIfNeeded(kakaoUser);
+  if (!customToken || !kakaoProfile?.kakaoId) {
+    throw new Error("카카오 Firebase 인증 정보를 가져오지 못했습니다.");
+  }
+
+  const userCredential = await signInWithCustomToken(auth, customToken);
+  const firebaseUser = await requireAuthenticatedFirebaseUser(userCredential.user);
+  const kakaoUser = {
+    ...kakaoProfile,
+    uid: firebaseUser.uid,
+    email: kakaoProfile.email || firebaseUser.email || "",
+    provider: "kakao",
+  };
+
+  await createKakaoUserDocumentIfNeeded(firebaseUser, kakaoProfile);
 
   if (persistAppUser) {
     await setAppUser(kakaoUser);

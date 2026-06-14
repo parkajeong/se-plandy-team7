@@ -2,6 +2,7 @@ const { HttpsError, onCall } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
 const { initializeApp } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
 const { FieldValue, getFirestore } = require("firebase-admin/firestore");
 const {
   assertNoteContent,
@@ -44,6 +45,61 @@ const logQuizError = (stage, error) => {
   console.error(`${QUIZ_LOG_PREFIX}: failed`, details);
   logger.error(`${QUIZ_LOG_PREFIX}: failed`, details);
 };
+
+exports.authenticateWithKakao = onCall(async (request) => {
+  const accessToken =
+    typeof request.data?.accessToken === "string"
+      ? request.data.accessToken.trim()
+      : "";
+
+  if (!accessToken) {
+    throw new HttpsError("invalid-argument", "카카오 액세스 토큰이 필요합니다.");
+  }
+
+  const response = await fetch("https://kapi.kakao.com/v2/user/me", {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
+    },
+  });
+  const profile = await response.json();
+
+  if (!response.ok || !profile?.id) {
+    logger.warn("authenticateWithKakao: invalid Kakao token", {
+      status: response.status,
+      kakaoErrorCode: profile?.code || null,
+    });
+    throw new HttpsError(
+      "unauthenticated",
+      profile?.msg || "카카오 사용자 인증에 실패했습니다."
+    );
+  }
+
+  const kakaoAccount = profile.kakao_account || {};
+  const profileInfo = kakaoAccount.profile || {};
+  const kakaoId = String(profile.id);
+  const uid = `kakao:${kakaoId}`;
+  const customToken = await getAuth().createCustomToken(uid, {
+    provider: "kakao",
+    kakaoId,
+  });
+
+  return {
+    customToken,
+    user: {
+      kakaoId,
+      email: kakaoAccount.email || "",
+      nickname:
+        profileInfo.nickname || profile.properties?.nickname || "Kakao User",
+      photoURL:
+        profileInfo.profile_image_url ||
+        profileInfo.thumbnail_image_url ||
+        profile.properties?.profile_image ||
+        profile.properties?.thumbnail_image ||
+        "",
+    },
+  };
+});
 
 const getCallableUserId = (request) => {
   const requestedUserId =

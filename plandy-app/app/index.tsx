@@ -77,6 +77,7 @@ export default function HomeScreen() {
       setPassword("");
       setIsSignUpMode(false);
     } catch (error: any) {
+      console.error("회원가입 실패 상세:", error);
       Alert.alert("회원가입 실패", error.message);
     }
   };
@@ -103,6 +104,7 @@ export default function HomeScreen() {
       Alert.alert("카카오 로그인 성공");
       router.replace(MAIN_ROUTE);
     } catch (error: any) {
+      console.error("카카오 로그인 실패 상세:", error);
       Alert.alert("카카오 로그인 실패", error.message);
     } finally {
       kakaoLoginInProgressRef.current = false;
