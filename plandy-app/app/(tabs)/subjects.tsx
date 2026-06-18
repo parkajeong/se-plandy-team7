@@ -243,7 +243,10 @@ export default function SubjectsScreen() {
                 <View style={styles.cardTitleRow}>
                   <Text style={styles.subjectTitle}>{item.title}</Text>
                   <TouchableOpacity
-                    onPress={() => setMenuOpenId(menuOpenId === item.id ? null : item.id)}
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      setMenuOpenId(menuOpenId === item.id ? null : item.id);
+                    }}
                     style={styles.menuButton}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
@@ -255,7 +258,8 @@ export default function SubjectsScreen() {
                   <View style={styles.menuDropdown}>
                     <TouchableOpacity
                       style={styles.menuItem}
-                      onPress={() => {
+                      onPress={(event) => {
+                        event.stopPropagation();
                         setMenuOpenId(null);
                         setEditingId(item.id);
                         setEditGoal(item.goal || '');
@@ -267,7 +271,8 @@ export default function SubjectsScreen() {
                     <View style={styles.menuDivider} />
                     <TouchableOpacity
                       style={styles.menuItem}
-                      onPress={() => {
+                      onPress={(event) => {
+                        event.stopPropagation();
                         setMenuOpenId(null);
                         handleDelete(item.id);
                       }}
@@ -284,7 +289,10 @@ export default function SubjectsScreen() {
                 </View>
 
                 {editingId === item.id ? (
-                  <View style={styles.editRow}>
+                  <Pressable
+                    style={styles.editRow}
+                    onPress={(event) => event.stopPropagation()}
+                  >
                     <TextInput
                       style={[styles.input, styles.editInput]}
                       value={editGoal}
@@ -294,17 +302,23 @@ export default function SubjectsScreen() {
                     />
                     <TouchableOpacity
                       style={styles.saveButton}
-                      onPress={() => handleUpdateGoal(item.id)}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        handleUpdateGoal(item.id);
+                      }}
                     >
                       <Text style={styles.saveButtonText}>저장</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.cancelButton}
-                      onPress={() => setEditingId(null)}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        setEditingId(null);
+                      }}
                     >
                       <Text style={styles.cancelButtonText}>취소</Text>
                     </TouchableOpacity>
-                  </View>
+                  </Pressable>
                 ) : (
                   <View style={styles.goalRow}>
                     <Ionicons name="flag-outline" size={14} color="#6B7280" />
