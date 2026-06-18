@@ -20,6 +20,7 @@ export type IncorrectQuestionItem = {
   score: number;
   total_count: number;
   correct_rate: number;
+  solved_at?: unknown;
 };
 
 type Props = {
