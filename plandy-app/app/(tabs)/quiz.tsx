@@ -16,9 +16,7 @@ import {
 
 import { LinearGradient } from "expo-linear-gradient";
 import SubjectDropdown from "@/components/SubjectDropdown";
-import IncorrectQuestionCard, {
-  IncorrectQuestionItem,
-} from "@/components/IncorrectQuestionCard";
+import { IncorrectQuestionItem } from "@/components/IncorrectQuestionCard";
 import { COLORS } from "@/constants/theme";
 import {
   getCurrentAppUserIdOrNull,
@@ -54,12 +52,25 @@ type Quiz = {
   created_at?: any;
 };
 
+type IncorrectNoteGroup = {
+  resultId: string;
+  quizTitle: string;
+  incorrectCount: number;
+  solvedAt?: any;
+};
+
 const QUESTION_COUNT_OPTIONS = [5, 10, 15, 20, 25, 30];
 
 const formatDate = (value: any) => {
-  const date = value?.toDate?.() || (value instanceof Date ? value : null);
+  const convertedValue = value?.toDate?.() || value;
+  const date =
+    convertedValue instanceof Date
+      ? convertedValue
+      : typeof convertedValue === "string" || typeof convertedValue === "number"
+        ? new Date(convertedValue)
+        : null;
 
-  if (!date) return "-";
+  if (!date || Number.isNaN(date.getTime())) return "-";
 
   return date.toLocaleDateString("ko-KR", {
     year: "numeric",
@@ -84,6 +95,32 @@ export default function QuizScreen() {
   const [incorrectNotes, setIncorrectNotes] = useState<IncorrectQuestionItem[]>([]);
   const [isLoadingIncorrectNotes, setIsLoadingIncorrectNotes] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  const incorrectNoteGroups = React.useMemo<IncorrectNoteGroup[]>(() => {
+    const groups = new Map<string, IncorrectNoteGroup>();
+
+    incorrectNotes.forEach((item) => {
+      const resultId = item.result_id;
+
+      if (!resultId) return;
+
+      const existingGroup = groups.get(resultId);
+
+      if (existingGroup) {
+        existingGroup.incorrectCount += 1;
+        return;
+      }
+
+      groups.set(resultId, {
+        resultId,
+        quizTitle: item.quiz_title || "AI 노트 퀴즈",
+        incorrectCount: 1,
+        solvedAt: item.solved_at,
+      });
+    });
+
+    return Array.from(groups.values());
+  }, [incorrectNotes]);
 
   const syncUserId = useCallback(() => {
     const currentUserId = getCurrentAppUserIdOrNull();
@@ -401,8 +438,8 @@ export default function QuizScreen() {
           </TouchableOpacity>
 
           <FlatList
-            data={incorrectNotes}
-            keyExtractor={(item) => item.id}
+            data={incorrectNoteGroups}
+            keyExtractor={(item) => item.resultId}
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               isLoadingIncorrectNotes ? (
@@ -414,16 +451,24 @@ export default function QuizScreen() {
               )
             }
             renderItem={({ item }) => (
-                <Pressable
-                  onPress={() =>
-                    router.push({
-                      pathname: "/incorrect-note/[resultId]",
-                      params: { resultId: item.result_id },
-                    })
-                  }
-                >
-                  <IncorrectQuestionCard item={item} showQuizTitle />
-                </Pressable>
+              <Pressable
+                style={styles.incorrectCard}
+                onPress={() =>
+                  router.push({
+                    pathname: "/incorrect-note/[resultId]",
+                    params: { resultId: item.resultId },
+                  })
+                }
+              >
+                <View style={styles.cardHeader}>
+                  <Text style={styles.quizTitle}>{item.quizTitle}</Text>
+                  <View style={styles.reviewBadge}>
+                    <Text style={styles.reviewBadgeText}>복습 필요</Text>
+                  </View>
+                </View>
+                <Text style={styles.metaText}>오답 {item.incorrectCount}개</Text>
+                <Text style={styles.metaText}>풀이일 {formatDate(item.solvedAt)}</Text>
+              </Pressable>
             )}
           />
         </View>
@@ -623,6 +668,14 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   card: {
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  incorrectCard: {
     backgroundColor: "#fff",
     borderRadius: 8,
     padding: 16,
