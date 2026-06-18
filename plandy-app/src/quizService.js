@@ -10,7 +10,7 @@ import {
   where,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { db, functions } from "./firebase";
+import { auth, db, functions } from "./firebase";
 
 const mapDoc = (snapshot) => ({
   ...snapshot.data(),
@@ -194,6 +194,99 @@ export const generateQuizFromNote = async ({
   const callable = httpsCallable(functions, "generateQuizFromNote");
   const result = await callable({ noteId, userId, subjectId, questionCount });
   return result.data;
+};
+
+export const getIncorrectNotesByCurrentUser = async () => {
+  const uid = auth.currentUser?.uid;
+
+  if (!uid) {
+    throw new Error("getIncorrectNotesByCurrentUser: authenticated user is required");
+  }
+
+  console.log("[incorrect-notes] current UID:", uid);
+
+  const quizResultsQuery = query(
+    collection(db, "quiz_results"),
+    where("user_id", "==", auth.currentUser.uid)
+  );
+  const quizResultsSnapshot = await getDocs(quizResultsQuery);
+  const quizResultsData = quizResultsSnapshot.docs.map(mapDoc);
+
+  const quizIds = [
+    ...new Set(
+      quizResultsData.flatMap((result) =>
+        Array.isArray(result.incorrect_items) && result.incorrect_items.length
+          ? result.incorrect_items
+              .map((item) => item.quiz_id || result.quiz_id)
+              .filter(Boolean)
+          : []
+      )
+    ),
+  ];
+  const quizEntries = await Promise.all(
+    quizIds.map(async (quizId) => {
+      try {
+        const quiz = await fetchQuizById(quizId);
+        return [quizId, quiz];
+      } catch (error) {
+        console.error(
+          `[incorrect-notes] failed to fetch quiz_id: ${quizId}`,
+          error
+        );
+        return [quizId, null];
+      }
+    })
+  );
+  const quizMap = new Map(quizEntries);
+
+  const incorrectNotes = quizResultsData.flatMap((result) => {
+    if (
+      !Array.isArray(result.incorrect_items) ||
+      result.incorrect_items.length === 0
+    ) {
+      return [];
+    }
+
+    return result.incorrect_items.flatMap((incorrectItem, itemIndex) => {
+      const quizId = incorrectItem.quiz_id || result.quiz_id;
+      const quiz = quizMap.get(quizId);
+      const questionIndex = Number(incorrectItem.question_index);
+      const question = Array.isArray(quiz?.questions)
+        ? quiz.questions[questionIndex]
+        : null;
+
+      if (!quiz || !question) {
+        return [];
+      }
+
+      return [{
+        ...incorrectItem,
+        id: `${result.id}-${questionIndex}-${itemIndex}`,
+        result_id: result.id,
+        quiz_id: quizId,
+        quiz_title: quiz.title || "AI 노트 퀴즈",
+        question_index: questionIndex,
+        question,
+        user_answer: Number(incorrectItem.user_answer),
+        is_review_needed: Boolean(incorrectItem.is_review_needed),
+        score: result.score,
+        total_count: result.total_count,
+        correct_rate: result.correct_rate,
+        solved_at: result.updated_at || result.solved_at || null,
+      }];
+    });
+  });
+
+  console.log(
+    "[incorrect-notes] quiz_results count:",
+    quizResultsData.length,
+    "flattened incorrect notes count:",
+    incorrectNotes.length
+  );
+
+  return incorrectNotes.sort(
+    (a, b) => getDateMillis(b.solved_at) - getDateMillis(a.solved_at)
+  );
 };
 
 export const getIncorrectNoteGroupsByUser = async (userId) => {

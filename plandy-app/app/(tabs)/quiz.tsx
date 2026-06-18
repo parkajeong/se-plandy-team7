@@ -16,6 +16,9 @@ import {
 
 import { LinearGradient } from "expo-linear-gradient";
 import SubjectDropdown from "@/components/SubjectDropdown";
+import IncorrectQuestionCard, {
+  IncorrectQuestionItem,
+} from "@/components/IncorrectQuestionCard";
 import { COLORS } from "@/constants/theme";
 import {
   getCurrentAppUserIdOrNull,
@@ -26,7 +29,7 @@ import {
   deleteQuiz,
   fetchNotesBySubject,
   fetchQuizzesBySubject,
-  getIncorrectNoteGroupsByUser,
+  getIncorrectNotesByCurrentUser,
   getQuizErrorMessage,
 } from "@/src/quizService";
 import { getSubjects } from "@/src/subjectService";
@@ -49,20 +52,6 @@ type Quiz = {
   questions?: unknown[];
   question_count?: number;
   created_at?: any;
-};
-
-type IncorrectNoteItem = {
-  question_index: number;
-  is_review_needed: boolean;
-};
-
-type IncorrectNoteGroup = {
-  result_id?: string;
-  quiz_id: string;
-  quiz_title: string;
-  solved_at: string;
-  incorrect_count: number;
-  items: IncorrectNoteItem[];
 };
 
 const QUESTION_COUNT_OPTIONS = [5, 10, 15, 20, 25, 30];
@@ -92,7 +81,7 @@ export default function QuizScreen() {
   const [noteLoadError, setNoteLoadError] = useState<string | null>(null);
   const [quizLoadError, setQuizLoadError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<"list" | "incorrect">("list");
-  const [incorrectNoteGroups, setIncorrectNoteGroups] = useState<IncorrectNoteGroup[]>([]);
+  const [incorrectNotes, setIncorrectNotes] = useState<IncorrectQuestionItem[]>([]);
   const [isLoadingIncorrectNotes, setIsLoadingIncorrectNotes] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
@@ -163,24 +152,24 @@ export default function QuizScreen() {
     [selectedSubject, userId]
   );
 
-  const fetchIncorrectNoteGroups = useCallback(async () => {
-    if (!userId) {
+  const fetchIncorrectNotes = useCallback(async () => {
+    if (!auth.currentUser?.uid) {
       Alert.alert("오류", "로그인 후 오답노트를 조회할 수 있습니다.");
       return;
     }
 
     try {
       setIsLoadingIncorrectNotes(true);
-      const groups = (await getIncorrectNoteGroupsByUser(userId)) as IncorrectNoteGroup[];
-      setIncorrectNoteGroups(groups);
+      const notes = (await getIncorrectNotesByCurrentUser()) as IncorrectQuestionItem[];
+      setIncorrectNotes(notes);
     } catch (error) {
       void error;
       Alert.alert("오류", "오답노트 조회 실패");
-      setIncorrectNoteGroups([]);
+      setIncorrectNotes([]);
     } finally {
       setIsLoadingIncorrectNotes(false);
     }
-  }, [userId]);
+  }, []);
 
   useEffect(() => {
     const unsubscribeFirebase = onAuthStateChanged(auth, syncUserId);
@@ -215,7 +204,7 @@ export default function QuizScreen() {
   const handleSelectTab = (tab: "list" | "incorrect") => {
     setSelectedTab(tab);
     if (tab === "incorrect") {
-      fetchIncorrectNoteGroups();
+      fetchIncorrectNotes();
     }
   };
 
@@ -403,7 +392,7 @@ export default function QuizScreen() {
         <View style={styles.incorrectContainer}>
           <TouchableOpacity
             style={[styles.refreshButton, !userId && styles.disabledButton]}
-            onPress={fetchIncorrectNoteGroups}
+            onPress={fetchIncorrectNotes}
             disabled={!userId}
           >
             <Text style={styles.refreshButtonText}>
@@ -412,10 +401,8 @@ export default function QuizScreen() {
           </TouchableOpacity>
 
           <FlatList
-            data={incorrectNoteGroups}
-            keyExtractor={(group, index) =>
-              `${group.result_id || group.quiz_id}-${group.solved_at || index}`
-            }
+            data={incorrectNotes}
+            keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               isLoadingIncorrectNotes ? (
@@ -426,35 +413,18 @@ export default function QuizScreen() {
                 </Text>
               )
             }
-            renderItem={({ item }) => {
-              const hasReviewNeeded = item.items.some(
-                (incorrect) => incorrect.is_review_needed === true
-              );
-
-              return (
+            renderItem={({ item }) => (
                 <Pressable
-                  style={styles.card}
                   onPress={() =>
                     router.push({
                       pathname: "/incorrect-note/[resultId]",
-                      params: { resultId: item.result_id || item.quiz_id },
+                      params: { resultId: item.result_id },
                     })
                   }
                 >
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.quizTitle}>{item.quiz_title}</Text>
-                    {hasReviewNeeded && (
-                      <View style={styles.reviewBadge}>
-                        <Text style={styles.reviewBadgeText}>복습 필요</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.metaText}>
-                    오답 {item.incorrect_count}개 · {item.solved_at}
-                  </Text>
+                  <IncorrectQuestionCard item={item} showQuizTitle />
                 </Pressable>
-              );
-            }}
+            )}
           />
         </View>
       )}

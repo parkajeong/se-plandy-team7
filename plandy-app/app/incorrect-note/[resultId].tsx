@@ -10,39 +10,15 @@ import {
   View,
 } from "react-native";
 
-import { getCurrentAppUserIdOrNull } from "@/src/appSession";
-import { getIncorrectNoteGroupsByUser } from "@/src/quizService";
+import { getIncorrectNotesByCurrentUser } from "@/src/quizService";
+import { auth } from "@/src/firebase";
 import { COLORS } from "@/constants/theme";
-
-type IncorrectNoteItem = {
-  question_index: number;
-  question: string;
-  user_answer_index: number;
-  user_answer_text: string;
-  correct_answer_index: number;
-  correct_answer_text: string;
-  explanation: string;
-  is_review_needed: boolean;
-};
-
-type IncorrectNoteGroup = {
-  result_id?: string;
-  quiz_id: string;
-  quiz_title: string;
-  solved_at: string;
-  incorrect_count: number;
-  items: IncorrectNoteItem[];
-};
+import IncorrectQuestionCard, {
+  IncorrectQuestionItem,
+} from "@/components/IncorrectQuestionCard";
 
 const getParam = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value;
-
-const CIRCLED_NUMBERS = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"];
-
-const getCircledNumber = (index: number) =>
-  index >= 0 && index < CIRCLED_NUMBERS.length
-    ? CIRCLED_NUMBERS[index]
-    : `${index + 1}.`;
 
 export const unstable_settings = {
   title: "오답노트",
@@ -53,14 +29,12 @@ export default function IncorrectNoteDetailScreen() {
   const params = useLocalSearchParams();
   const resultId = getParam(params.resultId);
 
-  const [group, setGroup] = useState<IncorrectNoteGroup | null>(null);
+  const [items, setItems] = useState<IncorrectQuestionItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
   const loadGroup = useCallback(async () => {
-    const userId = getCurrentAppUserIdOrNull();
-
-    if (!userId) {
+    if (!auth.currentUser?.uid) {
       setErrorMessage("로그인 후 오답노트를 조회할 수 있습니다.");
       setIsLoading(false);
       return;
@@ -68,20 +42,16 @@ export default function IncorrectNoteDetailScreen() {
 
     try {
       setIsLoading(true);
-      const groups = (await getIncorrectNoteGroupsByUser(
-        userId
-      )) as IncorrectNoteGroup[];
-      const matched = groups.find(
-        (item) => item.result_id === resultId || item.quiz_id === resultId
-      );
+      const notes = (await getIncorrectNotesByCurrentUser()) as IncorrectQuestionItem[];
+      const matched = notes.filter((item) => item.result_id === resultId);
 
-      if (!matched) {
+      if (!matched.length) {
         setErrorMessage("오답노트를 찾을 수 없습니다.");
-        setGroup(null);
+        setItems([]);
         return;
       }
 
-      setGroup(matched);
+      setItems(matched);
       setErrorMessage("");
     } catch (error) {
       void error;
@@ -96,10 +66,10 @@ export default function IncorrectNoteDetailScreen() {
   }, [loadGroup]);
 
   useLayoutEffect(() => {
-    if (group?.quiz_title) {
-      navigation.setOptions({ title: group.quiz_title });
+    if (items[0]?.quiz_title) {
+      navigation.setOptions({ title: items[0].quiz_title });
     }
-  }, [navigation, group?.quiz_title]);
+  }, [navigation, items]);
 
   if (isLoading) {
     return (
@@ -110,7 +80,7 @@ export default function IncorrectNoteDetailScreen() {
     );
   }
 
-  if (errorMessage || !group) {
+  if (errorMessage || !items.length) {
     return (
       <View style={styles.centerContainer}>
         <Ionicons name="alert-circle-outline" size={42} color="#EF4444" />
@@ -125,57 +95,14 @@ export default function IncorrectNoteDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{group.quiz_title}</Text>
-      <Text style={styles.summary}>
-        오답 {group.incorrect_count}개 · {group.solved_at}
-      </Text>
+      <Text style={styles.title}>{items[0].quiz_title || "오답노트"}</Text>
+      <Text style={styles.summary}>오답 {items.length}개</Text>
 
       <FlatList
-        data={group.items}
-        keyExtractor={(item, index) =>
-          `${group.quiz_id}-${item.question_index}-${index}`
-        }
+        data={items}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => (
-          <View style={styles.questionCard}>
-            <View style={styles.questionHeader}>
-              <Text style={styles.questionLabel}>
-                Q{item.question_index + 1}.
-              </Text>
-              {item.is_review_needed && (
-                <View style={styles.reviewBadge}>
-                  <Text style={styles.reviewBadgeText}>복습 필요</Text>
-                </View>
-              )}
-            </View>
-
-            <Text style={styles.questionText}>{item.question}</Text>
-
-            <View style={styles.answerSection}>
-              <Text style={styles.answerRow}>
-                <Text style={styles.answerLabel}>내 답: </Text>
-                <Text style={styles.wrongAnswerText}>
-                  {getCircledNumber(item.user_answer_index)} {item.user_answer_text}
-                </Text>
-              </Text>
-              <Text style={styles.answerRow}>
-                <Text style={styles.answerLabel}>정답: </Text>
-                <Text style={styles.correctAnswerText}>
-                  {getCircledNumber(item.correct_answer_index)}{" "}
-                  {item.correct_answer_text}
-                </Text>
-              </Text>
-            </View>
-
-            {item.explanation ? (
-              <View style={styles.explanationSection}>
-                <Text style={styles.explanationText}>
-                  해설: {item.explanation}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        )}
+        renderItem={({ item }) => <IncorrectQuestionCard item={item} />}
       />
     </View>
   );

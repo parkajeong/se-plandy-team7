@@ -10,7 +10,11 @@ jest.mock('firebase/firestore', () => ({
   deleteDoc: jest.fn(),
 }));
 
-jest.mock('../src/firebase', () => ({ db: {}, functions: {} }));
+jest.mock('../src/firebase', () => ({
+  auth: { currentUser: { uid: 'u1' } },
+  db: {},
+  functions: {},
+}));
 
 const service = require('../src/quizService');
 const firestore = require('firebase/firestore');
@@ -80,5 +84,98 @@ describe('quizService', () => {
     expect(Array.isArray(groups)).toBe(true);
     // groups should contain only entries with existing quiz and incorrect items mapped
     expect(groups.length).toBeLessThanOrEqual(quizResults.length);
+  });
+
+  test('getIncorrectNotesByCurrentUser queries quiz_results by auth UID and flattens incorrect_items', async () => {
+    const quizResults = [
+      {
+        id: 'res1',
+        quiz_id: 'q1',
+        score: 3,
+        total_count: 5,
+        correct_rate: 60,
+        incorrect_items: [
+          { question_index: 1, user_answer: 2, is_review_needed: true },
+          { question_index: 4, user_answer: 0 },
+        ],
+      },
+      {
+        id: 'res2',
+        quiz_id: 'q2',
+        score: 5,
+        total_count: 5,
+        incorrect_items: [],
+      },
+      {
+        id: 'res3',
+        quiz_id: 'q3',
+        score: 4,
+        total_count: 5,
+      },
+    ];
+
+    firestore.getDocs.mockResolvedValueOnce({
+      docs: quizResults.map((result) => ({
+        id: result.id,
+        data: () => result,
+      })),
+    });
+    firestore.getDoc = jest.fn().mockResolvedValue({
+      exists: () => true,
+      id: 'q1',
+      data: () => ({
+        title: 'Quiz 1',
+        questions: [
+          { question: 'Q1', options: ['a', 'b'], answer: 0 },
+          { question: 'Q2', options: ['a', 'b', 'c'], answer: 1, explanation: 'exp' },
+          { question: 'Q3', options: ['a'], answer: 0 },
+          { question: 'Q4', options: ['a'], answer: 0 },
+          { question: 'Q5', options: ['a', 'b'], answer: 1 },
+        ],
+      }),
+    });
+
+    const notes = await service.getIncorrectNotesByCurrentUser();
+
+    expect(firestore.where).toHaveBeenCalledWith('user_id', '==', 'u1');
+    expect(notes).toHaveLength(2);
+    expect(notes[0]).toEqual(expect.objectContaining({
+      result_id: 'res1',
+      quiz_id: 'q1',
+      question_index: 1,
+      user_answer: 2,
+      is_review_needed: true,
+      score: 3,
+      total_count: 5,
+      correct_rate: 60,
+      question: expect.objectContaining({
+        question: 'Q2',
+        answer: 1,
+      }),
+    }));
+  });
+
+  test('getIncorrectNotesByCurrentUser logs the quiz_id and continues when quiz lookup is denied', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    firestore.getDocs.mockResolvedValueOnce({
+      docs: [{
+        id: 'res-denied',
+        data: () => ({
+          quiz_id: 'quiz-denied',
+          incorrect_items: [{ question_index: 0, user_answer: 1 }],
+        }),
+      }],
+    });
+    firestore.getDoc = jest.fn().mockRejectedValue(
+      new Error('Missing or insufficient permissions')
+    );
+
+    await expect(service.getIncorrectNotesByCurrentUser()).resolves.toEqual([]);
+    expect(consoleError).toHaveBeenCalledWith(
+      '[incorrect-notes] failed to fetch quiz_id: quiz-denied',
+      expect.any(Error)
+    );
+
+    consoleError.mockRestore();
   });
 });

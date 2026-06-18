@@ -28,34 +28,17 @@ import { getSubjects } from "@/src/subjectService";
 import { COLORS } from "@/constants/theme";
 import { auth, db } from "@/src/firebase";
 import { getAppUser, subscribeAppUserChange } from "../../src/appSession";
-import { getIncorrectNoteGroupsByUser } from "@/src/quizService";
+import { getIncorrectNotesByCurrentUser } from "@/src/quizService";
 import SubjectDropdown from "../../components/SubjectDropdown";
+import IncorrectQuestionCard, {
+  IncorrectQuestionItem,
+} from "@/components/IncorrectQuestionCard";
 
 type Subject = {
   id: string;
   title: string;
   goal?: string;
   progress?: number;
-};
-
-type IncorrectNoteItem = {
-  question_index: number;
-  question: string;
-  user_answer_index: number;
-  user_answer_text: string;
-  correct_answer_index: number;
-  correct_answer_text: string;
-  explanation: string;
-  is_review_needed: boolean;
-};
-
-type IncorrectNoteGroup = {
-  result_id?: string;
-  quiz_id: string;
-  quiz_title: string;
-  solved_at: string;
-  incorrect_count: number;
-  items: IncorrectNoteItem[];
 };
 
 export default function NoteScreen() {
@@ -72,7 +55,7 @@ export default function NoteScreen() {
   const [content, setContent] = useState("");
 
   const [notes, setNotes] = useState<any[]>([]);
-  const [incorrectNoteGroups, setIncorrectNoteGroups] = useState<IncorrectNoteGroup[]>([]);
+  const [incorrectNotes, setIncorrectNotes] = useState<IncorrectQuestionItem[]>([]);
   const [isLoadingIncorrectNotes, setIsLoadingIncorrectNotes] = useState(false);
 
   const [isCreateNoteModalVisible, setIsCreateNoteModalVisible] = useState(false);
@@ -216,20 +199,20 @@ export default function NoteScreen() {
     }, [fetchSubjects, syncUserId])
   );
 
-  const fetchIncorrectNoteGroups = async () => {
-    if (!userId) {
+  const fetchIncorrectNotes = async () => {
+    if (!auth.currentUser?.uid) {
       Alert.alert("오류", "로그인 후 오답노트를 조회할 수 있습니다.");
       return;
     }
 
     try {
       setIsLoadingIncorrectNotes(true);
-      const groups = (await getIncorrectNoteGroupsByUser(userId)) as IncorrectNoteGroup[];
-      setIncorrectNoteGroups(groups);
+      const notes = (await getIncorrectNotesByCurrentUser()) as IncorrectQuestionItem[];
+      setIncorrectNotes(notes);
     } catch (error) {
       void error;
       Alert.alert("오류", "오답노트 조회 실패");
-      setIncorrectNoteGroups([]);
+      setIncorrectNotes([]);
     } finally {
       setIsLoadingIncorrectNotes(false);
     }
@@ -437,7 +420,7 @@ export default function NoteScreen() {
               ]}
               onPress={() => {
                 setSearchTab("incorrect");
-                fetchIncorrectNoteGroups();
+                fetchIncorrectNotes();
               }}
             >
               <Text
@@ -526,7 +509,7 @@ export default function NoteScreen() {
                   styles.searchButton,
                   !userId && styles.disabledButton,
                 ]}
-                onPress={fetchIncorrectNoteGroups}
+                onPress={fetchIncorrectNotes}
                 disabled={!userId}
               >
                 <Text style={styles.buttonText}>
@@ -535,10 +518,8 @@ export default function NoteScreen() {
               </TouchableOpacity>
 
               <FlatList
-                data={incorrectNoteGroups}
-                keyExtractor={(group, index) =>
-                  `${group.result_id || group.quiz_id}-${group.solved_at || index}`
-                }
+                data={incorrectNotes}
+                keyExtractor={(item) => item.id}
                 ListEmptyComponent={
                   isLoadingIncorrectNotes ? (
                     <Text style={styles.emptyText}>오답노트를 불러오는 중...</Text>
@@ -553,36 +534,19 @@ export default function NoteScreen() {
                     </View>
                   )
                 }
-                renderItem={({ item }) => {
-                  const hasReviewNeeded = item.items.some(
-                    (incorrect) => incorrect.is_review_needed === true
-                  );
-
-                  return (
+                renderItem={({ item }) => (
                     <TouchableOpacity
-                      style={styles.cardContainer}
                       activeOpacity={0.8}
                       onPress={() =>
                         router.push({
                           pathname: "/incorrect-note/[resultId]",
-                          params: { resultId: item.result_id || item.quiz_id },
+                          params: { resultId: item.result_id },
                         })
                       }
                     >
-                      <View style={styles.cardHeaderRow}>
-                        <Text style={styles.quizTitle}>{item.quiz_title}</Text>
-                        {hasReviewNeeded && (
-                          <View style={styles.reviewBadge}>
-                            <Text style={styles.reviewBadgeText}>복습 필요</Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.incorrectCount}>
-                        오답 {item.incorrect_count}개 · {item.solved_at}
-                      </Text>
+                      <IncorrectQuestionCard item={item} showQuizTitle />
                     </TouchableOpacity>
-                  );
-                }}
+                )}
               />
             </View>
           )}
