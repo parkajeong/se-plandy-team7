@@ -1,4 +1,6 @@
 import { router } from "expo-router";
+import { getAuth, signOut } from "firebase/auth";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,30 +16,28 @@ import {
 } from "react-native";
 
 import {
-  authenticateWithPasswordForWithdraw,
-  clearLocalSession,
-  getWithdrawAccountErrorMessage,
-  withdrawExternalAppAccount,
-  withdrawFirebaseAuthAccount,
-} from "../src/accountService";
-import {
   loginWithGoogle,
   loginWithIdOrEmail,
   loginWithKakao,
-  signInWithGoogleOnly,
-  signInWithKakaoOnly,
   signUpWithEmail,
 } from "../src/authService";
-import { beginAppLogout } from "../src/appSession";
+import {
+  beginAccountDeletionAuth,
+  beginAppLogout,
+  finishAccountDeletionAuth,
+} from "../src/appSession";
+import { app } from "../src/firebase";
 import { COLORS } from "@/constants/theme";
 
 const MAIN_ROUTE = "/(tabs)/subjects";
 const DANGER_RED = "#EF4444";
 
 export default function HomeScreen() {
+  const [authMode, setAuthMode] = useState<"login" | "delete">("login");
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [isKakaoLoginLoading, setIsKakaoLoginLoading] = useState(false);
   const kakaoLoginInProgressRef = useRef(false);
+  const accountDeletionInProgressRef = useRef(false);
 
   const [idOrEmail, setIdOrEmail] = useState("");
   const [email, setEmail] = useState("");
@@ -45,13 +45,9 @@ export default function HomeScreen() {
   const [nickname, setNickname] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [isWithdrawModalVisible, setIsWithdrawModalVisible] = useState(false);
-  const [withdrawIdOrEmail, setWithdrawIdOrEmail] = useState("");
-  const [withdrawPassword, setWithdrawPassword] = useState("");
-  const [isWithdrawing, setIsWithdrawing] = useState(false);
-  const [withdrawProvider, setWithdrawProvider] = useState<
-    "password" | "google" | "kakao" | null
-  >(null);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  const isDeleteMode = authMode === "delete";
 
   const showAlert = (title: string, message: string) => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -63,6 +59,10 @@ export default function HomeScreen() {
   };
 
   const handleSignUp = async () => {
+    if (isDeletingAccount) {
+      return;
+    }
+
     if (!email || !password || !nickname || !loginId) {
       Alert.alert("입력 오류", "아이디, 이메일, 비밀번호, 닉네임을 모두 입력해주세요.");
       return;
@@ -82,9 +82,78 @@ export default function HomeScreen() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleDeleteAfterAuth = async (authenticatedUser: any) => {
+    if (accountDeletionInProgressRef.current) {
+      return false;
+    }
+
+    const auth = getAuth(app);
+    const user = auth.currentUser;
+
+    console.log(
+      "[deleteAccount] current user:",
+      user?.uid || authenticatedUser?.uid
+    );
+
+    if (!user) {
+      showAlert(
+        "회원 탈퇴 인증",
+        "계정 탈퇴를 위해 다시 로그인해 주세요."
+      );
+      return false;
+    }
+
     try {
-      await loginWithGoogle();
+      const functions = getFunctions(app, "us-central1");
+      const callable = httpsCallable(functions, "deleteCurrentAccount");
+
+      accountDeletionInProgressRef.current = true;
+      setIsDeletingAccount(true);
+      console.log("[deleteAccount] callable start");
+      const result = await callable();
+      console.log("[deleteAccount] callable success:", result.data);
+
+      try {
+        await signOut(auth);
+      } catch (signOutError) {
+        console.warn("[deleteAccount] signOut failed:", signOutError);
+      }
+
+      beginAppLogout();
+      finishAccountDeletionAuth();
+      setAuthMode("login");
+      setIdOrEmail("");
+      setPassword("");
+      router.replace("/");
+      showAlert("회원 탈퇴 완료", "회원 탈퇴가 완료되었습니다.");
+      return true;
+    } catch (error: any) {
+      console.error("[deleteAccount] failed:", error);
+      const errorCode = error?.code || "unknown";
+      const errorMessage = error?.message || String(error);
+      showAlert(
+        "회원 탈퇴 실패",
+        `code: ${errorCode}\nmessage: ${errorMessage}`
+      );
+      return false;
+    } finally {
+      accountDeletionInProgressRef.current = false;
+      setIsDeletingAccount(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    if (isDeletingAccount) {
+      return;
+    }
+
+    try {
+      const user = await loginWithGoogle();
+
+      if (isDeleteMode) {
+        await handleDeleteAfterAuth(user);
+        return;
+      }
       Alert.alert("Google 로그인 성공");
       router.replace(MAIN_ROUTE);
     } catch (error: any) {
@@ -93,14 +162,19 @@ export default function HomeScreen() {
   };
 
   const handleKakaoLogin = async () => {
-    if (kakaoLoginInProgressRef.current) {
+    if (isDeletingAccount || kakaoLoginInProgressRef.current) {
       return;
     }
 
     try {
       kakaoLoginInProgressRef.current = true;
       setIsKakaoLoginLoading(true);
-      await loginWithKakao();
+      const user = await loginWithKakao();
+
+      if (isDeleteMode) {
+        await handleDeleteAfterAuth(user);
+        return;
+      }
       Alert.alert("카카오 로그인 성공");
       router.replace(MAIN_ROUTE);
     } catch (error: any) {
@@ -113,13 +187,22 @@ export default function HomeScreen() {
   };
 
   const handleLogin = async () => {
+    if (isDeletingAccount) {
+      return;
+    }
+
     if (!idOrEmail || !password) {
       Alert.alert("입력 오류", "아이디 또는 이메일과 비밀번호를 입력해주세요.");
       return;
     }
 
     try {
-      await loginWithIdOrEmail(idOrEmail, password);
+      const user = await loginWithIdOrEmail(idOrEmail, password);
+
+      if (isDeleteMode) {
+        await handleDeleteAfterAuth(user);
+        return;
+      }
       Alert.alert("로그인 성공");
       router.replace(MAIN_ROUTE);
     } catch (error: any) {
@@ -127,175 +210,22 @@ export default function HomeScreen() {
     }
   };
 
-  const openWithdrawModal = () => {
-    setWithdrawIdOrEmail("");
-    setWithdrawPassword("");
-    setIsWithdrawModalVisible(true);
-  };
-
-  const handleOpenWithdrawAccount = () => {
-    const message =
-      "회원 탈퇴를 위해 계정 인증이 필요합니다.\n탈퇴 시 계정 정보와 관련 데이터가 삭제되며 복구가 어려울 수 있습니다.";
-
-    if (Platform.OS === "web" && typeof window !== "undefined") {
-      if (window.confirm(message)) {
-        openWithdrawModal();
-      }
+  const handleDeleteMode = () => {
+    if (isDeletingAccount) {
       return;
     }
 
-    Alert.alert("회원 탈퇴", message, [
-      { text: "취소", style: "cancel" },
-      {
-        text: "계정 인증",
-        style: "destructive",
-        onPress: openWithdrawModal,
-      },
-    ]);
-  };
+    const nextMode = isDeleteMode ? "login" : "delete";
 
-  const confirmWithdraw = (onConfirm: () => Promise<void>) => {
-    const message =
-      "회원 탈퇴 시 계정 정보와 관련 데이터가 삭제되며 복구가 어려울 수 있습니다. 정말 탈퇴하시겠습니까?";
-
-    if (Platform.OS === "web" && typeof window !== "undefined") {
-      return window.confirm(message) ? onConfirm() : Promise.resolve();
-    }
-
-    return new Promise<void>((resolve) => {
-      Alert.alert("회원 탈퇴", message, [
-        {
-          text: "취소",
-          style: "cancel",
-          onPress: () => resolve(),
-        },
-        {
-          text: "탈퇴 진행",
-          style: "destructive",
-          onPress: () => {
-            void onConfirm().finally(resolve);
-          },
-        },
-      ]);
-    });
-  };
-
-  const resetWithdrawState = () => {
-    setIsWithdrawModalVisible(false);
-    setWithdrawIdOrEmail("");
-    setWithdrawPassword("");
+    setAuthMode(nextMode);
+    setIsSignUpMode(false);
     setPassword("");
-  };
 
-  const handleWithdrawWithPassword = async () => {
-    if (isWithdrawing) {
-      return;
-    }
-
-    if (!withdrawIdOrEmail.trim() || !withdrawPassword) {
-      showAlert("입력 오류", "아이디 또는 이메일과 비밀번호를 입력해주세요.");
-      return;
-    }
-
-    try {
-      setIsWithdrawing(true);
-      setWithdrawProvider("password");
-      const user = await authenticateWithPasswordForWithdraw({
-        idOrEmail: withdrawIdOrEmail,
-        password: withdrawPassword,
-      });
-
-      await confirmWithdraw(async () => {
-        try {
-          await withdrawFirebaseAuthAccount(user);
-
-          resetWithdrawState();
-          showAlert("회원 탈퇴 완료", "회원 탈퇴가 완료되었습니다.");
-        } catch (error: any) {
-          showAlert("회원 탈퇴 실패", getWithdrawAccountErrorMessage(error));
-        }
-      });
-    } catch (error: any) {
-      showAlert("회원 탈퇴 실패", getWithdrawAccountErrorMessage(error));
-    } finally {
-      await clearLocalSession();
-      setIsWithdrawing(false);
-      setWithdrawProvider(null);
-    }
-  };
-
-  const handleWithdrawWithGoogle = async () => {
-    if (isWithdrawing) {
-      return;
-    }
-
-    try {
-      setIsWithdrawing(true);
-      setWithdrawProvider("google");
-      let googleUser;
-
-      try {
-        beginAppLogout();
-        googleUser = await signInWithGoogleOnly({ cancelLogout: false });
-      } catch (error) {
-        void error;
-        showAlert("회원 탈퇴 실패", "Google 인증에 실패했습니다. 다시 시도해주세요.");
-        return;
-      }
-
-      await confirmWithdraw(async () => {
-        try {
-          await withdrawFirebaseAuthAccount(googleUser);
-          resetWithdrawState();
-          showAlert("회원 탈퇴 완료", "회원 탈퇴가 완료되었습니다.");
-        } catch (error: any) {
-          showAlert("회원 탈퇴 실패", getWithdrawAccountErrorMessage(error));
-        }
-      });
-    } finally {
-      await clearLocalSession();
-      setIsWithdrawing(false);
-      setWithdrawProvider(null);
-    }
-  };
-
-  const handleWithdrawWithKakao = async () => {
-    if (isWithdrawing || kakaoLoginInProgressRef.current) {
-      return;
-    }
-
-    try {
-      setIsWithdrawing(true);
-      setWithdrawProvider("kakao");
-      kakaoLoginInProgressRef.current = true;
-      let kakaoUser;
-
-      try {
-        beginAppLogout();
-        kakaoUser = await signInWithKakaoOnly({
-          cancelLogout: false,
-          persistAppUser: false,
-        });
-      } catch (error) {
-        void error;
-        showAlert("회원 탈퇴 실패", "카카오 인증에 실패했습니다. 다시 시도해주세요.");
-        return;
-      }
-
-      await confirmWithdraw(async () => {
-        try {
-          await withdrawExternalAppAccount(kakaoUser);
-          resetWithdrawState();
-          showAlert("회원 탈퇴 완료", "회원 탈퇴가 완료되었습니다.");
-        } catch (error: any) {
-          showAlert("회원 탈퇴 실패", getWithdrawAccountErrorMessage(error));
-        }
-      });
-    } finally {
-      kakaoLoginInProgressRef.current = false;
-      await clearLocalSession();
-      setIsWithdrawing(false);
-      setWithdrawProvider(null);
+    if (nextMode === "delete") {
+      beginAccountDeletionAuth();
+      console.log("[deleteAccount] mode enabled");
+    } else {
+      finishAccountDeletionAuth();
     }
   };
 
@@ -306,7 +236,13 @@ export default function HomeScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.authPanel}>
-      <Text style={styles.title}>{isSignUpMode ? "회원가입" : "로그인"}</Text>
+      <Text style={styles.title}>
+        {isSignUpMode
+          ? "회원가입"
+          : isDeleteMode
+            ? "회원 탈퇴 인증"
+            : "로그인"}
+      </Text>
 
       {isSignUpMode ? (
         <>
@@ -370,12 +306,28 @@ export default function HomeScreen() {
       )}
 
       {isSignUpMode ? (
-        <Pressable style={styles.primaryButton} onPress={handleSignUp}>
+        <Pressable
+          disabled={isDeletingAccount}
+          style={[
+            styles.primaryButton,
+            isDeletingAccount && styles.disabledButton,
+          ]}
+          onPress={handleSignUp}
+        >
           <Text style={styles.primaryButtonText}>회원가입</Text>
         </Pressable>
       ) : (
-        <Pressable style={styles.primaryButton} onPress={handleLogin}>
-          <Text style={styles.primaryButtonText}>로그인</Text>
+        <Pressable
+          disabled={isDeletingAccount}
+          style={[
+            styles.primaryButton,
+            isDeletingAccount && styles.disabledButton,
+          ]}
+          onPress={handleLogin}
+        >
+          <Text style={styles.primaryButtonText}>
+            {isDeleteMode ? "인증 후 탈퇴" : "로그인"}
+          </Text>
         </Pressable>
       )}
 
@@ -383,19 +335,33 @@ export default function HomeScreen() {
         <>
           <View style={styles.divider} />
           <View style={styles.buttonGrid}>
-            <Pressable style={styles.gridPrimaryButton} onPress={handleGoogleLogin}>
-              <Text style={styles.primaryButtonText}>Google로 로그인</Text>
+            <Pressable
+              disabled={isDeletingAccount}
+              style={[
+                styles.gridPrimaryButton,
+                isDeletingAccount && styles.disabledButton,
+              ]}
+              onPress={handleGoogleLogin}
+            >
+              <Text style={styles.primaryButtonText}>
+                {isDeleteMode ? "Google 인증 후 탈퇴" : "Google로 로그인"}
+              </Text>
             </Pressable>
             <Pressable
               style={[
                 styles.gridPrimaryButton,
-                isKakaoLoginLoading && styles.disabledButton,
+                (isKakaoLoginLoading || isDeletingAccount) &&
+                  styles.disabledButton,
               ]}
               onPress={handleKakaoLogin}
-              disabled={isKakaoLoginLoading}
+              disabled={isKakaoLoginLoading || isDeletingAccount}
             >
               <Text style={styles.primaryButtonText}>
-                {isKakaoLoginLoading ? "카카오 로그인 중..." : "카카오로 로그인"}
+                {isKakaoLoginLoading
+                  ? "카카오 로그인 중..."
+                  : isDeleteMode
+                    ? "카카오 인증 후 탈퇴"
+                    : "카카오로 로그인"}
               </Text>
             </Pressable>
           </View>
@@ -406,9 +372,15 @@ export default function HomeScreen() {
 
       <View style={styles.buttonGrid}>
         <Pressable
-          style={styles.gridSecondaryButton}
+          disabled={isDeletingAccount}
+          style={[
+            styles.gridSecondaryButton,
+            isDeletingAccount && styles.disabledButton,
+          ]}
           onPress={() => {
             setIsSignUpMode(!isSignUpMode);
+            setAuthMode("login");
+            finishAccountDeletionAuth();
             setPassword("");
           }}
         >
@@ -419,101 +391,35 @@ export default function HomeScreen() {
 
         {!isSignUpMode && (
           <Pressable
-            style={styles.gridSecondaryButton}
-            onPress={handleOpenWithdrawAccount}
+            disabled={isDeletingAccount}
+            style={[
+              styles.gridSecondaryButton,
+              isDeletingAccount && styles.disabledButton,
+            ]}
+            onPress={handleDeleteMode}
           >
-            <Text style={styles.secondaryButtonText}>회원 탈퇴</Text>
+            <Text style={styles.secondaryButtonText}>
+              {isDeleteMode ? "탈퇴 인증 취소" : "회원 탈퇴"}
+            </Text>
           </Pressable>
         )}
       </View>
       </View>
 
       <Modal
-        visible={isWithdrawModalVisible}
+        visible={isDeletingAccount}
         transparent
         animationType="fade"
-        onRequestClose={() => {
-          if (!isWithdrawing) {
-            setIsWithdrawModalVisible(false);
-          }
-        }}
+        statusBarTranslucent
+        onRequestClose={() => {}}
       >
-        <View style={styles.modalBackground}>
-          <View style={styles.withdrawModal}>
-            <Text style={styles.withdrawTitle}>회원 탈퇴</Text>
-            <Text style={styles.withdrawDescription}>
-              이메일/비밀번호 계정은 아이디 또는 이메일과 비밀번호를 입력해주세요. Google/Kakao 계정은 아래 버튼으로 다시 인증 후 탈퇴할 수 있습니다.
+        <View style={styles.deletingOverlay}>
+          <View style={styles.deletingCard}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.deletingTitle}>회원 탈퇴 중입니다</Text>
+            <Text style={styles.deletingDescription}>
+              계정과 학습 데이터를 삭제하고 있습니다. 잠시만 기다려주세요.
             </Text>
-
-            <TextInput
-              placeholder="아이디 또는 이메일"
-              value={withdrawIdOrEmail}
-              onChangeText={setWithdrawIdOrEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              editable={!isWithdrawing}
-              style={styles.input}
-            />
-
-            <TextInput
-              placeholder="비밀번호"
-              value={withdrawPassword}
-              onChangeText={setWithdrawPassword}
-              secureTextEntry
-              editable={!isWithdrawing}
-              style={styles.input}
-            />
-
-            <Pressable
-              disabled={isWithdrawing}
-              style={[
-                styles.withdrawConfirmButton,
-                isWithdrawing && styles.disabledButton,
-              ]}
-              onPress={handleWithdrawWithPassword}
-            >
-              {isWithdrawing && withdrawProvider === "password" ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <Text style={styles.withdrawConfirmButtonText}>탈퇴 진행</Text>
-              )}
-            </Pressable>
-
-            <Pressable
-              disabled={isWithdrawing}
-              style={[styles.withdrawProviderButton, isWithdrawing && styles.disabledButton]}
-              onPress={handleWithdrawWithGoogle}
-            >
-              {isWithdrawing && withdrawProvider === "google" ? (
-                <ActivityIndicator size="small" color="#6B7280" />
-              ) : (
-                <Text style={styles.withdrawProviderButtonText}>
-                  Google 계정으로 탈퇴
-                </Text>
-              )}
-            </Pressable>
-
-            <Pressable
-              disabled={isWithdrawing}
-              style={[styles.withdrawProviderButton, isWithdrawing && styles.disabledButton]}
-              onPress={handleWithdrawWithKakao}
-            >
-              {isWithdrawing && withdrawProvider === "kakao" ? (
-                <ActivityIndicator size="small" color="#6B7280" />
-              ) : (
-                <Text style={styles.withdrawProviderButtonText}>
-                  카카오 계정으로 탈퇴
-                </Text>
-              )}
-            </Pressable>
-
-            <Pressable
-              disabled={isWithdrawing}
-              style={[styles.withdrawCancelButton, isWithdrawing && styles.disabledButton]}
-              onPress={() => setIsWithdrawModalVisible(false)}
-            >
-              <Text style={styles.withdrawCancelButtonText}>취소</Text>
-            </Pressable>
           </View>
         </View>
       </Modal>
@@ -694,5 +600,35 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.65,
+  },
+  deletingOverlay: {
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    flex: 1,
+    justifyContent: "center",
+    padding: 24,
+  },
+  deletingCard: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    maxWidth: 420,
+    paddingHorizontal: 28,
+    paddingVertical: 32,
+    width: "100%",
+  },
+  deletingTitle: {
+    color: "#2B2B2B",
+    fontSize: 20,
+    fontWeight: "700",
+    marginTop: 18,
+    textAlign: "center",
+  },
+  deletingDescription: {
+    color: "#6B7280",
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 10,
+    textAlign: "center",
   },
 });

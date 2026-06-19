@@ -10,6 +10,7 @@ import "react-native-reanimated";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
   hasActiveSession,
+  isAccountDeletionAuthInProgress,
   isAppLogoutInProgress,
   subscribeAppLogoutChange,
   subscribeAppUserChange,
@@ -55,7 +56,11 @@ export default function RootLayout() {
 
       if ((isAppLogoutInProgress() || !isAuthenticated) && isInTabs) {
         nextRoute = LOGIN_ROUTE;
-      } else if (isAuthenticated && isLoginRoute) {
+      } else if (
+        isAuthenticated &&
+        isLoginRoute &&
+        !isAccountDeletionAuthInProgress()
+      ) {
         nextRoute = MAIN_ROUTE;
       }
 

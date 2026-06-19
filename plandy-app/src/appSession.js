@@ -6,6 +6,7 @@ export const APP_USER_CHANGED_EVENT = "plandy.appUserChanged";
 
 let memoryAppUser = null;
 let appLogoutInProgress = false;
+let accountDeletionAuthInProgress = false;
 const appUserListeners = new Set();
 const appLogoutListeners = new Set();
 
@@ -78,6 +79,17 @@ export const beginAppLogout = () => {
   clearAppUser();
   notifyAppLogoutChanged();
 };
+
+export const beginAccountDeletionAuth = () => {
+  accountDeletionAuthInProgress = true;
+};
+
+export const finishAccountDeletionAuth = () => {
+  accountDeletionAuthInProgress = false;
+};
+
+export const isAccountDeletionAuthInProgress = () =>
+  accountDeletionAuthInProgress;
 
 export const cancelAppLogout = () => {
   appLogoutInProgress = false;

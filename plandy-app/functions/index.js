@@ -4,6 +4,7 @@ const logger = require("firebase-functions/logger");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { FieldValue, getFirestore } = require("firebase-admin/firestore");
+const { randomUUID } = require("node:crypto");
 const {
   assertNoteContent,
   buildQuizPrompt,
@@ -45,6 +46,169 @@ const logQuizError = (stage, error) => {
   console.error(`${QUIZ_LOG_PREFIX}: failed`, details);
   logger.error(`${QUIZ_LOG_PREFIX}: failed`, details);
 };
+
+const deleteCollectionByQueries = async (collectionName, queries) => {
+  const db = getFirestore();
+  const documentRefs = new Map();
+
+  const queryResults = await Promise.all(
+    queries.map(async ({ fieldName, value }) => {
+      const snapshot = await db
+        .collection(collectionName)
+        .where(fieldName, "==", value)
+        .get();
+
+      logger.info("delete query result", {
+        collectionName,
+        fieldName,
+        value,
+        count: snapshot.size,
+      });
+
+      return snapshot.docs;
+    })
+  );
+
+  queryResults.flat().forEach((document) => {
+    documentRefs.set(document.ref.path, document.ref);
+  });
+
+  const refs = [...documentRefs.values()];
+  const batchCommits = [];
+
+  for (let index = 0; index < refs.length; index += 450) {
+    const batch = db.batch();
+    refs
+      .slice(index, index + 450)
+      .forEach((documentRef) => batch.delete(documentRef));
+    batchCommits.push(batch.commit());
+  }
+
+  await Promise.all(batchCommits);
+
+  logger.info("delete collection completed", {
+    collectionName,
+    deleted: refs.length,
+  });
+
+  return refs.length;
+};
+
+exports.deleteCurrentAccount = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 120,
+    memory: "512MiB",
+  },
+  async (request) => {
+    const uid = request.auth?.uid || "";
+    const email = request.auth?.token?.email || null;
+    const requestId = randomUUID();
+
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    try {
+      logger.info("deleteCurrentAccount: started", {
+        uid,
+        email,
+        requestId,
+      });
+
+      const db = getFirestore();
+      const deleted = {};
+      const uidValues = [
+        ...new Set([
+          uid,
+          ...(uid.startsWith("kakao:")
+            ? [uid.slice("kakao:".length)]
+            : []),
+        ]),
+      ];
+
+      const userDocumentRef = db.collection("users").doc(uid);
+      const userDocument = await userDocumentRef.get();
+      deleted.usersByDocId = userDocument.exists ? 1 : 0;
+
+      logger.info("delete query result", {
+        collectionName: "users",
+        fieldName: "__name__",
+        value: uid,
+        count: deleted.usersByDocId,
+      });
+
+      if (userDocument.exists) {
+        await userDocumentRef.delete();
+      }
+
+      const userQueries = ["uid", "loginId"].flatMap((fieldName) =>
+        uidValues.map((value) => ({ fieldName, value }))
+      );
+
+      if (email) {
+        userQueries.push({ fieldName: "email", value: email });
+      }
+
+      const userScopedCollections = [
+        "subjects",
+        "todos",
+        "notes",
+        "quizzes",
+        "quiz_results",
+        "schedules",
+        "recommendations",
+      ];
+
+      const collectionDeletionTasks = userScopedCollections.map(
+        async (collectionName) => {
+          const queries = ["user_id", "uid", "userId", "loginId"].flatMap(
+            (fieldName) =>
+              uidValues.map((value) => ({ fieldName, value }))
+          );
+
+          const count = await deleteCollectionByQueries(
+            collectionName,
+            queries
+          );
+
+          return [collectionName, count];
+        }
+      );
+
+      const [usersDeleted, collectionDeletionResults] = await Promise.all([
+        deleteCollectionByQueries("users", userQueries),
+        Promise.all(collectionDeletionTasks),
+      ]);
+
+      deleted.users = usersDeleted;
+      collectionDeletionResults.forEach(([collectionName, count]) => {
+        deleted[collectionName] = count;
+      });
+
+      await getAuth().deleteUser(uid);
+
+      logger.info("deleteCurrentAccount: completed", {
+        uid,
+        email,
+        requestId,
+        deleted,
+      });
+
+      return { ok: true, deleted };
+    } catch (error) {
+      logger.error("deleteCurrentAccount: failed", {
+        uid,
+        requestId,
+        code: error?.code || null,
+        message: getErrorMessage(error),
+        stack: error?.stack || null,
+      });
+
+      throw new HttpsError("internal", "계정 탈퇴에 실패했습니다.");
+    }
+  }
+);
 
 exports.authenticateWithKakao = onCall(async (request) => {
   const accessToken =
